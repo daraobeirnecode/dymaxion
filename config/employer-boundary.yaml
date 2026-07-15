@@ -1,0 +1,29 @@
+# Employer boundary — STRUCTURAL enforcement, not prompt-level.
+# Dymaxion never touches City of Sacramento data or systems.
+# Enforced at the skill-executor level by src/security/boundary.ts
+# (middleware step 1). Overriding either list requires editing this
+# file by hand — there is no runtime override.
+
+allowed_data_sources:
+  - type: arcgis_portal
+    url_pattern: 'https://*.maps.arcgis.com/*'
+  - type: arcgis_portal
+    url_pattern: 'https://*.arcgis.com/*'  # city domains excluded via denylist below
+  - type: postgis
+    connection: 'postgres://dymaxion:*@dymaxion-postgres:5432/dymaxion'
+  - type: filesystem
+    path_pattern: '/workspace/**'
+  - type: filesystem
+    path_pattern: '/Users/dara/Projects/**'
+
+denied_hostnames:
+  - '*.cityofsacramento.org'
+  - 'sacgov.*'
+  - 'city-of-sacramento*.arcgis.com'
+  # add known City vendor ArcGIS orgs here as they're identified
+
+denied_paths:
+  - '/City/**'
+  - '/CoS/**'
+
+audit_all_external_requests: true

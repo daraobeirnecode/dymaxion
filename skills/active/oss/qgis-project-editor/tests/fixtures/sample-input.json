@@ -1,0 +1,16 @@
+{
+  "project_path": "/workspace/projects/river-district.qgz",
+  "edits": [
+    {
+      "action": "add_layer",
+      "source": "/workspace/data/parcels.gpkg|layername=parcels",
+      "name": "Parcels"
+    },
+    {
+      "action": "set_symbology",
+      "layer": "Parcels",
+      "style": "/workspace/styles/parcels-zoning.qml"
+    }
+  ],
+  "backup": true
+}

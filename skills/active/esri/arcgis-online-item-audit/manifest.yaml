@@ -1,0 +1,37 @@
+slug: arcgis-online-item-audit
+name: ArcGIS Online Item Audit
+version: 0.1.0
+description: Inventory items in an ArcGIS Online org or folder, reporting ownership, sharing, last modified, and obvious duplicates.
+skill_class: workhorse
+tools: [esri-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.30
+  max_duration_seconds: 300
+inputs:
+  - name: org_url
+    type: string
+    required: true
+  - name: folder
+    type: string
+    required: false
+  - name: owner_filter
+    type: string
+    required: false
+  - name: max_items
+    type: number
+    required: false
+outputs:
+  - name: audit_report
+    type: object
+  - name: duplicates
+    type: array
+  - name: summary
+    type: string
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

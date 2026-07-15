@@ -1,0 +1,56 @@
+# Per-tier virtual budgets, USD-denominated, monthly reset.
+# Enforced PRE-CALL by src/llm/budget.ts (middleware step 2) — a runaway
+# skill blocks itself before it blocks anything else. Cap hits freeze the
+# tier, ping Telegram, and require a manual reset from the admin dashboard.
+
+budgets:
+  workhorse:
+    max_usd_per_month: 50
+    allowed_providers: [anthropic, openai, ollama]
+    allowed_models:
+      - claude-sonnet-5
+      - claude-haiku-4-5-20251001
+      - gpt-4o-mini
+      - "llama3.3:70b"
+
+  reasoning:
+    max_usd_per_month: 30
+    allowed_providers: [anthropic, openai]
+    allowed_models:
+      - claude-opus-4-8
+      - claude-sonnet-5
+      - gpt-4o
+
+  classification:
+    max_usd_per_month: 10
+    allowed_providers: [anthropic, openai, ollama]
+    allowed_models:
+      - claude-haiku-4-5-20251001
+      - gpt-4o-mini
+      - "qwen3:32b"
+
+  experimental:
+    max_usd_per_month: 5
+    allowed_providers: [anthropic, ollama]
+    allowed_models:
+      - claude-sonnet-5
+      - "llama3.3:70b"
+
+  local-only:
+    max_usd_per_month: 999            # local models are free; nominal cap
+    allowed_providers: [ollama]
+    allowed_models:
+      - "llama3.3:70b"
+      - "qwen3:32b"
+
+# skill_class → budget tier mapping (classes not listed use `default_tier`)
+default_tier: workhorse
+tier_by_skill_class:
+  classification: classification
+  narration: classification
+  reasoning: reasoning
+  skill_authoring: reasoning
+  planning: workhorse
+  drafting: workhorse
+  workhorse: workhorse
+  code_generation: workhorse

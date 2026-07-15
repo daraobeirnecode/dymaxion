@@ -1,0 +1,14 @@
+{
+  "project_name": "parcel-viewer",
+  "output_dir": "/workspace/projects",
+  "map_library": "maplibre",
+  "basemap_style": "https://demotiles.maplibre.org/style.json",
+  "layers": [
+    {
+      "url": "https://tiles.example.com/data/parcels_2026/{z}/{x}/{y}.pbf",
+      "type": "vector",
+      "title": "Parcels 2026"
+    }
+  ],
+  "typescript": true
+}

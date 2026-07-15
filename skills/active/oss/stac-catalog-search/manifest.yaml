@@ -1,0 +1,38 @@
+slug: stac-catalog-search
+name: STAC Catalog Search
+version: 0.1.0
+description: "Query a STAC catalog for imagery matching bbox, date range, and cloud cover, returning item URLs."
+skill_class: classification
+tools: [pystac-client]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.05
+  max_duration_seconds: 60
+inputs:
+  - name: catalog_url
+    type: string
+    required: true
+  - name: bbox
+    type: array
+    required: true
+  - name: datetime_range
+    type: string
+    required: false
+  - name: collections
+    type: array
+    required: false
+  - name: max_cloud_cover
+    type: number
+    required: false
+outputs:
+  - name: items
+    type: array
+  - name: search_summary
+    type: object
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

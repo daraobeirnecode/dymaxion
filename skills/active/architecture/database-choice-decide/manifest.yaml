@@ -1,0 +1,40 @@
+slug: database-choice-decide
+name: Database Choice Decide
+version: 0.1.0
+description: Recommend a spatial database (PostGIS, MSSQL Spatial, DuckDB Spatial, SpatiaLite) considering scale, budget, licensing, and team skills.
+skill_class: reasoning
+tools: []
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.60
+  max_duration_seconds: 180
+inputs:
+  - name: workload_description
+    type: string
+    required: true
+  - name: data_volume_gb
+    type: number
+    required: false
+  - name: team_skills
+    type: array
+    required: false
+  - name: licensing_constraints
+    type: string
+    required: false
+  - name: budget_constraint
+    type: string
+    required: false
+outputs:
+  - name: architecture_doc
+    type: string
+  - name: recommended_database
+    type: string
+  - name: tradeoffs
+    type: array
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

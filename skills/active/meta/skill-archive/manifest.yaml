@@ -1,0 +1,29 @@
+slug: skill-archive
+name: Skill Archive
+version: 0.1.0
+description: Archive a skill that hasn't been used in over 6 months and has a lower success rate than average; prompts for approval.
+skill_class: classification
+tools: [filesystem-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.05
+  max_duration_seconds: 60
+inputs:
+  - name: skill_slug
+    type: string
+    required: true
+  - name: dry_run
+    type: boolean
+    required: false
+outputs:
+  - name: archived_path
+    type: string
+  - name: archive_report
+    type: object
+destructive: true
+requires_approval: true
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

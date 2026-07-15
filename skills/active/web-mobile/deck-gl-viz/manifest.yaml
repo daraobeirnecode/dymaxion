@@ -1,0 +1,45 @@
+slug: deck-gl-viz
+name: Deck.gl Visualization Generator
+version: 0.1.0
+description: Generate a Deck.gl visualization (HexagonLayer, ArcLayer, TripsLayer, ScatterplotLayer, etc.) from a dataset plus a rendering intent.
+skill_class: workhorse
+tools: [filesystem-mcp, npm]
+executor:
+  type: node
+  entrypoint: executor.ts
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.30
+  max_duration_seconds: 600
+inputs:
+  - name: dataset_path
+    type: string
+    required: true
+  - name: rendering_intent
+    type: string
+    required: true
+  - name: output_dir
+    type: string
+    required: true
+  - name: layer_type
+    type: string
+    required: false
+  - name: color_field
+    type: string
+    required: false
+  - name: title
+    type: string
+    required: false
+outputs:
+  - name: project_path
+    type: string
+  - name: files_created
+    type: array
+  - name: layer_config
+    type: object
+  - name: next_steps
+    type: array
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

@@ -1,0 +1,5 @@
+{
+  "service_url": "https://services3.arcgis.com/EXAMPLE/arcgis/rest/services/Parcels/FeatureServer",
+  "layer_id": 0,
+  "include_domains": true
+}

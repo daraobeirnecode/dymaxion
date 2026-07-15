@@ -1,0 +1,58 @@
+# Gateway configuration. Sprint 1 ships telegram + cli + web enabled.
+# Every other gateway exists as a stub folder and is wired but disabled.
+# Enabling one later: set env vars in .env, flip enabled: true, then
+# `docker compose restart dymaxion-runtime`. No code changes.
+
+gateways:
+  telegram:
+    enabled: true
+    bot_token: os.environ/TELEGRAM_BOT_TOKEN
+    allowed_chat_ids:
+      - os.environ/TELEGRAM_ADMIN_CHAT_ID
+    poll_interval_ms: 1000
+    voice_transcription: true
+    progress_update_interval_seconds: 20
+
+  cli:
+    enabled: true
+
+  web:
+    enabled: true
+    bind: 100.117.65.43:3001
+    tailscale_only: true
+
+  teams:
+    enabled: false                   # Sprint 2
+    app_id: os.environ/TEAMS_APP_ID
+    app_password: os.environ/TEAMS_APP_PASSWORD
+    tenant_id: os.environ/TEAMS_TENANT_ID
+    mode: directline                 # avoid public webhook
+
+  slack:
+    enabled: false                   # Sprint 2
+    bot_token: os.environ/SLACK_BOT_TOKEN
+    app_token: os.environ/SLACK_APP_TOKEN
+    mode: socket                     # avoid public webhook
+
+  email:
+    enabled: false                   # Sprint 3
+    address: os.environ/DYMAXION_EMAIL_ADDRESS
+    imap:
+      host: os.environ/DYMAXION_EMAIL_IMAP_HOST
+      port: 993
+      poll_interval_seconds: 60
+    smtp:
+      host: os.environ/DYMAXION_EMAIL_SMTP_HOST
+      port: 587
+    allowlist_from:
+      - daraobeirne@gmail.com
+
+  arcgis-portal:
+    enabled: false                   # Sprint 4
+    portal_url: os.environ/DYMAXION_ARCGIS_PORTAL_URL
+    username: os.environ/DYMAXION_ARCGIS_USERNAME
+    password: os.environ/DYMAXION_ARCGIS_PASSWORD
+    notification_group_id: os.environ/DYMAXION_ARCGIS_NOTIFICATION_GROUP_ID
+
+  sms:
+    enabled: false                   # Sprint 4+

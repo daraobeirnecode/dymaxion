@@ -1,0 +1,53 @@
+slug: field-mapping-app
+name: Field Mapping App Scaffold
+version: 0.1.0
+description: Scaffold an Expo offline-first field-mapping app with local SQLite spatial storage, sync to PostGIS on reconnect, camera integration, and GPS points.
+skill_class: reasoning
+tools: [filesystem-mcp, npm]
+executor:
+  type: node
+  entrypoint: executor.ts
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 1.00
+  max_duration_seconds: 600
+inputs:
+  - name: project_name
+    type: string
+    required: true
+  - name: output_dir
+    type: string
+    required: true
+  - name: feature_schema
+    type: object
+    required: true
+  - name: sync_target
+    type: object
+    required: true
+  - name: conflict_policy
+    type: string
+    required: false
+  - name: enable_camera
+    type: boolean
+    required: false
+  - name: enable_gps_tracks
+    type: boolean
+    required: false
+  - name: style_url
+    type: string
+    required: false
+outputs:
+  - name: project_path
+    type: string
+  - name: files_created
+    type: array
+  - name: architecture_notes
+    type: string
+  - name: sync_endpoint_spec
+    type: object
+  - name: next_steps
+    type: array
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

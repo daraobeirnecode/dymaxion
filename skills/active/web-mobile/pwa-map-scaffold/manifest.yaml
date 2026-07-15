@@ -1,0 +1,50 @@
+slug: pwa-map-scaffold
+name: PWA Map Scaffold
+version: 0.1.0
+description: Progressive Web App with MapLibre plus a Service Worker for offline caching, as an alternative to native mobile.
+skill_class: workhorse
+tools: [filesystem-mcp, npm]
+executor:
+  type: node
+  entrypoint: executor.ts
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.50
+  max_duration_seconds: 600
+inputs:
+  - name: project_name
+    type: string
+    required: true
+  - name: output_dir
+    type: string
+    required: true
+  - name: basemap_style
+    type: string
+    required: false
+  - name: layers
+    type: array
+    required: false
+  - name: cache_regions
+    type: array
+    required: false
+  - name: app_title
+    type: string
+    required: false
+  - name: theme_color
+    type: string
+    required: false
+outputs:
+  - name: project_path
+    type: string
+  - name: files_created
+    type: array
+  - name: dev_command
+    type: string
+  - name: cache_estimate
+    type: object
+  - name: next_steps
+    type: array
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

@@ -1,0 +1,32 @@
+slug: parcel-brief
+name: Parcel Brief
+version: 0.1.0
+description: Given a parcel APN and portal URL, produce a one-page brief PDF with attributes, adjacent parcels, zoning, and permit history.
+skill_class: workhorse
+tools: [esri-mcp, filesystem-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.40
+  max_duration_seconds: 120
+inputs:
+  - name: apn
+    type: string
+    required: true
+  - name: portal_url
+    type: string
+    required: true
+  - name: output_path
+    type: string
+    required: false
+outputs:
+  - name: brief_pdf_path
+    type: string
+  - name: parcel_summary_json
+    type: object
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

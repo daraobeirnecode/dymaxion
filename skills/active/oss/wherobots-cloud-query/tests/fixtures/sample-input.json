@@ -1,0 +1,6 @@
+{
+  "sql": "SELECT class, count(*) AS n FROM wherobots_open_data.overture.buildings_building WHERE ST_Intersects(geometry, ST_GeomFromText('POLYGON((-6.4 53.3, -6.1 53.3, -6.1 53.45, -6.4 53.45, -6.4 53.3))')) GROUP BY class ORDER BY n DESC",
+  "workspace": "dymaxion",
+  "runtime_size": "small",
+  "output_format": "geojson"
+}

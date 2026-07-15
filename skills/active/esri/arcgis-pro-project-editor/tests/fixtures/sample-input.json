@@ -1,0 +1,21 @@
+{
+  "project_path": "C:/Projects/CountyBasemap/CountyBasemap.aprx",
+  "operations": [
+    {
+      "op": "add_layer",
+      "params": {
+        "source": "C:/data/hydrants.shp",
+        "map": "Main Map"
+      }
+    },
+    {
+      "op": "set_symbology",
+      "params": {
+        "layer": "hydrants",
+        "renderer": "simple",
+        "color": "#d7301f"
+      }
+    }
+  ],
+  "backup": true
+}

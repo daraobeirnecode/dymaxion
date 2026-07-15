@@ -1,0 +1,38 @@
+slug: gdal-raster-warp
+name: GDAL Raster Warp
+version: 0.1.0
+description: "Reproject or resample a raster with gdalwarp given target SRS, resolution, and resampling method."
+skill_class: classification
+tools: [gdal-bin]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.05
+  max_duration_seconds: 60
+inputs:
+  - name: input_path
+    type: string
+    required: true
+  - name: output_path
+    type: string
+    required: true
+  - name: target_srs
+    type: string
+    required: true
+  - name: resolution
+    type: number
+    required: false
+  - name: resampling
+    type: string
+    required: false
+outputs:
+  - name: output_path
+    type: string
+  - name: warp_summary
+    type: object
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

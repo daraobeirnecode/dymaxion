@@ -1,0 +1,12 @@
+---
+title: "Geodatabase Types: File vs Enterprise vs Mobile"
+category: architecture
+topic_tags: [file-geodatabase, enterprise-geodatabase, mobile-geodatabase, geopackage, sde, formats]
+status: stub
+---
+
+# Geodatabase Types: File vs Enterprise vs Mobile
+
+Esri's three geodatabase containers serve different tiers. File geodatabase (`.gdb` folder): single-user editing (multi-reader), ~1 TB-per-dataset practical scale, fast local I/O, compression, domains/subtypes/relationship classes — the standard for deliverables, archives, and desktop analysis; open-source access exists via GDAL's OpenFileGDB driver (read and, since GDAL 3.6, write), so FGDB is no longer an interchange dead end. Enterprise geodatabase (SDE schema in PostgreSQL/SQL Server/Oracle/SAP HANA): true multi-user editing, traditional and branch versioning, archiving, replicas, editor tracking, and services-based access — required for concurrent editing shops, Utility Network, and Parcel Fabric; it is a schema and behavior layer on a DBMS, not a separate engine. Mobile geodatabase (`.geodatabase`, SQLite-based): the take-offline format created by `arcpy.management.CreateMobileGDB` or replica downloads, readable by Pro and the Maps SDKs, increasingly positioned as the lightweight successor to FGDB for single-user work since it is a real SQL database you can query with any SQLite client. The open equivalent is GeoPackage (OGC standard, also SQLite): near-universal tool support (QGIS default, GDAL, Field Maps can read), one file, R-tree spatial index — prefer it for cross-platform exchange, but note it lacks Esri behaviors (domains survive only partially, no relationship classes, no versioning). Personal geodatabase (`.mdb`, Access-based) is deprecated and 32-bit-bound; migrate on sight. Behavior is the real differentiator, not storage: attribute rules, topologies, networks, and versioning only fully live in enterprise geodatabases, so "which gdb" is really "which behaviors does this workflow need." Round-trip caution: FGDB→GeoPackage→FGDB drops domains-as-behavior, converts subtypes to plain integers, and renames fields that collide with SQL reserved words — always diff schema after conversion. Rule of thumb: exchange → GeoPackage, Esri-internal single-user → FGDB or mobile gdb, multi-editor system of record → enterprise gdb on PostgreSQL.
+
+TODO: expand from authoritative source (Esri geodatabase types documentation on pro.arcgis.com; OGC GeoPackage spec; GDAL OpenFileGDB driver docs).

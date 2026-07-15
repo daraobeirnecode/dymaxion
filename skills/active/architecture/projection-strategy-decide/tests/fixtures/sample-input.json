@@ -1,0 +1,10 @@
+{
+  "project_description": "Regional habitat connectivity analysis with area calculations and a public web map",
+  "area_of_interest": "Sacramento Valley, California",
+  "analysis_types": [
+    "area",
+    "distance",
+    "overlay"
+  ],
+  "web_display_required": true
+}

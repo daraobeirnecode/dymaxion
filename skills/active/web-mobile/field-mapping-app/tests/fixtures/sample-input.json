@@ -1,0 +1,24 @@
+{
+  "project_name": "culvert-inspect",
+  "output_dir": "/workspace/projects",
+  "feature_schema": {
+    "layer_name": "culvert_inspections",
+    "geometry_type": "point",
+    "fields": [
+      { "name": "asset_id", "type": "text", "required": true },
+      { "name": "condition", "type": "text", "required": true, "domain": ["good", "fair", "poor", "failed"] },
+      { "name": "blockage_pct", "type": "integer", "required": false },
+      { "name": "inspected_at", "type": "date", "required": true },
+      { "name": "photo", "type": "photo", "required": false }
+    ]
+  },
+  "sync_target": {
+    "api_base_url": "https://gis-api.example.com/sync",
+    "table": "assets.culvert_inspections",
+    "id_field": "inspection_id"
+  },
+  "conflict_policy": "last-write-wins",
+  "enable_camera": true,
+  "enable_gps_tracks": false,
+  "style_url": "https://tiles.example.com/styles/topo/style.json"
+}

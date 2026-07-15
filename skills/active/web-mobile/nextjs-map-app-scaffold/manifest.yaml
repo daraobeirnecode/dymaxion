@@ -1,0 +1,45 @@
+slug: nextjs-map-app-scaffold
+name: Next.js Map App Scaffold
+version: 0.1.0
+description: Scaffold a Next.js 15 App Router project with ArcGIS Maps SDK for JavaScript, MapLibre, or Deck.gl (per param), including a basic map, layer, and popup.
+skill_class: workhorse
+tools: [filesystem-mcp, npm]
+executor:
+  type: node
+  entrypoint: executor.ts
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.60
+  max_duration_seconds: 600
+inputs:
+  - name: project_name
+    type: string
+    required: true
+  - name: output_dir
+    type: string
+    required: true
+  - name: map_library
+    type: string
+    required: true
+  - name: basemap_style
+    type: string
+    required: false
+  - name: layers
+    type: array
+    required: false
+  - name: typescript
+    type: boolean
+    required: false
+outputs:
+  - name: project_path
+    type: string
+  - name: files_created
+    type: array
+  - name: dev_command
+    type: string
+  - name: next_steps
+    type: array
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

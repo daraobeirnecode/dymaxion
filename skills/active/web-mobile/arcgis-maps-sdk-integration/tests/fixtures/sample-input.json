@@ -1,0 +1,19 @@
+{
+  "project_dir": "/workspace/projects/parcel-viewer",
+  "layers": [
+    {
+      "url": "https://services.arcgis.com/abc123/arcgis/rest/services/parcels_2026/FeatureServer/0",
+      "type": "feature",
+      "title": "Parcels 2026",
+      "popup_fields": ["APN", "ZONING", "ACRES"]
+    },
+    {
+      "url": "https://services.arcgis.com/abc123/arcgis/rest/services/zoning/FeatureServer/0",
+      "type": "feature",
+      "title": "Zoning"
+    }
+  ],
+  "widgets": ["Legend", "LayerList", "Search"],
+  "interactions": ["popup", "highlight"],
+  "api_key_env": "NEXT_PUBLIC_ARCGIS_API_KEY"
+}

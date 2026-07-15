@@ -1,0 +1,35 @@
+slug: arcpy-script-runner
+name: ArcPy Script Runner
+version: 0.1.0
+description: Execute an arcpy Python script on the Windows Worker with specified inputs shuttled over Tailscale.
+skill_class: workhorse
+tools: [windows-worker]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: windows-worker
+budget:
+  max_cost_usd: 0.30
+  max_duration_seconds: 600
+inputs:
+  - name: script_slug
+    type: string
+    required: true
+  - name: parameters
+    type: object
+    required: true
+  - name: input_paths
+    type: array
+    required: false
+  - name: output_dir
+    type: string
+    required: false
+outputs:
+  - name: output_paths
+    type: array
+  - name: execution_log
+    type: string
+destructive: true
+requires_approval: true
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

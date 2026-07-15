@@ -1,0 +1,6 @@
+{
+  "migration_sql": "CREATE TABLE landuse_2026 (id serial PRIMARY KEY, lpid text, class text, geom geometry(MultiPolygon, 2157)); CREATE INDEX landuse_2026_geom_idx ON landuse_2026 USING GIST (geom);",
+  "database": "gisdb",
+  "dry_run": true,
+  "description": "Add 2026 landuse table with spatial index (ITM, EPSG:2157)"
+}

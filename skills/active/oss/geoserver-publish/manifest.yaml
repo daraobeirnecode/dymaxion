@@ -1,0 +1,38 @@
+slug: geoserver-publish
+name: GeoServer Publish
+version: 0.1.0
+description: "Publish a PostGIS table or GeoPackage as a WMS/WFS layer via the GeoServer REST API."
+skill_class: workhorse
+tools: [http]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.1
+  max_duration_seconds: 300
+inputs:
+  - name: geoserver_url
+    type: string
+    required: true
+  - name: workspace
+    type: string
+    required: true
+  - name: source
+    type: object
+    required: true
+  - name: layer_name
+    type: string
+    required: false
+  - name: style
+    type: string
+    required: false
+outputs:
+  - name: layer_urls
+    type: object
+  - name: publish_log
+    type: string
+destructive: true
+requires_approval: true
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

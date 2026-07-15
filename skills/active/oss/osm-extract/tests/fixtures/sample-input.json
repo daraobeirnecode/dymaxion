@@ -1,0 +1,13 @@
+{
+  "bbox": [
+    -6.4,
+    53.3,
+    -6.1,
+    53.45
+  ],
+  "tags": {
+    "highway": "*"
+  },
+  "source": "overpass",
+  "output_format": "geojson"
+}

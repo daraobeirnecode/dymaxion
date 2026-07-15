@@ -1,0 +1,10 @@
+{
+  "service_url": "https://services3.arcgis.com/EXAMPLE/arcgis/rest/services/Parcels/FeatureServer",
+  "layer_id": 0,
+  "where": "ZONING = 'R-1' AND ACREAGE > 0.5",
+  "out_fields": [
+    "APN",
+    "ZONING",
+    "ACREAGE"
+  ]
+}

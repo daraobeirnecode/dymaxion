@@ -1,0 +1,38 @@
+slug: arcgis-online-webmap-clone
+name: ArcGIS Online Web Map Clone
+version: 0.1.0
+description: Clone a Web Map from one org to another, remapping data source URLs, with approval per source.
+skill_class: workhorse
+tools: [esri-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.20
+  max_duration_seconds: 300
+inputs:
+  - name: webmap_item_id
+    type: string
+    required: true
+  - name: source_org_url
+    type: string
+    required: true
+  - name: target_org_url
+    type: string
+    required: true
+  - name: url_remap
+    type: object
+    required: false
+  - name: target_folder
+    type: string
+    required: false
+outputs:
+  - name: cloned_item_id
+    type: string
+  - name: remap_report
+    type: object
+destructive: true
+requires_approval: true
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

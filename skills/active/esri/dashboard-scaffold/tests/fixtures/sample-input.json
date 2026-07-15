@@ -1,0 +1,24 @@
+{
+  "service_url": "https://services3.arcgis.com/EXAMPLE/arcgis/rest/services/Permits/FeatureServer",
+  "title": "Permit Activity Dashboard",
+  "widgets": [
+    {
+      "type": "indicator",
+      "field": "OBJECTID",
+      "statistic": "count",
+      "title": "Total Permits"
+    },
+    {
+      "type": "serial-chart",
+      "field": "ISSUE_DATE",
+      "statistic": "count",
+      "title": "Permits by Month"
+    },
+    {
+      "type": "pie-chart",
+      "field": "PERMIT_TYPE",
+      "statistic": "count",
+      "title": "By Type"
+    }
+  ]
+}

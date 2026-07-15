@@ -1,0 +1,11 @@
+{
+  "geoserver_url": "http://geoserver:8080/geoserver",
+  "workspace": "dymaxion",
+  "source": {
+    "type": "postgis",
+    "connection": "gisdb",
+    "table": "public.parcels"
+  },
+  "layer_name": "parcels",
+  "style": "parcels-zoning"
+}

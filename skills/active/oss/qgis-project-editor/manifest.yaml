@@ -1,0 +1,34 @@
+slug: qgis-project-editor
+name: QGIS Project Editor
+version: 0.1.0
+description: "Open a QGIS project (.qgz), apply layer/symbology/layout edits, save."
+skill_class: workhorse
+tools: [cli-anything-qgis]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.3
+  max_duration_seconds: 300
+inputs:
+  - name: project_path
+    type: string
+    required: true
+  - name: edits
+    type: array
+    required: true
+  - name: backup
+    type: boolean
+    required: false
+outputs:
+  - name: project_path
+    type: string
+  - name: applied_edits
+    type: array
+  - name: backup_path
+    type: string
+destructive: true
+requires_approval: true
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

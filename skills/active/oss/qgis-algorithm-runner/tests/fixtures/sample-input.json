@@ -1,0 +1,9 @@
+{
+  "algorithm": "native:buffer",
+  "parameters": {
+    "INPUT": "/workspace/data/parcels.gpkg|layername=parcels",
+    "DISTANCE": 50,
+    "OUTPUT": "/workspace/data/parcels_buffer_50m.gpkg"
+  },
+  "output_path": "/workspace/data/parcels_buffer_50m.gpkg"
+}

@@ -1,0 +1,10 @@
+{
+  "layer_types": [
+    "vector-parcels",
+    "vector-roads",
+    "raster-hillshade"
+  ],
+  "expected_qps": 40,
+  "hosting_environment": "docker-compose on a single VM alongside PostGIS",
+  "budget_constraint": "self-hosted, no per-request fees"
+}

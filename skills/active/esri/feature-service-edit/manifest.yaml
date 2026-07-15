@@ -1,0 +1,35 @@
+slug: feature-service-edit
+name: Feature Service Edit
+version: 0.1.0
+description: Apply feature edits (add/update/delete) to a Feature Service with reviewer approval.
+skill_class: workhorse
+tools: [esri-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.10
+  max_duration_seconds: 120
+inputs:
+  - name: service_url
+    type: string
+    required: true
+  - name: layer_id
+    type: number
+    required: true
+  - name: edits
+    type: object
+    required: true
+  - name: rollback_on_failure
+    type: boolean
+    required: false
+outputs:
+  - name: edit_results
+    type: object
+  - name: summary
+    type: string
+destructive: true
+requires_approval: true
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

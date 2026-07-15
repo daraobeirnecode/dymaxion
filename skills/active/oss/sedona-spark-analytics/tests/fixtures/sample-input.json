@@ -1,0 +1,17 @@
+{
+  "sql": "SELECT a.name, count(*) AS building_count FROM buildings b JOIN admin a ON ST_Contains(a.geom, b.geom) GROUP BY a.name",
+  "datasets": [
+    {
+      "name": "buildings",
+      "path": "s3://dymaxion-scratch/overture/buildings/",
+      "format": "geoparquet"
+    },
+    {
+      "name": "admin",
+      "path": "/workspace/data/admin.geoparquet",
+      "format": "geoparquet"
+    }
+  ],
+  "spark_master": "local[8]",
+  "output_path": "/workspace/data/building_counts.parquet"
+}

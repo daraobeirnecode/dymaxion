@@ -1,0 +1,10 @@
+{
+  "connection": {
+    "host": "sde-prod.example-county.gov",
+    "database": "gisprod",
+    "auth_ref": "SDE_GISPROD_RO",
+    "version": "SDE.DEFAULT"
+  },
+  "dataset": "gisprod.parcels.tax_parcels",
+  "register_as": "county-sde-prod"
+}

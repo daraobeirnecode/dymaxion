@@ -1,0 +1,34 @@
+slug: feature-service-schema-inspect
+name: Feature Service Schema Inspect
+version: 0.1.0
+description: Return field list, types, and domains for a Feature Service layer.
+skill_class: classification
+tools: [esri-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.05
+  max_duration_seconds: 60
+inputs:
+  - name: service_url
+    type: string
+    required: true
+  - name: layer_id
+    type: number
+    required: true
+  - name: include_domains
+    type: boolean
+    required: false
+outputs:
+  - name: fields
+    type: array
+  - name: domains
+    type: object
+  - name: layer_info
+    type: object
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

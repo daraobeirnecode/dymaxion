@@ -1,0 +1,75 @@
+# Provider registry — which LLM providers exist and how each authenticates.
+# Anthropic is API-key by design (no OAuth offered for API access).
+# All OAuth providers connect via the admin dashboard → Providers → Connect.
+# Tokens are stored encrypted in dymaxion.oauth_tokens and auto-refreshed.
+
+providers:
+  anthropic:
+    enabled: true
+    auth_mode: api_key
+    api_key_env: ANTHROPIC_API_KEY
+    models:
+      - claude-opus-4-8
+      - claude-sonnet-5
+      - claude-haiku-4-5-20251001
+
+  openai:
+    enabled: false                    # enable via admin dashboard OAuth flow
+    auth_mode: oauth
+    oauth:
+      discovery_url: https://auth.openai.com/.well-known/openid-configuration
+      client_id_env: OPENAI_OAUTH_CLIENT_ID
+      client_secret_env: OPENAI_OAUTH_CLIENT_SECRET
+      scopes: [model:read, model:write, usage:read]
+      redirect_uri: http://100.117.65.43:3001/api/oauth/openai/callback
+    models: [gpt-4o, gpt-4o-mini, gpt-4-turbo]
+
+  google:
+    enabled: false
+    auth_mode: oauth
+    oauth:
+      discovery_url: https://accounts.google.com/.well-known/openid-configuration
+      client_id_env: GOOGLE_OAUTH_CLIENT_ID
+      client_secret_env: GOOGLE_OAUTH_CLIENT_SECRET
+      scopes: [https://www.googleapis.com/auth/generative-language]
+      redirect_uri: http://100.117.65.43:3001/api/oauth/google/callback
+    models: [gemini-2.5-pro, gemini-2.5-flash]
+
+  azure:
+    enabled: false
+    auth_mode: oauth
+    oauth:
+      discovery_url_template: https://login.microsoftonline.com/{tenant}/v2.0/.well-known/openid-configuration
+      tenant_env: AZURE_TENANT_ID
+      client_id_env: AZURE_CLIENT_ID
+      client_secret_env: AZURE_CLIENT_SECRET
+      scopes: [https://cognitiveservices.azure.com/.default]
+      redirect_uri: http://100.117.65.43:3001/api/oauth/azure/callback
+    endpoint_env: AZURE_OPENAI_ENDPOINT
+    deployment_env: AZURE_OPENAI_DEPLOYMENT
+    models: [gpt-4o-azure]
+
+  cohere:
+    enabled: false
+    auth_mode: oauth
+    oauth:
+      authorization_endpoint: https://dashboard.cohere.com/oauth/authorize
+      token_endpoint: https://dashboard.cohere.com/oauth/token
+      client_id_env: COHERE_OAUTH_CLIENT_ID
+      client_secret_env: COHERE_OAUTH_CLIENT_SECRET
+      scopes: [chat, embed, classify]
+      redirect_uri: http://100.117.65.43:3001/api/oauth/cohere/callback
+    models: [command-r-plus, command-r]
+
+  ollama:
+    enabled: true                     # local by default
+    auth_mode: none
+    base_url_env: OLLAMA_BASE_URL
+    base_url: http://host.docker.internal:11434
+    models: ["llama3.3:70b", "qwen3:32b"]
+
+  voyage:
+    enabled: true
+    auth_mode: api_key
+    api_key_env: VOYAGE_API_KEY
+    embedding_models: [voyage-3-large]

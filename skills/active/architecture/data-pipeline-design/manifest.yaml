@@ -1,0 +1,37 @@
+slug: data-pipeline-design
+name: Data Pipeline Design
+version: 0.1.0
+description: Design an ETL pipeline for spatial data (source assessment, staging, transformation, quality checks, publication) returning an architecture doc plus an n8n workflow scaffold.
+skill_class: reasoning
+tools: [filesystem-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 1.00
+  max_duration_seconds: 180
+inputs:
+  - name: source_descriptions
+    type: array
+    required: true
+  - name: target_description
+    type: string
+    required: true
+  - name: update_frequency
+    type: string
+    required: false
+  - name: quality_requirements
+    type: string
+    required: false
+outputs:
+  - name: architecture_doc
+    type: string
+  - name: n8n_workflow_path
+    type: string
+  - name: pipeline_stages
+    type: array
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

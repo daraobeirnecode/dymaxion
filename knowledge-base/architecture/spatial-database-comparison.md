@@ -1,0 +1,12 @@
+---
+title: "Database Choice: PostGIS vs SQL Server vs Oracle vs Cloud-Native Geospatial"
+category: architecture
+topic_tags: [postgis, sql-server-spatial, oracle-spatial, bigquery, snowflake, database-selection]
+status: stub
+---
+
+# Database Choice: PostGIS vs SQL Server vs Oracle vs Cloud-Native Geospatial
+
+PostGIS is the reference implementation for open spatial SQL: 600+ functions, geometry and geography types, GiST/SP-GiST/BRIN indexing, raster support, topology, `ST_AsMVT` for direct tile generation, and first-class GDAL/QGIS/GeoServer integration — it is the default choice unless a constraint rules it out. SQL Server Spatial offers `geometry`/`geography` types with a smaller function set (no equivalent breadth of `ST_*` analytics, no MVT generation) but wins where an organization is already a SQL Server shop or the enterprise geodatabase standard is Microsoft; Esri fully supports SDE on it. Oracle Spatial (now included with Oracle DB licenses) is deep — SDO_GEOMETRY, network and raster data models, GeoRaster — but appears mostly in legacy enterprise estates; new builds rarely justify its operational weight. Cloud-native warehouses do analytics, not serving: BigQuery `GEOGRAPHY` (spherical, S2-indexed, `ST_*` functions over petabytes, pay-per-scan), Snowflake `GEOGRAPHY`/`GEOMETRY` (similar model, per-second warehouse billing), and Athena/Trino spatial over GeoParquet in object storage — all excel at massive joins and aggregations, none at low-latency per-feature CRUD, editing, or tile serving. DuckDB with the `spatial` extension has emerged as the local/embedded analytics complement — GeoParquet-native, GDAL built in — for pipeline work that doesn't need a server. Esri constraint: hosted/branch-versioned workflows require an Esri-supported enterprise geodatabase DBMS (PostgreSQL, SQL Server, Oracle, SAP HANA), so an all-warehouse architecture cannot host SDE. Typical modern split: PostGIS as the operational store and publication source, GeoParquet in object storage for the analytical/archive tier, warehouse engines when data volume or an existing platform demands it. Choose by workload: transactional editing + serving → PostGIS (or SQL Server in MS shops); billion-row batch analytics → BigQuery/Snowflake/DuckDB over GeoParquet; never pick by feature-list length alone.
+
+TODO: expand from authoritative source (PostGIS manual; Esri supported-database matrices; BigQuery and Snowflake geospatial documentation).

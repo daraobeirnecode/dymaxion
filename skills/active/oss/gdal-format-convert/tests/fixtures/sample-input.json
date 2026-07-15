@@ -1,0 +1,9 @@
+{
+  "input_path": "/workspace/data/parcels.shp",
+  "output_path": "/workspace/data/parcels.gpkg",
+  "output_format": "GPKG",
+  "options": [
+    "-nlt",
+    "MULTIPOLYGON"
+  ]
+}

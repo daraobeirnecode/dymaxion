@@ -1,0 +1,32 @@
+slug: skill-improve
+name: Skill Improve
+version: 0.1.0
+description: Given an existing skill and a failure log, propose an updated version in diff mode, showing changes for approval.
+skill_class: workhorse
+tools: [filesystem-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.50
+  max_duration_seconds: 180
+inputs:
+  - name: skill_slug
+    type: string
+    required: true
+  - name: failure_log
+    type: string
+    required: true
+  - name: improvement_hint
+    type: string
+    required: false
+outputs:
+  - name: proposed_diff
+    type: string
+  - name: change_summary
+    type: string
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

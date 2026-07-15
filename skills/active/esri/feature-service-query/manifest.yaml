@@ -1,0 +1,38 @@
+slug: feature-service-query
+name: Feature Service Query
+version: 0.1.0
+description: Query an ArcGIS Feature Service with a where clause and geometry filter, returning features as GeoJSON.
+skill_class: classification
+tools: [esri-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.05
+  max_duration_seconds: 60
+inputs:
+  - name: service_url
+    type: string
+    required: true
+  - name: layer_id
+    type: number
+    required: true
+  - name: where
+    type: string
+    required: false
+  - name: geometry
+    type: object
+    required: false
+  - name: out_fields
+    type: array
+    required: false
+outputs:
+  - name: features
+    type: object
+  - name: query_summary
+    type: string
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

@@ -1,0 +1,7 @@
+{
+  "input_path": "/workspace/data/dem_wgs84.tif",
+  "output_path": "/workspace/data/dem_itm_10m.tif",
+  "target_srs": "EPSG:2157",
+  "resolution": 10,
+  "resampling": "bilinear"
+}

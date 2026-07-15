@@ -1,0 +1,7 @@
+{
+  "workload_description": "Municipal parcel viewer for 12 departments with nightly ETL from an enterprise geodatabase",
+  "client_count": 250,
+  "data_volume_gb": 40,
+  "realtime_required": false,
+  "budget_constraint": "under $200/month hosting"
+}

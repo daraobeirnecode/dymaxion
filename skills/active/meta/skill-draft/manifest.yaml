@@ -1,0 +1,32 @@
+slug: skill-draft
+name: Skill Draft
+version: 0.1.0
+description: 'Given a failed attempt, draft a new skill: research the domain, write SKILL.md + manifest + executor stub, and save to skills/proposed/.'
+skill_class: reasoning
+tools: [filesystem-mcp, github-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 5.00
+  max_duration_seconds: 300
+inputs:
+  - name: failed_run_id
+    type: string
+    required: true
+  - name: problem_description
+    type: string
+    required: true
+  - name: similar_skill_hints
+    type: array
+    required: false
+outputs:
+  - name: proposed_skill_id
+    type: string
+  - name: skill_folder_path
+    type: string
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

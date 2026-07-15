@@ -1,0 +1,6 @@
+{
+  "sql": "SELECT p.apn, ST_Area(p.geom) AS area_sqm FROM parcels p JOIN flood_zones f ON ST_Intersects(p.geom, f.geom) WHERE f.zone = 'AE' LIMIT 100",
+  "connection": "gisdb",
+  "max_rows": 100,
+  "explain": false
+}

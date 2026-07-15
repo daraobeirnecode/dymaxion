@@ -1,0 +1,5 @@
+{
+  "skill_slug": "osm-extract",
+  "failure_log": "Overpass API returned 429 Too Many Requests on 3 consecutive runs; executor has no backoff or mirror fallback",
+  "improvement_hint": "add exponential backoff and fall back to a secondary Overpass mirror"
+}

@@ -1,0 +1,35 @@
+slug: sedona-spark-analytics
+name: Sedona Spark Analytics
+version: 0.1.0
+description: "Run distributed spatial analytics with Apache Sedona on a Spark cluster for 100M+ feature workloads."
+skill_class: reasoning
+tools: [pyspark, sedona]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.6
+  max_duration_seconds: 900
+inputs:
+  - name: sql
+    type: string
+    required: true
+  - name: datasets
+    type: array
+    required: true
+  - name: spark_master
+    type: string
+    required: false
+  - name: output_path
+    type: string
+    required: false
+outputs:
+  - name: output_path
+    type: string
+  - name: job_metrics
+    type: object
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

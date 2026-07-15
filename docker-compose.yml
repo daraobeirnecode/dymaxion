@@ -1,0 +1,165 @@
+# Dymaxion — full stack.
+# Standalone compose file: runs alongside existing n8n / Echo / Hermes stacks,
+# never merged into them. Network: dymaxion-net.
+#
+# MCP servers (esri, postgres, filesystem, github) are NOT compose services —
+# the runtime spawns them as subprocesses per config/mcp-servers.yaml.
+# The Windows Worker is a native Windows service (see windows-worker/).
+
+services:
+  dymaxion-postgres:
+    image: pgvector/pgvector:pg18
+    container_name: dymaxion-postgres
+    environment:
+      POSTGRES_USER: dymaxion
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: dymaxion
+    volumes:
+      - dymaxion_pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5434:5432"
+    networks:
+      - dymaxion-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dymaxion"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  dymaxion-langfuse:
+    image: langfuse/langfuse:2
+    container_name: dymaxion-langfuse
+    environment:
+      DATABASE_URL: postgres://dymaxion:${POSTGRES_PASSWORD}@dymaxion-postgres:5432/dymaxion?schema=langfuse
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
+      SALT: ${LANGFUSE_SALT}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY}
+      TELEMETRY_ENABLED: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      dymaxion-postgres:
+        condition: service_healthy
+    networks:
+      - dymaxion-net
+    restart: unless-stopped
+
+  dymaxion-whisper:
+    build: ./docker/whisper
+    container_name: dymaxion-whisper
+    volumes:
+      - dymaxion_audio:/audio
+    networks:
+      - dymaxion-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+
+  dymaxion-runtime:
+    build: ./dymaxion-runtime
+    container_name: dymaxion-runtime
+    environment:
+      DATABASE_URL: postgres://dymaxion:${POSTGRES_PASSWORD}@dymaxion-postgres:5432/dymaxion
+      LANGFUSE_URL: http://dymaxion-langfuse:3000
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      WHISPER_URL: http://dymaxion-whisper:8000
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY}
+      OAUTH_TOKEN_ENCRYPTION_KEY: ${OAUTH_TOKEN_ENCRYPTION_KEY}
+      OPENAI_OAUTH_CLIENT_ID: ${OPENAI_OAUTH_CLIENT_ID}
+      OPENAI_OAUTH_CLIENT_SECRET: ${OPENAI_OAUTH_CLIENT_SECRET}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT}
+      COHERE_OAUTH_CLIENT_ID: ${COHERE_OAUTH_CLIENT_ID}
+      COHERE_OAUTH_CLIENT_SECRET: ${COHERE_OAUTH_CLIENT_SECRET}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID}
+      ESRI_PORTAL_URL: ${ESRI_PORTAL_URL}
+      ESRI_CLIENT_ID: ${ESRI_CLIENT_ID}
+      ESRI_CLIENT_SECRET: ${ESRI_CLIENT_SECRET}
+      DYMAXION_POSTGIS_URL: postgres://dymaxion:${POSTGRES_PASSWORD}@dymaxion-postgres:5432/dymaxion
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      WINDOWS_WORKER_URL: ${WINDOWS_WORKER_URL}
+      WINDOWS_WORKER_SECRET: ${WINDOWS_WORKER_SECRET}
+    volumes:
+      - ./skills:/workspace/skills
+      - ./config:/workspace/config:ro
+      - ./knowledge-base:/workspace/knowledge-base:ro
+      - dymaxion_workspace:/workspace/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      dymaxion-postgres:
+        condition: service_healthy
+      dymaxion-whisper:
+        condition: service_started
+    networks:
+      - dymaxion-net
+    restart: unless-stopped
+
+  dymaxion-admin:
+    build: ./dymaxion-admin
+    container_name: dymaxion-admin
+    environment:
+      DATABASE_URL: postgres://dymaxion:${POSTGRES_PASSWORD}@dymaxion-postgres:5432/dymaxion
+      LANGFUSE_URL: http://dymaxion-langfuse:3000
+      RUNTIME_URL: http://dymaxion-runtime:8787
+      OAUTH_TOKEN_ENCRYPTION_KEY: ${OAUTH_TOKEN_ENCRYPTION_KEY}
+      OPENAI_OAUTH_CLIENT_ID: ${OPENAI_OAUTH_CLIENT_ID}
+      OPENAI_OAUTH_CLIENT_SECRET: ${OPENAI_OAUTH_CLIENT_SECRET}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+      COHERE_OAUTH_CLIENT_ID: ${COHERE_OAUTH_CLIENT_ID}
+      COHERE_OAUTH_CLIENT_SECRET: ${COHERE_OAUTH_CLIENT_SECRET}
+      ADMIN_BIND_HOST: ${ADMIN_BIND_HOST:-127.0.0.1}
+    ports:
+      # Bind to your Tailscale IP (set ADMIN_BIND_HOST=100.117.65.43 in .env)
+      # so the dashboard is reachable only inside the tailnet.
+      - "${ADMIN_BIND_HOST:-127.0.0.1}:3001:3001"
+    depends_on:
+      dymaxion-postgres:
+        condition: service_healthy
+    networks:
+      - dymaxion-net
+    restart: unless-stopped
+
+  dymaxion-skill-sandbox:
+    image: docker:27-dind
+    container_name: dymaxion-skill-sandbox
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - dymaxion_sandbox:/var/lib/docker
+      - ./skills:/workspace/skills:ro
+    networks:
+      - dymaxion-net
+    restart: unless-stopped
+
+volumes:
+  dymaxion_pgdata:
+  dymaxion_audio:
+  dymaxion_workspace:
+  dymaxion_sandbox:
+
+networks:
+  dymaxion-net:
+    driver: bridge
+    name: dymaxion-net

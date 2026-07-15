@@ -1,0 +1,37 @@
+slug: duckdb-spatial-analytics
+name: DuckDB Spatial Analytics
+version: 0.1.0
+description: "Run large-scale spatial analytics with DuckDB Spatial over GeoParquet, joins, and aggregations up to ~100M features."
+skill_class: workhorse
+tools: [duckdb]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.2
+  max_duration_seconds: 900
+inputs:
+  - name: sql
+    type: string
+    required: true
+  - name: sources
+    type: array
+    required: false
+  - name: output_path
+    type: string
+    required: false
+  - name: memory_limit
+    type: string
+    required: false
+outputs:
+  - name: result_path
+    type: string
+  - name: result_preview
+    type: array
+  - name: stats
+    type: object
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

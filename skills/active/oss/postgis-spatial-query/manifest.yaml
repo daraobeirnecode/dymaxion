@@ -1,0 +1,35 @@
+slug: postgis-spatial-query
+name: PostGIS Spatial Query
+version: 0.1.0
+description: "Execute a spatial SQL query against a PostGIS database and return results plus metadata."
+skill_class: workhorse
+tools: [postgres-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.1
+  max_duration_seconds: 60
+inputs:
+  - name: sql
+    type: string
+    required: true
+  - name: connection
+    type: string
+    required: false
+  - name: max_rows
+    type: number
+    required: false
+  - name: explain
+    type: boolean
+    required: false
+outputs:
+  - name: rows
+    type: array
+  - name: metadata
+    type: object
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

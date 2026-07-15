@@ -1,0 +1,51 @@
+slug: cesium-3d-scene
+name: Cesium 3D Scene Scaffold
+version: 0.1.0
+description: Scaffold a CesiumJS 3D map with terrain, imagery, and custom entities, with support for Google Photorealistic 3D Tiles.
+skill_class: workhorse
+tools: [filesystem-mcp, npm]
+executor:
+  type: node
+  entrypoint: executor.ts
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.40
+  max_duration_seconds: 600
+inputs:
+  - name: project_name
+    type: string
+    required: true
+  - name: output_dir
+    type: string
+    required: true
+  - name: terrain
+    type: boolean
+    required: false
+  - name: imagery_provider
+    type: string
+    required: false
+  - name: use_google_3d_tiles
+    type: boolean
+    required: false
+  - name: entities
+    type: array
+    required: false
+  - name: camera
+    type: object
+    required: false
+  - name: ion_token_env
+    type: string
+    required: false
+outputs:
+  - name: project_path
+    type: string
+  - name: files_created
+    type: array
+  - name: dev_command
+    type: string
+  - name: next_steps
+    type: array
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

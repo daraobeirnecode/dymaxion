@@ -1,0 +1,14 @@
+{
+  "catalog_url": "https://earth-search.aws.element84.com/v1",
+  "bbox": [
+    -6.4,
+    53.3,
+    -6.1,
+    53.45
+  ],
+  "datetime_range": "2026-05-01/2026-07-01",
+  "collections": [
+    "sentinel-2-l2a"
+  ],
+  "max_cloud_cover": 10
+}

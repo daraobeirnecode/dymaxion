@@ -1,0 +1,11 @@
+{
+  "workload_description": "County-wide address point maintenance with weekly bulk loads and 5 concurrent editors",
+  "data_volume_gb": 15,
+  "team_skills": [
+    "postgresql",
+    "python",
+    "qgis"
+  ],
+  "licensing_constraints": "no per-core commercial licensing",
+  "budget_constraint": "open source strongly preferred"
+}

@@ -1,0 +1,38 @@
+slug: qgis-map-export
+name: QGIS Map Export
+version: 0.1.0
+description: "Render a QGIS layout to PNG/PDF/SVG at specified DPI with batch support."
+skill_class: classification
+tools: [cli-anything-qgis]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.06
+  max_duration_seconds: 300
+inputs:
+  - name: project_path
+    type: string
+    required: true
+  - name: layout_name
+    type: string
+    required: true
+  - name: format
+    type: string
+    required: false
+  - name: dpi
+    type: number
+    required: false
+  - name: output_dir
+    type: string
+    required: false
+outputs:
+  - name: exported_files
+    type: array
+  - name: render_log
+    type: string
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

@@ -1,0 +1,8 @@
+{
+  "failed_run_id": "run_01J9ZK3X7QVT8M2E",
+  "problem_description": "User asked to bulk-download NAIP imagery tiles for a county AOI; no existing skill covers imagery download with tiling and retry",
+  "similar_skill_hints": [
+    "stac-catalog-search",
+    "gdal-raster-warp"
+  ]
+}

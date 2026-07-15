@@ -1,0 +1,5 @@
+{
+  "apn": "123-456-789",
+  "portal_url": "https://gis.example-county.gov/portal",
+  "output_path": "/workspace/data/parcel-briefs/123-456-789-2026-07-14.pdf"
+}

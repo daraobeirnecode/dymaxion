@@ -1,0 +1,40 @@
+slug: maplibre-scene-builder
+name: MapLibre Scene Builder
+version: 0.1.0
+description: Build a MapLibre GL style JSON for a set of PostGIS/MVT layers with styling rules generated from data classification.
+skill_class: workhorse
+tools: [filesystem-mcp, npm, postgres-mcp]
+executor:
+  type: node
+  entrypoint: executor.ts
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.40
+  max_duration_seconds: 600
+inputs:
+  - name: layers
+    type: array
+    required: true
+  - name: tile_base_url
+    type: string
+    required: true
+  - name: basemap_style
+    type: string
+    required: false
+  - name: classes
+    type: number
+    required: false
+  - name: output_path
+    type: string
+    required: true
+outputs:
+  - name: style_path
+    type: string
+  - name: style_json
+    type: object
+  - name: layer_summaries
+    type: array
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

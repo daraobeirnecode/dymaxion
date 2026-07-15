@@ -1,0 +1,25 @@
+{
+  "project_name": "tower-siting-3d",
+  "output_dir": "/workspace/projects",
+  "terrain": true,
+  "imagery_provider": "cesium-ion",
+  "use_google_3d_tiles": false,
+  "entities": [
+    {
+      "type": "point",
+      "name": "Proposed Tower A",
+      "positions": [[-121.4944, 38.5816, 120]],
+      "properties": { "height_m": 45 }
+    },
+    {
+      "type": "polyline",
+      "name": "Microwave Link",
+      "positions": [
+        [-121.4944, 38.5816, 165],
+        [-121.5231, 38.6104, 152]
+      ]
+    }
+  ],
+  "camera": { "lon": -121.5, "lat": 38.55, "height_m": 8000, "heading": 0, "pitch": -35 },
+  "ion_token_env": "VITE_CESIUM_ION_TOKEN"
+}

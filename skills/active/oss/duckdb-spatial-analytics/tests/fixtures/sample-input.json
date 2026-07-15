@@ -1,0 +1,15 @@
+{
+  "sql": "SELECT a.name, count(*) AS building_count FROM buildings b JOIN admin a ON ST_Within(b.geom, a.geom) GROUP BY a.name ORDER BY building_count DESC",
+  "sources": [
+    {
+      "name": "buildings",
+      "path": "/workspace/data/buildings.geoparquet"
+    },
+    {
+      "name": "admin",
+      "path": "/workspace/data/admin_boundaries.geoparquet"
+    }
+  ],
+  "output_path": "/workspace/data/buildings_by_admin.parquet",
+  "memory_limit": "8GB"
+}

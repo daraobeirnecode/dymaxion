@@ -1,0 +1,35 @@
+slug: martin-tile-serve
+name: Martin Tile Serve
+version: 0.1.0
+description: "Configure the Martin tile server to serve a PostGIS table as MVT tiles."
+skill_class: workhorse
+tools: [filesystem-mcp, http]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.1
+  max_duration_seconds: 300
+inputs:
+  - name: table
+    type: string
+    required: true
+  - name: connection
+    type: string
+    required: true
+  - name: config_path
+    type: string
+    required: false
+  - name: tile_options
+    type: object
+    required: false
+outputs:
+  - name: tile_endpoint
+    type: string
+  - name: config_path
+    type: string
+destructive: true
+requires_approval: true
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

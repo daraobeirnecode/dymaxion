@@ -1,0 +1,45 @@
+slug: expo-map-scaffold
+name: Expo Map Scaffold
+version: 0.1.0
+description: Scaffold an Expo (React Native) mobile app with MapLibre GL Native and offline tile support.
+skill_class: workhorse
+tools: [filesystem-mcp, npm]
+executor:
+  type: node
+  entrypoint: executor.ts
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.60
+  max_duration_seconds: 600
+inputs:
+  - name: project_name
+    type: string
+    required: true
+  - name: output_dir
+    type: string
+    required: true
+  - name: style_url
+    type: string
+    required: false
+  - name: offline_regions
+    type: array
+    required: false
+  - name: initial_center
+    type: array
+    required: false
+  - name: initial_zoom
+    type: number
+    required: false
+outputs:
+  - name: project_path
+    type: string
+  - name: files_created
+    type: array
+  - name: run_commands
+    type: array
+  - name: next_steps
+    type: array
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

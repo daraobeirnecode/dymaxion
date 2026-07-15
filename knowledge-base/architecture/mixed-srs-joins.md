@@ -1,0 +1,12 @@
+---
+title: "Projection Strategy: Handling Mixed-SRS Data in Joins"
+category: architecture
+topic_tags: [mixed-srs, spatial-join, st-transform, srid-mismatch, data-integration]
+status: stub
+---
+
+# Projection Strategy: Handling Mixed-SRS Data in Joins
+
+Joining datasets stored in different SRSs is where projection errors actually bite: PostGIS refuses outright with "ST_Intersects: Operation on mixed SRID geometries," while friendlier tools (some desktop GIS, pandas-style joins on projected-on-the-fly layers) silently reproject with default transformations that may be wrong at the datum level. The correct pattern is to normalize before joining: pick one join CRS (the finer-accuracy dataset's CRS, or the project working CRS), transform the other side explicitly — `JOIN b ON ST_Intersects(a.geom, ST_Transform(b.geom, 26910))` — and know that the transformed side loses index usage unless you materialize it (a temp table or generated column with its own GiST index restores index-driven joins; for one-off queries, a functional index `CREATE INDEX ON b USING gist (ST_Transform(geom, 26910))` works when the transform is immutable-safe). Datum mismatches are subtler than SRID mismatches: NAD83 State Plane parcels joined to WGS84 GPS points via a null-shift "transform" misalign by ~1–2 m — enough to flip parcel assignment for points near boundaries — so specify the geographic transformation (grid-based, e.g. NADCON5/HTDP paths in PROJ) when accuracy matters. Precision effects compound: transforming, snapping, and transforming back accumulates error, so transform once, join once, and keep the output in the join CRS with lineage recorded. On-the-fly reprojection in QGIS/Pro is a display convenience, not an analysis guarantee — geoprocessing tools honor it inconsistently, so materialize a common-CRS copy before batch analysis. In arcpy, `arcpy.env.outputCoordinateSystem` plus `arcpy.env.geographicTransformations` pins both halves of the decision for a whole script. Federated/warehouse joins (BigQuery, Snowflake) sidestep the issue by forcing everything to spherical WGS84 geography — convenient, but re-check any survey-grade expectations after import. Audit rule: any join across `dymaxion.datasets` rows with differing `srid` metadata should log the transformation used.
+
+TODO: expand from authoritative source (PostGIS ST_Transform and mixed-SRID error docs; PROJ geodetic transformation guidance; Esri geographic transformation environment docs).

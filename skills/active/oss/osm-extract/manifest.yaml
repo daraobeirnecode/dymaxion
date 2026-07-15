@@ -1,0 +1,38 @@
+slug: osm-extract
+name: OSM Extract
+version: 0.1.0
+description: "Extract OpenStreetMap features for a bbox using the Overpass API or a local .pbf via osmium, returned as GeoJSON/GeoPackage."
+skill_class: workhorse
+tools: [osmium, http]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.08
+  max_duration_seconds: 300
+inputs:
+  - name: bbox
+    type: array
+    required: true
+  - name: tags
+    type: object
+    required: true
+  - name: source
+    type: string
+    required: false
+  - name: pbf_path
+    type: string
+    required: false
+  - name: output_format
+    type: string
+    required: false
+outputs:
+  - name: output_path
+    type: string
+  - name: extract_summary
+    type: object
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

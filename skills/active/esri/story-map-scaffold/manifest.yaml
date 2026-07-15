@@ -1,0 +1,38 @@
+slug: story-map-scaffold
+name: Story Map Scaffold
+version: 0.1.0
+description: Generate a StoryMap draft from a set of maps, images, and a narrative outline using the ArcGIS Online StoryMap REST API.
+skill_class: workhorse
+tools: [esri-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.80
+  max_duration_seconds: 300
+inputs:
+  - name: title
+    type: string
+    required: true
+  - name: narrative_outline
+    type: string
+    required: true
+  - name: map_item_ids
+    type: array
+    required: false
+  - name: image_urls
+    type: array
+    required: false
+  - name: target_folder
+    type: string
+    required: false
+outputs:
+  - name: storymap_item_id
+    type: string
+  - name: draft_url
+    type: string
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

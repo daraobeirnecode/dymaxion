@@ -1,0 +1,37 @@
+slug: tile-server-decide
+name: Tile Server Decide
+version: 0.1.0
+description: Recommend a tile serving strategy (pg_tileserv, Martin, TileServer GL, GeoServer, MapTiler, Mapbox) considering layer types, expected QPS, and budget.
+skill_class: workhorse
+tools: []
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.40
+  max_duration_seconds: 180
+inputs:
+  - name: layer_types
+    type: array
+    required: true
+  - name: expected_qps
+    type: number
+    required: false
+  - name: hosting_environment
+    type: string
+    required: false
+  - name: budget_constraint
+    type: string
+    required: false
+outputs:
+  - name: architecture_doc
+    type: string
+  - name: recommended_tile_server
+    type: string
+  - name: tradeoffs
+    type: array
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

@@ -1,0 +1,12 @@
+---
+title: "Field Mapping: Attribute Domains and Photo Attachments"
+category: workflow-patterns
+topic_tags: [attribute-domains, coded-values, attachments, photos, data-quality, geodatabase]
+status: stub
+---
+
+# Field Mapping: Attribute Domains and Photo Attachments
+
+Controlled vocabularies belong in the geodatabase, not in training documents: coded-value domains (stored code + displayed description, e.g. `1 = "Good", 2 = "Fair", 3 = "Poor"`) and range domains (numeric min/max) constrain field entry at capture time, which is the cheapest point to enforce data quality. Create them with `arcpy.management.CreateDomain` / `AddCodedValueToDomain` / `AssignDomainToField`, or in hosted feature layers via the service definition's field `domain` JSON; subtypes let different asset classes (e.g. hydrant vs valve) carry different domain sets on the same field. Field Maps, Survey123, QField, and Collector all render coded domains as pick lists automatically — free UI plus guaranteed valid values; contingent values (attribute rules-era feature) further restrict combinations, like limiting `failure_mode` choices by `asset_type`. Keep codes stable forever and add rather than repurpose values, because historical records keep old codes; publish a domain dictionary alongside the layer for analysts. Photo attachments ride the Esri attachments mechanism: enable with `arcpy.management.EnableAttachments` (creates an `__ATTACH` table keyed by GlobalID/REL_GLOBALID), captured photos sync as binary attachments through `addAttachment`/`queryAttachments` REST operations, and they survive append but not overwrite republishing. Practical attachment policy: cap photo size in the app (Field Maps supports upload size settings), name/exif conventions if photos will be exported, and use `exportAttachments` scripts (ArcGIS API for Python) or the attachments relationship in FGDB to bulk-extract for reports. In open-source stacks, QField stores photos as files referenced by an attachment field and Mergin Maps syncs them alongside the GeoPackage; either way store the photo path/URL plus capture timestamp on the feature. Attachments bloat replicas fast — decide whether photos sync in the field or upload on wifi (Field Maps offers deferred attachment upload) before the campaign.
+
+TODO: expand from authoritative source (Esri attribute domains and subtypes docs on pro.arcgis.com; ArcGIS REST attachments operations; Survey123/Field Maps attachment settings docs).

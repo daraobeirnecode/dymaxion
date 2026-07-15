@@ -1,0 +1,5 @@
+{
+  "proposed_skill_slug": "naip-imagery-download",
+  "fixture_path": "tests/fixtures/sample-input.json",
+  "timeout_seconds": 120
+}

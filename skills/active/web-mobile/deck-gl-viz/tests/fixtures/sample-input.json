@@ -1,0 +1,8 @@
+{
+  "dataset_path": "/workspace/data/bike-trips-2026-q2.csv",
+  "rendering_intent": "Show trip start density as 3D hexagons colored and extruded by count, city-wide overview zoom",
+  "output_dir": "/workspace/viz/bike-trip-density",
+  "layer_type": "hexagon",
+  "color_field": "trip_count",
+  "title": "Bike Trip Density Q2 2026"
+}

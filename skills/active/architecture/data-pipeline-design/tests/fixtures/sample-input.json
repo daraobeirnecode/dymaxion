@@ -1,0 +1,9 @@
+{
+  "source_descriptions": [
+    "nightly CSV drops of permit records on an SFTP server",
+    "county parcels ArcGIS Feature Service, updated weekly"
+  ],
+  "target_description": "PostGIS analytics schema powering a MapLibre dashboard",
+  "update_frequency": "nightly",
+  "quality_requirements": "geometry validity and APN referential integrity against parcels"
+}

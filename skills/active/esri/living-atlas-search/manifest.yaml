@@ -1,0 +1,38 @@
+slug: living-atlas-search
+name: Living Atlas Search
+version: 0.1.0
+description: Search Esri Living Atlas by keyword, filtered by license, type, and extent, returning candidate items.
+skill_class: classification
+tools: [esri-mcp, http]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.05
+  max_duration_seconds: 60
+inputs:
+  - name: keywords
+    type: string
+    required: true
+  - name: item_type
+    type: string
+    required: false
+  - name: license_filter
+    type: string
+    required: false
+  - name: extent
+    type: object
+    required: false
+  - name: max_results
+    type: number
+    required: false
+outputs:
+  - name: items
+    type: array
+  - name: search_summary
+    type: string
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

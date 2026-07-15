@@ -1,0 +1,12 @@
+{
+  "keywords": "national wetlands inventory",
+  "item_type": "Feature Service",
+  "license_filter": "public",
+  "extent": {
+    "xmin": -122.6,
+    "ymin": 38.2,
+    "xmax": -121.0,
+    "ymax": 39.1
+  },
+  "max_results": 10
+}

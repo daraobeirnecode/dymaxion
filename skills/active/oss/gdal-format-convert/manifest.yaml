@@ -1,0 +1,35 @@
+slug: gdal-format-convert
+name: GDAL Format Convert
+version: 0.1.0
+description: "Convert between spatial formats using ogr2ogr or gdal_translate, any format to any format."
+skill_class: classification
+tools: [gdal-bin]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.05
+  max_duration_seconds: 60
+inputs:
+  - name: input_path
+    type: string
+    required: true
+  - name: output_path
+    type: string
+    required: true
+  - name: output_format
+    type: string
+    required: false
+  - name: options
+    type: array
+    required: false
+outputs:
+  - name: output_path
+    type: string
+  - name: conversion_summary
+    type: object
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-surface text-neutral-300 antialiased;
+}
+
+@layer components {
+  .card {
+    @apply rounded border border-surface-border bg-surface-raised p-4;
+  }
+  .table-dense {
+    @apply w-full border-collapse text-sm;
+  }
+  .table-dense th {
+    @apply border-b border-surface-border px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500;
+  }
+  .table-dense td {
+    @apply border-b border-surface-border/60 px-3 py-1.5 align-top;
+  }
+  .badge {
+    @apply inline-block rounded px-1.5 py-0.5 text-xs font-medium;
+  }
+  .badge-ok {
+    @apply badge bg-green-900/50 text-green-400;
+  }
+  .badge-pending {
+    @apply badge bg-amber-900/50 text-amber-400;
+  }
+  .badge-failed {
+    @apply badge bg-red-900/50 text-red-400;
+  }
+  .badge-neutral {
+    @apply badge bg-neutral-800 text-neutral-400;
+  }
+  .input {
+    @apply rounded border border-surface-border bg-surface px-2 py-1.5 text-sm text-neutral-200 placeholder:text-neutral-600 focus:border-neutral-500 focus:outline-none;
+  }
+  .btn {
+    @apply rounded border border-surface-border bg-surface-raised px-3 py-1.5 text-sm text-neutral-200 hover:border-neutral-500 disabled:opacity-50;
+  }
+  .btn-approve {
+    @apply btn border-green-800 text-green-400 hover:border-green-600;
+  }
+  .btn-reject {
+    @apply btn border-red-900 text-red-400 hover:border-red-700;
+  }
+  .code-block {
+    @apply overflow-x-auto rounded border border-surface-border bg-black/40 p-3 font-mono text-xs leading-relaxed text-neutral-300;
+  }
+}

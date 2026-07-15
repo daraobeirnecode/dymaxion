@@ -1,0 +1,35 @@
+slug: wherobots-cloud-query
+name: Wherobots Cloud Query
+version: 0.1.0
+description: "Query a Wherobots cloud workspace for scale-out spatial analytics beyond local Sedona capacity."
+skill_class: workhorse
+tools: [wherobots-cli, http]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.3
+  max_duration_seconds: 900
+inputs:
+  - name: sql
+    type: string
+    required: true
+  - name: workspace
+    type: string
+    required: true
+  - name: runtime_size
+    type: string
+    required: false
+  - name: output_format
+    type: string
+    required: false
+outputs:
+  - name: results
+    type: array
+  - name: run_metadata
+    type: object
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

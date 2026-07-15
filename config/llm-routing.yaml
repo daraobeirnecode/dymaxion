@@ -1,0 +1,42 @@
+# Skill class → provider:model routing.
+# Model names carry a provider prefix: anthropic:claude-sonnet-5,
+# openai:gpt-4o, ollama:llama3.3:70b, ...
+# Fallback chains are tried in order when the primary errors or its
+# provider is not connected.
+
+default: anthropic:claude-sonnet-5
+
+by_skill_class:
+  classification: anthropic:claude-haiku-4-5-20251001
+  planning: anthropic:claude-sonnet-5
+  reasoning: anthropic:claude-opus-4-8
+  drafting: anthropic:claude-sonnet-5
+  workhorse: anthropic:claude-sonnet-5
+  code_generation: anthropic:claude-sonnet-5
+  narration: anthropic:claude-haiku-4-5-20251001
+  skill_authoring: anthropic:claude-opus-4-8
+
+by_skill_slug:
+  # per-skill overrides
+  deployment-topology-decide: anthropic:claude-opus-4-8
+  database-choice-decide: anthropic:claude-opus-4-8
+  data-pipeline-design: anthropic:claude-opus-4-8
+  skill-draft: anthropic:claude-opus-4-8
+  feature-service-query: anthropic:claude-haiku-4-5-20251001
+
+fallbacks:
+  anthropic:claude-opus-4-8:
+    - anthropic:claude-sonnet-5
+    - openai:gpt-4o
+    - ollama:llama3.3:70b
+  anthropic:claude-sonnet-5:
+    - anthropic:claude-haiku-4-5-20251001
+    - openai:gpt-4o-mini
+    - ollama:llama3.3:70b
+  anthropic:claude-haiku-4-5-20251001:
+    - openai:gpt-4o-mini
+    - ollama:qwen3:32b
+
+retry_policy:
+  default_num_retries: 3
+  default_retry_after_seconds: 2

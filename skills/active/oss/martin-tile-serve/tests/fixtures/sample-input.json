@@ -1,0 +1,9 @@
+{
+  "table": "public.parcels",
+  "connection": "postgresql://dymaxion@dymaxion-postgres:5432/gisdb",
+  "config_path": "/workspace/config/martin.yaml",
+  "tile_options": {
+    "minzoom": 8,
+    "maxzoom": 16
+  }
+}

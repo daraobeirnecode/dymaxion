@@ -1,0 +1,42 @@
+slug: arcgis-maps-sdk-integration
+name: ArcGIS Maps SDK Integration
+version: 0.1.0
+description: Add ArcGIS Maps SDK 4.x layers, widgets, and interactions to an existing Next.js project.
+skill_class: workhorse
+tools: [filesystem-mcp, npm]
+executor:
+  type: node
+  entrypoint: executor.ts
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.30
+  max_duration_seconds: 600
+inputs:
+  - name: project_dir
+    type: string
+    required: true
+  - name: layers
+    type: array
+    required: true
+  - name: widgets
+    type: array
+    required: false
+  - name: interactions
+    type: array
+    required: false
+  - name: api_key_env
+    type: string
+    required: false
+outputs:
+  - name: files_created
+    type: array
+  - name: files_modified
+    type: array
+  - name: layers_added
+    type: array
+  - name: next_steps
+    type: array
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

@@ -1,0 +1,32 @@
+slug: skill-test
+name: Skill Test
+version: 0.1.0
+description: Execute a proposed skill in the Docker sandbox with test fixtures and report pass/fail plus logs; never touches production data.
+skill_class: none
+tools: [docker]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.05
+  max_duration_seconds: 300
+inputs:
+  - name: proposed_skill_slug
+    type: string
+    required: true
+  - name: fixture_path
+    type: string
+    required: false
+  - name: timeout_seconds
+    type: number
+    required: false
+outputs:
+  - name: test_result
+    type: object
+  - name: sandbox_logs
+    type: string
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

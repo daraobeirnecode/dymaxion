@@ -1,0 +1,35 @@
+slug: permit-monitor
+name: Permit Monitor
+version: 0.1.0
+description: Watch a Feature Service for new permits matching a saved filter and push Telegram alerts on new hits.
+skill_class: classification
+tools: [esri-mcp]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: dymaxion-runtime
+budget:
+  max_cost_usd: 0.05
+  max_duration_seconds: 60
+inputs:
+  - name: service_url
+    type: string
+    required: true
+  - name: filter_where
+    type: string
+    required: true
+  - name: last_check_timestamp
+    type: string
+    required: false
+  - name: alert_channel
+    type: string
+    required: false
+outputs:
+  - name: new_permits
+    type: array
+  - name: alert_message
+    type: string
+destructive: false
+requires_approval: false
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'

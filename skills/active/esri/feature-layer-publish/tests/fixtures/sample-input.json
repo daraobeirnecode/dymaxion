@@ -1,0 +1,7 @@
+{
+  "source_path": "/workspace/data/trails.gpkg",
+  "target_org_url": "https://example-county.maps.arcgis.com",
+  "target_folder": "Parks",
+  "service_name": "County_Trails",
+  "sharing_level": "org"
+}

@@ -1,0 +1,24 @@
+{
+  "layers": [
+    {
+      "table": "public.parcels_2026",
+      "geometry_type": "polygon",
+      "style_field": "assessed_value",
+      "classification": "quantile"
+    },
+    {
+      "table": "public.zoning",
+      "geometry_type": "polygon",
+      "style_field": "zone_class",
+      "classification": "categorical"
+    },
+    {
+      "table": "public.streets",
+      "geometry_type": "line"
+    }
+  ],
+  "tile_base_url": "https://tiles.example.com",
+  "basemap_style": "https://demotiles.maplibre.org/style.json",
+  "classes": 5,
+  "output_path": "/workspace/styles/parcels-scene.json"
+}

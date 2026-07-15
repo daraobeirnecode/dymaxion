@@ -1,0 +1,17 @@
+{
+  "service_url": "https://services3.arcgis.com/EXAMPLE/arcgis/rest/services/Hydrants/FeatureServer",
+  "layer_id": 0,
+  "edits": {
+    "adds": [],
+    "updates": [
+      {
+        "attributes": {
+          "OBJECTID": 4211,
+          "STATUS": "OUT_OF_SERVICE"
+        }
+      }
+    ],
+    "deletes": []
+  },
+  "rollback_on_failure": true
+}

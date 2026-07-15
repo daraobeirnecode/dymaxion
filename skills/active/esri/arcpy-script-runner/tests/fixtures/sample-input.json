@@ -1,0 +1,11 @@
+{
+  "script_slug": "clip-and-project",
+  "parameters": {
+    "target_srs": "EPSG:2226",
+    "clip_layer": "city_boundary"
+  },
+  "input_paths": [
+    "C:/dymaxion/staging/roads.gdb"
+  ],
+  "output_dir": "C:/dymaxion/scratch"
+}

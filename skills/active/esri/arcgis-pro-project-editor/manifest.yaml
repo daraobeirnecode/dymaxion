@@ -1,0 +1,32 @@
+slug: arcgis-pro-project-editor
+name: ArcGIS Pro Project Editor
+version: 0.1.0
+description: Open an ArcGIS Pro project, apply changes such as adding layers, symbology, reprojection, and layout edits, then save.
+skill_class: workhorse
+tools: [windows-worker]
+executor:
+  type: python
+  entrypoint: executor.py
+  runtime: windows-worker
+budget:
+  max_cost_usd: 0.60
+  max_duration_seconds: 600
+inputs:
+  - name: project_path
+    type: string
+    required: true
+  - name: operations
+    type: array
+    required: true
+  - name: backup
+    type: boolean
+    required: false
+outputs:
+  - name: modified_project_path
+    type: string
+  - name: operation_results
+    type: array
+destructive: true
+requires_approval: true
+authored_by: dymaxion-core-library
+approved_at: '2026-07-14T00:00:00Z'
