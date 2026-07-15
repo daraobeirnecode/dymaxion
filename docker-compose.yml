@@ -15,7 +15,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: dymaxion
     volumes:
-      - dymaxion_pgdata:/var/lib/postgresql/data
+      # Postgres 18+ images store data in a version-specific subdir of
+      # /var/lib/postgresql — mounting at .../data breaks initdb.
+      - dymaxion_pgdata:/var/lib/postgresql
       - ./migrations:/docker-entrypoint-initdb.d:ro
     ports:
       - "127.0.0.1:5434:5432"
