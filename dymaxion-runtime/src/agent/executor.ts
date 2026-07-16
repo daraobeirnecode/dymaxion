@@ -9,7 +9,7 @@ import { db, schema } from '../db/client.js';
 import { classify } from './classifier.js';
 import { plan as makePlan } from './planner.js';
 import { review } from './critic.js';
-import { narrate } from './narrator.js';
+import { narrate, answerDirectly } from './narrator.js';
 import { runSkill } from '../skills/executor.js';
 import { shouldAttemptAuthoring, draftSkill } from '../skills/author.js';
 import { getSkill } from '../skills/registry.js';
@@ -51,16 +51,24 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
     await db.update(schema.agentRuns).set({ plan }).where(eq(schema.agentRuns.id, runId));
     await auditEvent('run_step', { step: 'plan', summary: plan.summary, steps: plan.steps.length }, runId);
 
-    // Capability gap with no plan → consider drafting a new skill
-    if (plan.steps.length === 0 && plan.summary === 'no-skill-gap') {
-      const outcome = await draftSkill({
-        agentRunId: runId,
-        failureContext: message.body,
-        desiredCapability: intent.summary,
-      });
-      await finish(runId, 'completed', outcome.detail, 0);
-      await gateway.sendFinal(target, outcome.detail);
-      await persistOutgoing(message.gateway, message.source_id, outcome.detail);
+    // Empty plan: either conversational (answer directly) or a genuine
+    // capability gap on an actionable task (consider drafting a new skill).
+    // Greetings/questions must NEVER trigger self-authoring.
+    if (plan.steps.length === 0) {
+      const genuineGap =
+        plan.summary === 'no-skill-gap' && !intent.isQuestion && intent.complexity !== 'trivial';
+      const reply = genuineGap
+        ? (
+            await draftSkill({
+              agentRunId: runId,
+              failureContext: message.body,
+              desiredCapability: intent.summary,
+            })
+          ).detail
+        : await answerDirectly(message, memory, runId);
+      await finish(runId, 'completed', reply, 0);
+      await gateway.sendFinal(target, reply);
+      await persistOutgoing(message.gateway, message.source_id, reply);
       return;
     }
 

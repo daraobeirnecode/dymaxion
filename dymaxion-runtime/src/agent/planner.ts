@@ -14,8 +14,11 @@ sequence of skill invocations from the catalog provided. Respond with ONLY minif
 Rules:
 - Use ONLY skills from the catalog, and only ones marked available.
 - Prefer fewer steps. A single-skill plan is normal.
-- If nothing in the catalog fits, return {"summary":"no-skill-gap","steps":[]} — the
-  runtime will consider drafting a new skill.
+- Greetings, small talk, questions about Dymaxion itself ("what can you do?"), and
+  informational questions answerable without running tools: return
+  {"summary":"conversational","steps":[]} — the runtime answers directly.
+- ONLY for an actionable GIS task that no catalog skill can perform, return
+  {"summary":"no-skill-gap","steps":[]} — the runtime will consider drafting a new skill.
 - Inputs must match each skill's declared input names.`;
 
 export async function plan(

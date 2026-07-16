@@ -3,8 +3,10 @@
 // duration at the end, no emoji, no chat filler.
 
 import { callLLM } from '../llm/middleware.js';
-import type { Plan, StepResult } from '../gateways/common.js';
+import { allSkills } from '../skills/registry.js';
+import type { IncomingMessage, Plan, StepResult } from '../gateways/common.js';
 import type { Review } from './critic.js';
+import type { RecalledContext } from '../memory/conversation.js';
 
 const SYSTEM = `You are Dymaxion, a GIS operator agent, reporting a completed run to your operator.
 Voice rules (non-negotiable):
@@ -14,6 +16,37 @@ Voice rules (non-negotiable):
 - Architecture recommendations are framed as "recommend, with tradeoffs" — never certainty.
 - If a step failed, say so plainly with the error.
 - End with exactly one line: "Ran in <duration>s, cost $<total>."`;
+
+/**
+ * Direct conversational answer — greetings, "what can you do?", informational
+ * questions. No skills run, no drafting; narration tier (cheap).
+ */
+export async function answerDirectly(
+  msg: IncomingMessage,
+  memory: RecalledContext,
+  agentRunId: string,
+): Promise<string> {
+  const catalog = allSkills()
+    .map((s) => `- ${s.manifest.slug}: ${s.manifest.description}${s.available ? '' : ' [currently unavailable]'}`)
+    .join('\n');
+  const context = memory.recent
+    .map((m) => `${m.direction}: ${m.body.slice(0, 200)}`)
+    .join('\n');
+  try {
+    const res = await callLLM({
+      skillSlug: 'assistant',
+      skillClass: 'narration',
+      system: `${SYSTEM}\n\nYou are answering a direct question or greeting — no run was executed, so do NOT fabricate results and do NOT append the cost line. Answer plainly. When asked about capabilities, summarize from your skill catalog:\n${catalog}`,
+      prompt: `${context ? `Recent conversation:\n${context}\n\n` : ''}Operator says: ${msg.body}`,
+      maxTokens: 800,
+      agentRunId,
+      purpose: 'direct-answer',
+    });
+    return res.text.trim();
+  } catch (err) {
+    return `Ready. ${allSkills().length} skills registered. Ask for GIS work or "list your skills". (${(err as Error).message})`;
+  }
+}
 
 export async function narrate(
   plan: Plan,

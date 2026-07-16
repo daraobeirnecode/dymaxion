@@ -47,6 +47,17 @@ async function daemon(): Promise<void> {
   logger.info('dymaxion runtime starting');
   const cfg = loadConfig();
 
+  // Runs left 'running'/'awaiting_approval' by a previous process are dead —
+  // mark them failed so the dashboard reflects reality.
+  const { inArray } = await import('drizzle-orm');
+  const { db, schema } = await import('./db/client.js');
+  const stale = await db
+    .update(schema.agentRuns)
+    .set({ status: 'failed', endedAt: new Date(), finalNarrative: 'interrupted by runtime restart' })
+    .where(inArray(schema.agentRuns.status, ['running', 'awaiting_approval']))
+    .returning({ id: schema.agentRuns.id });
+  if (stale.length) logger.warn({ count: stale.length }, 'marked stale runs as failed');
+
   await startAllMcpServers();
   startWorkerHealthLoop();
   await checkWorkerHealth();
