@@ -73,6 +73,17 @@ export function chunkText(text: string): string[] {
   return chunks;
 }
 
+interface PendingChunk {
+  doc: KbDoc;
+  chunkIndex: number;
+  text: string;
+}
+
+// Voyage keys without a payment method are capped at 10K tokens/min, so keep
+// each batch comfortably under that; embed() handles 429 backoff between
+// batches.
+const BATCH_TOKEN_BUDGET = 8_000;
+
 export async function loadKnowledgeBase(refresh = false): Promise<{ files: number; chunks: number }> {
   const root = kbRoot();
   if (!existsSync(root)) {
@@ -80,8 +91,9 @@ export async function loadKnowledgeBase(refresh = false): Promise<{ files: numbe
     return { files: 0, chunks: 0 };
   }
 
-  let files = 0;
-  let chunks = 0;
+  // Pass 1: collect every chunk that needs (re-)embedding.
+  const pending: PendingChunk[] = [];
+  const filesTouched = new Set<string>();
   for (const path of walkMarkdown(root)) {
     const doc = parseDoc(path);
 
@@ -94,28 +106,53 @@ export async function loadKnowledgeBase(refresh = false): Promise<{ files: numbe
       if (embeddedAt && new Date(embeddedAt) >= doc.mtime) continue;
     }
 
-    // Replace prior chunks for this file (idempotent reload)
-    await db.execute(dsql`
-      DELETE FROM dymaxion.messages
-      WHERE gateway = 'system-seed' AND attachments->>'source_file' = ${doc.relPath}
-    `);
-
     const parts = chunkText(doc.body);
     if (!parts.length) continue;
-    const vectors = await embed(parts.map((p) => p.slice(0, 8000)));
-    for (let i = 0; i < parts.length; i++) {
+    parts.forEach((text, chunkIndex) => pending.push({ doc, chunkIndex, text: text.slice(0, 8000) }));
+    filesTouched.add(doc.relPath);
+  }
+
+  // Replace prior chunks for touched files (idempotent reload).
+  for (const relPath of filesTouched) {
+    await db.execute(dsql`
+      DELETE FROM dymaxion.messages
+      WHERE gateway = 'system-seed' AND attachments->>'source_file' = ${relPath}
+    `);
+  }
+
+  // Pass 2: embed in token-bounded batches (one API call per batch).
+  let done = 0;
+  while (done < pending.length) {
+    const batch: PendingChunk[] = [];
+    let budget = 0;
+    while (done + batch.length < pending.length) {
+      const next = pending[done + batch.length];
+      const estTokens = Math.ceil(next.text.length / 4);
+      if (batch.length > 0 && budget + estTokens > BATCH_TOKEN_BUDGET) break;
+      batch.push(next);
+      budget += estTokens;
+    }
+
+    const vectors = await embed(batch.map((c) => c.text));
+    for (let i = 0; i < batch.length; i++) {
+      const { doc, chunkIndex, text } = batch[i];
       await db.insert(schema.messages).values({
         gateway: 'system-seed',
         sourceId: doc.relPath,
         direction: 'reference',
-        body: parts[i],
+        body: text,
         embedding: vectors[i],
-        attachments: { source_file: doc.relPath, topic_tags: doc.topicTags, category: doc.category, chunk: i },
+        attachments: {
+          source_file: doc.relPath,
+          topic_tags: doc.topicTags,
+          category: doc.category,
+          chunk: chunkIndex,
+        },
       });
     }
-    files += 1;
-    chunks += parts.length;
-    logger.info({ file: doc.relPath, chunks: parts.length }, 'knowledge doc embedded');
+    done += batch.length;
+    logger.info({ embedded: done, total: pending.length }, 'knowledge batch embedded');
   }
-  return { files, chunks };
+
+  return { files: filesTouched.size, chunks: pending.length };
 }
