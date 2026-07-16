@@ -3,21 +3,30 @@
 # backoff; handshake failure → skill availability degrades, startup continues.
 
 servers:
+  # esri-mcp is a Python (>=3.12) project — launched via uv, which provisions
+  # its own interpreter + deps on first spawn (cached thereafter).
   - name: esri
     description: Query, edit, and administer ArcGIS Feature Services + Portal
-    command: npx
-    args: ["-y", "github:daraobeirnecode/esri-mcp"]
+    command: uv
+    args:
+      - run
+      - --python
+      - "3.12"
+      - --with
+      - git+https://github.com/daraobeirnecode/esri-mcp
+      - python
+      - -m
+      - esri_mcp
     env:
       ESRI_PORTAL_URL: os.environ/ESRI_PORTAL_URL
       ESRI_CLIENT_ID: os.environ/ESRI_CLIENT_ID
       ESRI_CLIENT_SECRET: os.environ/ESRI_CLIENT_SECRET
 
+  # server-postgres takes the connection URL as a positional argument.
   - name: postgres
     description: Query and inspect Postgres/PostGIS
     command: npx
-    args: ["-y", "@modelcontextprotocol/server-postgres"]
-    env:
-      DATABASE_URL: os.environ/DYMAXION_POSTGIS_URL
+    args: ["-y", "@modelcontextprotocol/server-postgres", "os.environ/DYMAXION_POSTGIS_URL"]
 
   - name: filesystem
     description: Read/write files under the approved workspace

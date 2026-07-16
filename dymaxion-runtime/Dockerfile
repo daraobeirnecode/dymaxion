@@ -45,6 +45,10 @@ RUN pip3 install --break-system-packages --no-cache-dir cli-anything-qgis || \
      pip3 install --break-system-packages --no-cache-dir /opt/qgis-cli) || \
     echo "cli-anything-qgis unavailable at build time — qgis skills degrade"
 
+# uv — launches Python MCP servers (esri-mcp needs python >=3.12; uv
+# provisions its own interpreter on first run)
+RUN pip3 install --break-system-packages --no-cache-dir uv
+
 # ArcGIS Pro CLI + arcpy are Windows-only — proxied via the Windows Worker
 # (windows-worker/), never installed here.
 
