@@ -9,9 +9,11 @@
     "dymaxion": "dist/cli.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "dev": "tsx src/main.ts",
     "start": "node dist/main.js",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "engines": {
@@ -26,7 +28,7 @@
     "@mastra/core": "latest",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "ai": "^5.0.0",
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "^0.45.2",
     "langfuse": "^3.35.0",
     "openid-client": "^6.5.0",
     "pino": "^9.6.0",
@@ -36,6 +38,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.10"
   }
 }

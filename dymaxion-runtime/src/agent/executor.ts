@@ -7,13 +7,20 @@
 import { eq } from 'drizzle-orm';
 import { db, schema } from '../db/client.js';
 import { classify } from './classifier.js';
+import { deterministicReply } from './fast-path.js';
 import { plan as makePlan } from './planner.js';
 import { review } from './critic.js';
 import { narrate, answerDirectly } from './narrator.js';
 import { runSkill } from '../skills/executor.js';
 import { shouldAttemptAuthoring, draftSkill } from '../skills/author.js';
 import { getSkill } from '../skills/registry.js';
-import { persistIncoming, persistOutgoing, loadRelevant } from '../memory/conversation.js';
+import {
+  persistIncoming,
+  persistOutgoing,
+  loadRecent,
+  loadRelevant,
+  type RecalledContext,
+} from '../memory/conversation.js';
 import { getPreference } from '../memory/preferences.js';
 import { createApprovalRequest, awaitDecision } from '../security/approval.js';
 import { auditEvent } from '../security/audit.js';
@@ -30,6 +37,7 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
     source: message.source_id,
     body: message.body.slice(0, 500),
   });
+  const fastReply = deterministicReply(message.body);
   const messageId = await persistIncoming(message);
 
   // one agent_runs row per request; plan filled in after step 2
@@ -41,12 +49,39 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
   traceRun(runId, 'agent-run', { gateway: message.gateway });
 
   try {
+    if (fastReply !== null) {
+      const directPlan = { summary: 'deterministic-fast-path', steps: [] };
+      await db.update(schema.agentRuns).set({ plan: directPlan }).where(eq(schema.agentRuns.id, runId));
+      await auditEvent('run_step', { step: 'deterministic-fast-path' }, runId);
+      await finish(runId, 'completed', fastReply, 0);
+      await gateway.sendFinal(target, fastReply);
+      await persistOutgoing(message.gateway, message.source_id, fastReply);
+      return;
+    }
+
     // 1. Classify
     const intent = await classify(message, runId);
     await auditEvent('run_step', { step: 'classify', intent }, runId);
 
-    // 2. Plan
-    const memory = await loadRelevant(message);
+    // Simple general conversation does not need semantic recall or a planner.
+    if (intent.domain === 'general' && (intent.isQuestion || intent.complexity === 'trivial')) {
+      const memory: RecalledContext = {
+        recent: await loadRecent(message),
+        similar: [],
+        knowledge: [],
+      };
+      const directPlan = { summary: 'direct-answer', steps: [] };
+      await db.update(schema.agentRuns).set({ plan: directPlan }).where(eq(schema.agentRuns.id, runId));
+      await auditEvent('run_step', { step: 'direct-answer' }, runId);
+      const reply = await answerDirectly(message, memory, runId);
+      await finish(runId, 'completed', reply, 0);
+      await gateway.sendFinal(target, reply);
+      await persistOutgoing(message.gateway, message.source_id, reply);
+      return;
+    }
+
+    // 2. Plan actionable work with semantic knowledge.
+    const memory = await loadRelevant(message, messageId);
     const plan = await makePlan(message, intent, memory, runId);
     await db.update(schema.agentRuns).set({ plan }).where(eq(schema.agentRuns.id, runId));
     await auditEvent('run_step', { step: 'plan', summary: plan.summary, steps: plan.steps.length }, runId);
@@ -125,8 +160,14 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
       }
     }
 
-    // 5. Self-critique (single revision pass: re-run failed non-optional steps once)
-    const critique = await review(plan, results, runId);
+    // 5. Self-critique only when execution produced a failure or an
+    // incomplete result set. Successful schema-validated runs do not need an
+    // additional narration-tier round trip.
+    const allStepsSucceeded =
+      results.length === plan.steps.length && results.every((result) => result.ok);
+    const critique = allStepsSucceeded
+      ? { needsRevision: false, notes: 'All planned steps completed successfully.' }
+      : await review(plan, results, runId);
     if (critique.needsRevision) {
       await auditEvent('run_step', { step: 'critique', notes: critique.notes }, runId);
       for (let i = 0; i < results.length; i++) {

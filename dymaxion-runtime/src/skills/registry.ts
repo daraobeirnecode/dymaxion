@@ -40,6 +40,10 @@ export interface RegisteredSkill {
 
 const registry = new Map<string, RegisteredSkill>();
 
+export function isStubExecutor(source: string): boolean {
+  return /TODO:\s*implement/i.test(source) || /["']status["']\s*:\s*["']stub["']/i.test(source);
+}
+
 // Tools that are always present inside the runtime container.
 const BUILTIN_TOOLS = new Set([
   'gdal-bin',
@@ -136,7 +140,13 @@ export async function loadSkills(persist = true): Promise<RegisteredSkill[]> {
 
         let available = true;
         let unavailableReason: string | undefined;
+        const executorSource = readFileSync(join(dir, manifest.executor.entrypoint), 'utf8');
+        if (isStubExecutor(executorSource)) {
+          available = false;
+          unavailableReason = 'executor is an unfinished stub';
+        }
         for (const tool of manifest.tools ?? []) {
+          if (!available) break;
           const check = toolAvailable(tool);
           if (!check.ok) {
             available = false;
@@ -210,13 +220,15 @@ export function applicableSkills(domain: string): RegisteredSkill[] {
     meta: ['meta'],
   };
   const categories = byCategory[domain];
-  if (!categories) return allSkills();
-  return allSkills().filter((s) => categories.includes(s.category));
+  const available = allSkills().filter((skill) => skill.available);
+  if (!categories) return available;
+  return available.filter((skill) => categories.includes(skill.category));
 }
 
 /** Refresh worker/MCP-dependent availability without a full rescan. */
 export function refreshAvailability(): void {
   for (const skill of registry.values()) {
+    if (skill.unavailableReason === 'executor is an unfinished stub') continue;
     if (
       skill.manifest.executor.runtime === 'windows-worker' ||
       skill.manifest.tools.includes('windows-worker')

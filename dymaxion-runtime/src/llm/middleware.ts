@@ -114,9 +114,14 @@ export async function callLLM(req: LLMCallRequest): Promise<LLMCallResult> {
   const route = routeFor(req.skillSlug, req.skillClass, req.llmOverride);
   const tier = tierForSkillClass(req.skillClass);
   const chain = [route.primary, ...route.fallbacks];
+  const totalTimeoutMs = Number(process.env.LLM_TOTAL_TIMEOUT_MS ?? 60_000);
+  const attemptTimeoutMs = Number(process.env.LLM_ATTEMPT_TIMEOUT_MS ?? 30_000);
+  const deadline = Date.now() + totalTimeoutMs;
 
   let lastError: unknown;
   for (const modelRef of chain) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) break;
     try {
       boundaryCheck(modelRef); // 1
       const { provider } = splitModelRef(modelRef);
@@ -131,6 +136,7 @@ export async function callLLM(req: LLMCallRequest): Promise<LLMCallResult> {
         prompt: req.prompt,
         maxOutputTokens: req.maxTokens,
         temperature: req.temperature,
+        abortSignal: AbortSignal.timeout(Math.max(1, Math.min(remainingMs, attemptTimeoutMs))),
       });
       const latencyMs = Date.now() - started;
       const inputTokens = gen.usage?.inputTokens ?? 0;

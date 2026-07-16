@@ -138,10 +138,19 @@ export async function runSkill(
       } catch {
         /* non-JSON output is passed through raw */
       }
+      const stubOutput =
+        typeof output === 'object' &&
+        output !== null &&
+        'status' in output &&
+        (output as { status?: unknown }).status === 'stub';
       result = {
-        ok: code === 0,
+        ok: code === 0 && !stubOutput,
         output,
-        error: code === 0 ? undefined : stderr || `exit code ${code}`,
+        error: stubOutput
+          ? `skill '${slug}' is an unfinished stub`
+          : code === 0
+            ? undefined
+            : stderr || `exit code ${code}`,
         durationMs: Date.now() - started,
         costUsd: 0,
       };

@@ -52,6 +52,7 @@ export class TelegramGateway implements Gateway {
   private running = false;
   private offset = 0;
   private readonly pendingApprovals = new Map<string, (r: ApprovalResponse) => void>();
+  private readonly messageQueues = new Map<string, Promise<void>>();
 
   constructor(
     private readonly botToken: string,
@@ -65,10 +66,12 @@ export class TelegramGateway implements Gateway {
   }
 
   private async call<T>(method: string, body?: Record<string, unknown>): Promise<T> {
+    const timeoutMs = method === 'getUpdates' ? 35_000 : 15_000;
     const res = await fetch(this.api(method), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const data = (await res.json()) as { ok: boolean; result: T; description?: string };
     if (!data.ok) throw new Error(`telegram ${method}: ${data.description}`);
@@ -100,16 +103,43 @@ export class TelegramGateway implements Gateway {
         });
         for (const update of updates) {
           this.offset = update.update_id + 1;
-          await this.handleUpdate(update).catch((err) =>
-            logger.error({ err }, 'telegram update handling failed'),
-          );
+          this.dispatchUpdate(update);
+        }
+        // getUpdates already long-polls. Only pause after an empty result;
+        // never add an avoidable delay after a real message arrives.
+        if (updates.length === 0 && this.pollIntervalMs > 0) {
+          await sleep(this.pollIntervalMs);
         }
       } catch (err) {
         logger.warn({ err }, 'telegram poll error — backing off 5s');
         await sleep(5000);
       }
-      await sleep(this.pollIntervalMs);
     }
+  }
+
+  /**
+   * Callback queries bypass the per-chat queue so an approval can resolve
+   * while its agent run is waiting. Ordinary messages remain serial per chat.
+   */
+  private dispatchUpdate(update: TgUpdate): void {
+    if (update.callback_query) {
+      void this.handleUpdate(update).catch((err) =>
+        logger.error({ err }, 'telegram callback handling failed'),
+      );
+      return;
+    }
+
+    const chatId = update.message ? String(update.message.chat.id) : 'unknown';
+    const previous = this.messageQueues.get(chatId) ?? Promise.resolve();
+    const current = previous
+      .catch((err) => logger.error({ err, chatId }, 'previous telegram message failed'))
+      .then(() => this.handleUpdate(update));
+    this.messageQueues.set(chatId, current);
+    void current
+      .catch((err) => logger.error({ err, chatId }, 'telegram update handling failed'))
+      .finally(() => {
+        if (this.messageQueues.get(chatId) === current) this.messageQueues.delete(chatId);
+      });
   }
 
   private async handleUpdate(update: TgUpdate): Promise<void> {
@@ -126,39 +156,59 @@ export class TelegramGateway implements Gateway {
       return;
     }
 
-    let body = msg.text ?? msg.caption ?? '';
-    const attachments: Attachment[] = [];
+    // Telegram clears chat actions after at most five seconds. Start before
+    // attachment handling, memory, or LLM work, and renew until completion.
+    const stopTyping = this.startTyping(msg.chat.id);
 
-    if (msg.voice) {
-      body = await this.transcribeVoice(msg.voice.file_id);
-    }
-    if (msg.photo?.length) {
-      const best = msg.photo[msg.photo.length - 1];
-      attachments.push(await this.downloadFile(best.file_id, 'photo.jpg'));
-    }
-    if (msg.document) {
-      attachments.push(
-        await this.downloadFile(msg.document.file_id, msg.document.file_name ?? 'document', msg.document.mime_type),
-      );
-    }
-    if (!body && !attachments.length) return;
+    try {
+      let body = msg.text ?? msg.caption ?? '';
+      const attachments: Attachment[] = [];
 
-    const incoming: IncomingMessage = {
-      gateway: this.name,
-      source_id: String(msg.chat.id),
-      from: {
-        id: String(msg.from?.id ?? msg.chat.id),
-        display_name: msg.from?.first_name ?? msg.from?.username ?? 'operator',
-      },
-      body,
-      attachments,
-      received_at: new Date(),
-      metadata: { message_id: msg.message_id, voice: Boolean(msg.voice) },
-    };
-    await this.handler?.(incoming);
+      if (msg.voice) {
+        body = await this.transcribeVoice(msg.voice.file_id);
+      }
+      if (msg.photo?.length) {
+        const best = msg.photo[msg.photo.length - 1];
+        attachments.push(await this.downloadFile(best.file_id, 'photo.jpg'));
+      }
+      if (msg.document) {
+        attachments.push(
+          await this.downloadFile(
+            msg.document.file_id,
+            msg.document.file_name ?? 'document',
+            msg.document.mime_type,
+          ),
+        );
+      }
+      if (!body && !attachments.length) return;
+
+      const incoming: IncomingMessage = {
+        gateway: this.name,
+        source_id: String(msg.chat.id),
+        from: {
+          id: String(msg.from?.id ?? msg.chat.id),
+          display_name: msg.from?.first_name ?? msg.from?.username ?? 'operator',
+        },
+        body,
+        attachments,
+        received_at: new Date(),
+        metadata: { message_id: msg.message_id, voice: Boolean(msg.voice) },
+      };
+      await this.handler?.(incoming);
+    } finally {
+      stopTyping();
+    }
   }
 
   private async handleCallback(cb: NonNullable<TgUpdate['callback_query']>): Promise<void> {
+    if (String(cb.from.id) !== String(this.adminChatId)) {
+      await this.call('answerCallbackQuery', {
+        callback_query_id: cb.id,
+        text: 'Not authorized.',
+        show_alert: true,
+      });
+      return;
+    }
     // callback data: "approve:<approvalId>" | "reject:<approvalId>"
     const [action, approvalId] = (cb.data ?? '').split(':');
     if ((action === 'approve' || action === 'reject') && approvalId) {
@@ -228,6 +278,17 @@ export class TelegramGateway implements Gateway {
 
   async sendFinal(target: MessageTarget, narrative: string): Promise<void> {
     await this.send(target, { body: narrative });
+  }
+
+  private startTyping(chatId: number): () => void {
+    const pulse = () =>
+      this.call('sendChatAction', { chat_id: chatId, action: 'typing' }).catch((err) =>
+        logger.debug({ err, chatId }, 'telegram typing action failed'),
+      );
+    void pulse();
+    const timer = setInterval(() => void pulse(), 4_000);
+    timer.unref();
+    return () => clearInterval(timer);
   }
 
   async requestApproval(target: MessageTarget, req: ApprovalRequest): Promise<ApprovalResponse> {

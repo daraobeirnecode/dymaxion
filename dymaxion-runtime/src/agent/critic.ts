@@ -11,8 +11,8 @@ export interface Review {
 
 const SYSTEM = `You review a GIS agent run before delivery. Respond ONLY with minified JSON:
 {"needsRevision":true|false,"notes":"<one sentence>"}
-needsRevision=true only when a step failed silently, outputs contradict the plan, or a
-required output is missing. Stub outputs (status:"stub") are expected in Sprint 1 — not a failure.`;
+needsRevision=true when a step failed silently, outputs contradict the plan, a required
+output is missing, or any output reports status:"stub". Stub output is never success.`;
 
 export async function review(
   plan: Plan,

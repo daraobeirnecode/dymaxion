@@ -26,8 +26,9 @@ export async function answerDirectly(
   memory: RecalledContext,
   agentRunId: string,
 ): Promise<string> {
-  const catalog = allSkills()
-    .map((s) => `- ${s.manifest.slug}: ${s.manifest.description}${s.available ? '' : ' [currently unavailable]'}`)
+  const availableSkills = allSkills().filter((skill) => skill.available);
+  const catalog = availableSkills
+    .map((skill) => `- ${skill.manifest.slug}: ${skill.manifest.description}`)
     .join('\n');
   const context = memory.recent
     .map((m) => `${m.direction}: ${m.body.slice(0, 200)}`)
@@ -44,7 +45,7 @@ export async function answerDirectly(
     });
     return res.text.trim();
   } catch (err) {
-    return `Ready. ${allSkills().length} skills registered. Ask for GIS work or "list your skills". (${(err as Error).message})`;
+    return `Ready. ${availableSkills.length} skills available. Ask for GIS work or "list your skills". (${(err as Error).message})`;
   }
 }
 
