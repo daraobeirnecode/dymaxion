@@ -55,7 +55,7 @@ cross-platform `arcgis` Python API). The four arcpy/Pro-dependent skills
 | Service | Purpose | Where |
 | --- | --- | --- |
 | dymaxion-postgres | memory + audit + OAuth tokens (pgvector) | 127.0.0.1:5434 |
-| dymaxion-langfuse | LLM observability | http://localhost:3000 |
+| dymaxion-langfuse | LLM observability | http://localhost:3000 (set `LANGFUSE_PORT` in `.env` if 3000 is taken) |
 | dymaxion-whisper | voice-memo transcription | internal :8000 |
 | dymaxion-runtime | the agent daemon + runtime API | internal :8787 |
 | dymaxion-admin | dashboard + web chat + OAuth callbacks | http://$ADMIN_BIND_HOST:3001 |

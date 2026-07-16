@@ -1,4 +1,8 @@
 # Dymaxion — full stack.
+# Explicit project name so this stack never shares a compose namespace with
+# other stacks whose directory happens to be named "dymaxion".
+name: dymaxion-agent
+
 # Standalone compose file: runs alongside existing n8n / Echo / Hermes stacks,
 # never merged into them. Network: dymaxion-net.
 #
@@ -35,13 +39,15 @@ services:
     container_name: dymaxion-langfuse
     environment:
       DATABASE_URL: postgres://dymaxion:${POSTGRES_PASSWORD}@dymaxion-postgres:5432/dymaxion?schema=langfuse
-      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_URL: http://localhost:${LANGFUSE_PORT:-3000}
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
       SALT: ${LANGFUSE_SALT}
       ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY}
       TELEMETRY_ENABLED: "false"
     ports:
-      - "127.0.0.1:3000:3000"
+      # Host port configurable — set LANGFUSE_PORT in .env if 3000 is taken
+      # (e.g. by another stack on the same machine)
+      - "127.0.0.1:${LANGFUSE_PORT:-3000}:3000"
     depends_on:
       dymaxion-postgres:
         condition: service_healthy

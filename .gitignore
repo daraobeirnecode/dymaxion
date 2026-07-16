@@ -5,6 +5,9 @@
 *.age
 *.key
 
+# Machine-local compose overrides
+docker-compose.override.yml
+
 # Data + runtime state
 data/
 logs/
