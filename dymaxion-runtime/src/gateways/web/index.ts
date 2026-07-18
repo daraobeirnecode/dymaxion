@@ -22,6 +22,7 @@ import { awaitDecision, decideApproval } from '../../security/approval.js';
 import { allSkills } from '../../skills/registry.js';
 import { workerAvailable, workerConfigured, workerExecutionEnabled } from '../../worker/client.js';
 import { logger } from '../../observability/logger.js';
+import { authenticateInternalApproval } from '../../security/internal-approval-auth.js';
 
 const PORT = Number(process.env.RUNTIME_HTTP_PORT ?? 8787);
 
@@ -122,15 +123,19 @@ export class WebGateway implements Gateway {
   }
 
   private async handleApproval(id: string, req: HttpRequest, res: ServerResponse): Promise<void> {
+    const authenticated = authenticateInternalApproval(req.headers);
+    if (!authenticated.ok) {
+      res.writeHead(authenticated.status).end(JSON.stringify({ error: authenticated.error }));
+      return;
+    }
     const body = JSON.parse((await readBody(req)) || '{}') as {
       decision?: 'approved' | 'rejected';
-      decided_by?: string;
     };
     if (!id || (body.decision !== 'approved' && body.decision !== 'rejected')) {
       res.writeHead(400).end(JSON.stringify({ error: 'approved or rejected decision required' }));
       return;
     }
-    const accepted = await decideApproval(id, body.decision, body.decided_by ?? 'admin-dashboard');
+    const accepted = await decideApproval(id, body.decision, authenticated.approverIdentity);
     res.writeHead(accepted ? 200 : 409).end(JSON.stringify({ ok: accepted }));
   }
 

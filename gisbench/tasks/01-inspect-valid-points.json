@@ -4,7 +4,7 @@
   "capability": "inspect_dataset",
   "input": { "fixture": "synthetic-points.geojson" },
   "expected": { "outcome": "success", "golden_file": "inspect-valid-points.json" },
-  "tolerances": { "numeric_absolute": 0, "normalized_fields": ["source paths", "file mtime", "path-derived hashes"] },
+  "tolerances": { "numeric_absolute": 0, "normalized_fields": ["$.output.passport.source_uri", "$.output.passport.source_handle", "$.output.evidence.source.uri", "$.output.evidence.source.identity.value", "$.output.evidence.source.version.modified_at", "$.output.evidence.parameters.canonical_json", "$.output.evidence.parameters.sha256", "$.output.evidence.outputs[0].sha256"] },
   "allowed_operations": ["boundary_preflight", "stat", "read_file", "parse_geojson", "hash_sha256", "derive_metadata"],
   "expected_approval": { "required": false, "decision": "not-requested" }
 }

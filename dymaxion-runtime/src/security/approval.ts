@@ -34,7 +34,7 @@ interface ApprovalDraft {
   payload: Record<string, unknown>;
   payloadHash: string;
   target: string;
-  credentialIdentity: string | null;
+  credentialIdentity: string;
   requestedAt: Date;
   expiresAt: Date;
 }
@@ -42,7 +42,7 @@ interface ApprovalDraft {
 interface ApprovalBinding {
   payloadHash: string;
   target: string;
-  credentialIdentity: string | null;
+  credentialIdentity: string;
 }
 
 export interface ApprovalStore {
@@ -247,6 +247,10 @@ function deps(supplied: ApprovalDependencies = {}) {
 }
 
 function publicRequest(record: ApprovalRecord): ApprovalRequest {
+  const credentialIdentity = record.credentialIdentity;
+  if (!credentialIdentity) {
+    throw new Error('historical approval without a trusted credential identity cannot be dispatched');
+  }
   return {
     id: record.id,
     agent_run_id: record.agentRunId,
@@ -254,34 +258,10 @@ function publicRequest(record: ApprovalRecord): ApprovalRequest {
     payload: record.payload,
     payload_hash: record.payloadHash,
     target: record.target,
-    credential_identity: record.credentialIdentity,
+    credential_identity: credentialIdentity,
     requested_at: record.requestedAt.toISOString(),
     expires_at: record.expiresAt.toISOString(),
   };
-}
-
-export function extractCredentialIdentity(payload: Record<string, unknown>): string | null {
-  const keys = new Set([
-    'credential_identity',
-    'credentialIdentity',
-    'account_id',
-    'accountId',
-    'connection_id',
-    'connectionId',
-    'portal_username',
-  ]);
-  const stack: unknown[] = [payload];
-  const seen = new Set<object>();
-  while (stack.length) {
-    const value = stack.pop();
-    if (!value || typeof value !== 'object' || seen.has(value)) continue;
-    seen.add(value);
-    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-      if (keys.has(key) && typeof item === 'string' && item.trim()) return item.trim();
-      if (item && typeof item === 'object') stack.push(item);
-    }
-  }
-  return null;
 }
 
 export function deriveApprovalTarget(skill: string, payload: Record<string, unknown>): string {
@@ -311,11 +291,12 @@ export async function createApprovalRequest(
   agentRunId: string,
   stepDescription: string,
   payload: Record<string, unknown>,
-  options: { timeoutMinutes: number; target: string; credentialIdentity?: string | null },
+  options: { timeoutMinutes: number; target: string; credentialIdentity: string },
   supplied: ApprovalDependencies = {},
 ): Promise<ApprovalRequest> {
   const { store, now, audit } = deps(supplied);
   if (!options.target.trim()) throw new Error('approval target is required');
+  if (!options.credentialIdentity.trim()) throw new Error('trusted credential identity is required');
   const requestedAt = now();
   const expiresAt = new Date(requestedAt.getTime() + options.timeoutMinutes * 60_000);
   const record = await store.create({
@@ -325,7 +306,7 @@ export async function createApprovalRequest(
     payload,
     payloadHash: sha256Canonical(payload),
     target: options.target,
-    credentialIdentity: options.credentialIdentity ?? null,
+    credentialIdentity: options.credentialIdentity,
     requestedAt,
     expiresAt,
   });
@@ -369,7 +350,7 @@ export async function consumeApproval(
   request: ApprovalRequest,
   payload: Record<string, unknown>,
   target: string,
-  credentialIdentity: string | null,
+  credentialIdentity: string,
   supplied: ApprovalDependencies = {},
 ): Promise<ApprovalRecord> {
   const { store, now, audit } = deps(supplied);

@@ -20,9 +20,9 @@ import {
   awaitDecision,
   consumeApproval,
   deriveApprovalTarget,
-  extractCredentialIdentity,
 } from '../security/approval.js';
 import { auditEvent } from '../security/audit.js';
+import { resolveExecutionCredentialIdentity } from '../security/execution-identity.js';
 import { traceRun, flushLangfuse } from '../observability/langfuse.js';
 import { logger } from '../observability/logger.js';
 import type { Gateway, IncomingMessage, MessageTarget, StepResult } from '../gateways/common.js';
@@ -91,7 +91,7 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
     for (const step of plan.steps) {
       if (step.destructive) {
         const approvalTarget = deriveApprovalTarget(step.skill, step.input);
-        const credentialIdentity = extractCredentialIdentity(step.input);
+        const credentialIdentity = resolveExecutionCredentialIdentity(step.skill);
         const req = await createApprovalRequest(runId, step.description, step.input, {
           timeoutMinutes,
           target: approvalTarget,
@@ -111,7 +111,12 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
         }
         // Recompute and atomically consume immediately before dispatch. Any
         // payload/target/identity change or replay fails closed here.
-        await consumeApproval(req, step.input, approvalTarget, credentialIdentity);
+        await consumeApproval(
+          req,
+          step.input,
+          deriveApprovalTarget(step.skill, step.input),
+          resolveExecutionCredentialIdentity(step.skill),
+        );
       }
 
       const result = await runSkill(step.skill, step.input, runId);
@@ -215,7 +220,7 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
   for (const step of storedPlan.steps) {
     if (step.destructive) {
       const approvalTarget = deriveApprovalTarget(step.skill, step.input);
-      const credentialIdentity = extractCredentialIdentity(step.input);
+      const credentialIdentity = resolveExecutionCredentialIdentity(step.skill);
       const request = await createApprovalRequest(replay.id, `Replay: ${step.description}`, step.input, {
         timeoutMinutes,
         target: approvalTarget,
@@ -230,7 +235,12 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
         .catch(async () => awaitDecision(request));
       await db.update(schema.agentRuns).set({ status: 'running' }).where(eq(schema.agentRuns.id, replay.id));
       if (!decision.approved) break;
-      await consumeApproval(request, step.input, approvalTarget, credentialIdentity);
+      await consumeApproval(
+        request,
+        step.input,
+        deriveApprovalTarget(step.skill, step.input),
+        resolveExecutionCredentialIdentity(step.skill),
+      );
     }
     const r = await runSkill(step.skill, step.input, replay.id);
     results.push({ ok: r.ok, output: r.output, error: r.error, cost_usd: r.costUsd, duration_ms: r.durationMs });

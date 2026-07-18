@@ -7,7 +7,6 @@ import {
   createApprovalRequest,
   decideApproval,
   deriveApprovalTarget,
-  extractCredentialIdentity,
 } from '../src/security/approval.js';
 
 const now = new Date('2026-07-18T12:00:00.000Z');
@@ -24,7 +23,7 @@ const payload = {
   credential_identity: 'arcgis:user-123',
 };
 const target = deriveApprovalTarget('edit_feature_service', payload);
-const credentialIdentity = extractCredentialIdentity(payload);
+const credentialIdentity = 'arcgis:user-123';
 
 test('destructive approvals fail closed when no exact target is declared', () => {
   assert.throws(

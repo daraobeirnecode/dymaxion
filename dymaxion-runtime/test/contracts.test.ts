@@ -87,6 +87,7 @@ test('evidence bundles cover provenance and reject unknown fields recursively', 
 
 test('canonical JSON and hashes are stable across object key order', () => {
   assert.equal(canonicalJson({ z: 1, a: { d: 4, b: 2 } }), '{"a":{"b":2,"d":4},"z":1}');
+  assert.equal(canonicalJson({ ä: 4, å: 3, z: 2, a: 1 }), '{"a":1,"z":2,"ä":4,"å":3}');
   assert.equal(sha256Canonical({ b: 2, a: 1 }), sha256Canonical({ a: 1, b: 2 }));
   assert.throws(() => canonicalJson({ value: Number.NaN }), /finite JSON number/);
 });

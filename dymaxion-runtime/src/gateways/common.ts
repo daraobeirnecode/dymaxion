@@ -62,7 +62,7 @@ export interface ApprovalRequest {
   payload: Record<string, unknown>;
   payload_hash: string;
   target: string;
-  credential_identity: string | null;
+  credential_identity: string;
   requested_at: string;
   expires_at: string;
 }

@@ -1,13 +1,12 @@
-// Dymaxion Windows Worker Phase 0 scaffold. Health and authenticated file
-// shuttle endpoints remain for build/transport verification. Prompt-addressable
-// ArcPy and ArcGIS Pro execution routes are permanently disabled (HTTP 410)
-// pending an allowlisted job catalog and independent security testing.
+// Dymaxion Windows Worker Phase 0 scaffold. Only authenticated health remains
+// live. Execution and file-shuttle routes return HTTP 410 pending an allowlisted
+// job catalog and independent security testing.
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { isAuthorized } from './auth.js';
 import { healthReport } from './health.js';
-import { handleUpload, handleDownload } from './file-shuttler.js';
 import { log } from './logger.js';
+import { PHASE0_DISABLED_MESSAGE, phase0RouteDisabled } from './phase0-policy.js';
 
 const PORT = Number(process.env.WORKER_PORT ?? 4444);
 
@@ -24,22 +23,14 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://worker');
     const route = `${req.method} ${url.pathname}`;
 
+    if (phase0RouteDisabled(route)) {
+      json(res, 410, { error: PHASE0_DISABLED_MESSAGE });
+      return;
+    }
+
     switch (route) {
       case 'GET /health':
         json(res, 200, await healthReport());
-        return;
-      case 'POST /arcpy/run':
-      case 'POST /pro-cli/run':
-        json(res, 410, {
-          error:
-            'Windows execution is disabled in Phase 0 pending an allowlisted job catalog and independent security testing.',
-        });
-        return;
-      case 'POST /files/upload':
-        await handleUpload(req, res, url.searchParams);
-        return;
-      case 'GET /files/download':
-        await handleDownload(res, url.searchParams);
         return;
       default:
         json(res, 404, { error: `no route: ${route}` });

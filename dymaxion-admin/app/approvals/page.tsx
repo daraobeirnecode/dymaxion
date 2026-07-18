@@ -48,6 +48,12 @@ export default async function ApprovalsPage() {
                 </Link>
               </div>
               <p className="text-sm text-neutral-200">{req.stepDescription}</p>
+              <dl className="grid gap-1 text-xs text-neutral-400 md:grid-cols-2">
+                <div><dt className="inline text-neutral-500">Target: </dt><dd className="inline font-mono break-all">{req.target}</dd></div>
+                <div><dt className="inline text-neutral-500">Credential: </dt><dd className="inline font-mono">{req.credentialIdentity ?? 'invalid historical row'}</dd></div>
+                <div><dt className="inline text-neutral-500">Expires: </dt><dd className="inline font-mono">{fmtDate(req.expiresAt)}</dd></div>
+                <div><dt className="inline text-neutral-500">Payload hash: </dt><dd className="inline font-mono">{req.payloadHash}</dd></div>
+              </dl>
               <details>
                 <summary className="cursor-pointer text-xs text-neutral-500">step payload</summary>
                 <pre className="code-block mt-2">{prettyJson(req.stepPayload)}</pre>
@@ -73,6 +79,7 @@ export default async function ApprovalsPage() {
                 <th>Step</th>
                 <th>Decision</th>
                 <th>By</th>
+                <th>Consumed</th>
                 <th>Responded</th>
               </tr>
             </thead>
@@ -90,6 +97,7 @@ export default async function ApprovalsPage() {
                     <span className={statusBadgeClass(req.decision)}>{req.decision}</span>
                   </td>
                   <td className="font-mono text-xs">{req.decidedBy ?? '—'}</td>
+                  <td className="font-mono">{req.consumedAt ? fmtDate(req.consumedAt) : '—'}</td>
                   <td className="font-mono">{fmtDate(req.respondedAt)}</td>
                 </tr>
               ))}

@@ -24,6 +24,12 @@ export async function POST(
       { status: 400 }
     );
   }
+  if (decision === 'approved') {
+    return Response.json(
+      { error: 'model-authored skill activation is disabled in Phase 0' },
+      { status: 410 }
+    );
+  }
 
   const updated = await db
     .update(schema.proposedSkills)

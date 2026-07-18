@@ -4,6 +4,7 @@ import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { runSkill, type RunSkillDependencies } from '../skills/executor.js';
+import { sha256Canonical, sha256Text } from '../contracts/canonical.js';
 
 const TaskSchema = z
   .object({
@@ -56,8 +57,78 @@ function benchmarkRoot(): string {
   return process.env.GISBENCH_ROOT ?? resolve(process.cwd(), '../gisbench');
 }
 
-function normalizeResult(
+type NormalizationContext = { workspaceRoot: string; fixtureRoot: string };
+
+const FIELD_NORMALIZERS: Record<string, (value: unknown, context: NormalizationContext) => unknown> = {
+  '$.error': (value, context) => {
+    if (typeof value !== 'string') throw new TypeError('$.error must be a string');
+    return value
+      .replaceAll(context.fixtureRoot, '<FIXTURE_ROOT>')
+      .replaceAll(context.workspaceRoot, '<WORKSPACE_ROOT>');
+  },
+  '$.output.passport.source_uri': () => '<FIXTURE_URI>',
+  '$.output.passport.source_handle': () => '<FIXTURE_PATH>',
+  '$.output.evidence.source.uri': () => '<FIXTURE_URI>',
+  '$.output.evidence.source.identity.value': () => '<FIXTURE_PATH>',
+  '$.output.evidence.source.version.modified_at': () => '<NORMALIZED_FILE_MTIME>',
+  '$.output.evidence.parameters.canonical_json': () => '<ENVIRONMENT_DEPENDENT_CANONICAL_PARAMETERS>',
+  '$.output.evidence.parameters.sha256': () => '<ENVIRONMENT_DEPENDENT_PARAMETER_HASH>',
+  '$.output.evidence.outputs[0].sha256': () => '<ENVIRONMENT_DEPENDENT_OUTPUT_HASH>',
+};
+
+function setNormalizedField(
+  root: Record<string, unknown>,
+  path: string,
+  context: NormalizationContext,
+): void {
+  const normalize = FIELD_NORMALIZERS[path];
+  assert.ok(normalize, `unsupported declared normalization field: ${path}`);
+  const segments = path
+    .replace(/^\$\.?/, '')
+    .replace(/\[(\d+)\]/g, '.$1')
+    .split('.')
+    .filter(Boolean);
+  assert.ok(segments.length, `invalid normalization field: ${path}`);
+  let parent: unknown = root;
+  for (const segment of segments.slice(0, -1)) {
+    assert.ok(parent !== null && typeof parent === 'object', `${path}: missing parent '${segment}'`);
+    parent = (parent as Record<string, unknown>)[segment];
+  }
+  assert.ok(parent !== null && typeof parent === 'object', `${path}: missing field parent`);
+  const key = segments.at(-1)!;
+  const record = parent as Record<string, unknown>;
+  assert.ok(Object.hasOwn(record, key), `${path}: declared field does not exist`);
+  record[key] = normalize(record[key], context);
+}
+
+function validateEvidenceHashes(normalized: Record<string, unknown>): void {
+  if (normalized.ok !== true) return;
+  assert.ok(normalized.output && typeof normalized.output === 'object', 'successful result requires output');
+  const output = normalized.output as Record<string, unknown>;
+  const passport = output.passport as Record<string, unknown>;
+  const evidence = output.evidence as Record<string, unknown>;
+  assert.ok(passport && evidence, 'successful result requires passport and evidence');
+  const source = evidence.source as Record<string, unknown>;
+  const parameters = evidence.parameters as Record<string, unknown>;
+  const outputs = evidence.outputs as Array<Record<string, unknown>>;
+  assert.equal(source.sha256, passport.file_sha256, 'evidence source hash must match the inspected file hash');
+  assert.equal(
+    parameters.sha256,
+    sha256Text(String(parameters.canonical_json)),
+    'evidence parameter hash must validate before normalization',
+  );
+  assert.ok(Array.isArray(outputs) && outputs.length === 1, 'exactly one output artifact is required');
+  assert.equal(outputs[0]?.name, 'dataset_passport');
+  assert.equal(
+    outputs[0]?.sha256,
+    sha256Canonical(passport),
+    'evidence output hash must validate before normalization',
+  );
+}
+
+export function normalizeResult(
   result: { ok: boolean; output?: unknown; error?: string; costUsd: number },
+  normalizedFields: string[],
   workspaceRoot: string,
   fixtureRoot: string,
 ): unknown {
@@ -69,30 +140,9 @@ function normalizeResult(
       cost_usd: result.costUsd,
     }),
   ) as Record<string, unknown>;
-  if (typeof normalized.error === 'string') {
-    normalized.error = normalized.error
-      .replaceAll(fixtureRoot, '<FIXTURE_ROOT>')
-      .replaceAll(workspaceRoot, '<WORKSPACE_ROOT>');
-  }
-  if (!result.ok || !normalized.output || typeof normalized.output !== 'object') return normalized;
-
-  const output = normalized.output as Record<string, unknown>;
-  const passport = output.passport as Record<string, unknown>;
-  const evidence = output.evidence as Record<string, unknown>;
-  const source = evidence.source as Record<string, unknown>;
-  const identity = source.identity as Record<string, unknown>;
-  const version = source.version as Record<string, unknown>;
-  const parameters = evidence.parameters as Record<string, unknown>;
-  const outputs = evidence.outputs as Array<Record<string, unknown>>;
-
-  passport.source_uri = '<FIXTURE_URI>';
-  passport.source_handle = '<FIXTURE_PATH>';
-  source.uri = '<FIXTURE_URI>';
-  identity.value = '<FIXTURE_PATH>';
-  version.modified_at = '<NORMALIZED_FILE_MTIME>';
-  parameters.canonical_json = '<ENVIRONMENT_DEPENDENT_CANONICAL_PARAMETERS>';
-  parameters.sha256 = '<ENVIRONMENT_DEPENDENT_PARAMETER_HASH>';
-  for (const artifact of outputs) artifact.sha256 = '<ENVIRONMENT_DEPENDENT_OUTPUT_HASH>';
+  validateEvidenceHashes(normalized);
+  const context = { workspaceRoot, fixtureRoot };
+  for (const field of normalizedFields) setNormalizedField(normalized, field, context);
   return normalized;
 }
 
@@ -164,7 +214,12 @@ async function executeTask(
   const disallowed = [...operations].filter((operation) => !task.allowed_operations.includes(operation as never));
   assert.deepEqual(disallowed, [], `${task.id}: disallowed operations`);
   return {
-    normalized: normalizeResult(result, roots.workspace, roots.fixtures),
+    normalized: normalizeResult(
+      result,
+      task.tolerances.normalized_fields,
+      roots.workspace,
+      roots.fixtures,
+    ),
     operations: [...operations],
   };
 }

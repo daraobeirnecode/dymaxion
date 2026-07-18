@@ -2,7 +2,7 @@
   "name": "dymaxion-runtime",
   "version": "0.1.0",
   "private": true,
-  "description": "Dymaxion GIS agent runtime — Mastra + Vercel AI SDK, multi-gateway, skill-first",
+  "description": "Dymaxion GIS agent runtime — TypeScript + Vercel AI SDK, multi-gateway, skill-first",
   "type": "module",
   "main": "dist/main.js",
   "bin": {
@@ -21,15 +21,15 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^2.0.0",
-    "@ai-sdk/azure": "^2.0.0",
-    "@ai-sdk/cohere": "^2.0.0",
-    "@ai-sdk/google": "^2.0.0",
-    "@ai-sdk/openai": "^2.0.0",
-    "@mastra/core": "latest",
+    "@ai-sdk/anthropic": "4.0.16",
+    "@ai-sdk/azure": "4.0.17",
+    "@ai-sdk/cohere": "4.0.11",
+    "@ai-sdk/google": "4.0.18",
+    "@ai-sdk/openai": "4.0.16",
+
     "@modelcontextprotocol/sdk": "^1.12.0",
-    "ai": "^5.0.0",
-    "drizzle-orm": "^0.44.0",
+    "ai": "7.0.31",
+    "drizzle-orm": "0.45.2",
     "langfuse": "^3.35.0",
     "openid-client": "^6.5.0",
     "pino": "^9.6.0",
@@ -39,6 +39,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@mastra/core": "1.51.0",
     "@types/node": "^22.13.0",
     "typescript": "^5.8.0"
   }
