@@ -3,7 +3,7 @@ name: Phase 0 CI
 on:
   pull_request:
   push:
-    branches: [main, feat/phase-0-foundation]
+    branches: [main]
 
 permissions:
   contents: read
