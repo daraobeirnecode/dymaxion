@@ -1,0 +1,170 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "passport": {
+      "schema_version": "1.0.0",
+      "source_uri": "<FIXTURE_URI>",
+      "source_handle": "<FIXTURE_PATH>",
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "file_sha256": "4cde829264587578f45b54159874db7904fe8b89a52f77b1d000aa3af73c5f33",
+      "file_size_bytes": 672,
+      "format": "GeoJSON",
+      "crs": "OGC:CRS84",
+      "axis_order": "longitude,latitude",
+      "units": "degrees",
+      "extent": [
+        -105.1001,
+        39.6002,
+        -104.9002,
+        39.7001
+      ],
+      "schema": [
+        {
+          "name": "active",
+          "types": [
+            "boolean"
+          ],
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "nullable": false
+        },
+        {
+          "name": "observed_at",
+          "types": [
+            "string"
+          ],
+          "nullable": false
+        },
+        {
+          "name": "site_id",
+          "types": [
+            "number"
+          ],
+          "nullable": false
+        }
+      ],
+      "feature_count": 2,
+      "geometry_types": [
+        "Point"
+      ],
+      "temporal_fields": [
+        {
+          "name": "observed_at",
+          "min": "2026-01-15T10:00:00.000Z",
+          "max": "2026-02-20T11:30:00.000Z",
+          "parsed_count": 2
+        }
+      ],
+      "warnings": []
+    },
+    "evidence": {
+      "schema_version": "1.0.0",
+      "bundle_id": "inspect_dataset:4cde829264587578",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "source": {
+        "uri": "<FIXTURE_URI>",
+        "identity": {
+          "kind": "file",
+          "value": "<FIXTURE_PATH>"
+        },
+        "version": {
+          "modified_at": "<NORMALIZED_FILE_MTIME>"
+        },
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "4cde829264587578f45b54159874db7904fe8b89a52f77b1d000aa3af73c5f33"
+      },
+      "gis_metadata": {
+        "format": "GeoJSON",
+        "crs": "OGC:CRS84",
+        "axis_order": "longitude,latitude",
+        "units": "degrees",
+        "extent": [
+          -105.1001,
+          39.6002,
+          -104.9002,
+          39.7001
+        ],
+        "schema": [
+          {
+            "name": "active",
+            "types": [
+              "boolean"
+            ],
+            "nullable": false
+          },
+          {
+            "name": "name",
+            "types": [
+              "string"
+            ],
+            "nullable": false
+          },
+          {
+            "name": "observed_at",
+            "types": [
+              "string"
+            ],
+            "nullable": false
+          },
+          {
+            "name": "site_id",
+            "types": [
+              "number"
+            ],
+            "nullable": false
+          }
+        ],
+        "row_count": 2,
+        "geometry_types": [
+          "Point"
+        ],
+        "temporal_fields": [
+          {
+            "name": "observed_at",
+            "min": "2026-01-15T10:00:00.000Z",
+            "max": "2026-02-20T11:30:00.000Z",
+            "parsed_count": 2
+          }
+        ]
+      },
+      "parameters": {
+        "canonical_json": "<ENVIRONMENT_DEPENDENT_CANONICAL_PARAMETERS>",
+        "sha256": "<ENVIRONMENT_DEPENDENT_PARAMETER_HASH>"
+      },
+      "execution": {
+        "capability": "inspect_dataset",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "dataset_passport",
+          "sha256": "<ENVIRONMENT_DEPENDENT_OUTPUT_HASH>",
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "geojson_structure",
+              "output_schema"
+            ],
+            "warnings": []
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

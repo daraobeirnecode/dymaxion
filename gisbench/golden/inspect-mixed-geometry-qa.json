@@ -1,0 +1,136 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "passport": {
+      "schema_version": "1.0.0",
+      "source_uri": "<FIXTURE_URI>",
+      "source_handle": "<FIXTURE_PATH>",
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "file_sha256": "9fdc8752686c986110d27219d598f75c4bc86b9e99bfa22af8ce358719df5e41",
+      "file_size_bytes": 528,
+      "format": "GeoJSON",
+      "crs": "OGC:CRS84",
+      "axis_order": "longitude,latitude",
+      "units": "degrees",
+      "extent": [
+        2.34,
+        48.84,
+        2.36,
+        48.86
+      ],
+      "schema": [
+        {
+          "name": "asset_id",
+          "types": [
+            "string"
+          ],
+          "nullable": false
+        },
+        {
+          "name": "value",
+          "types": [
+            "number"
+          ],
+          "nullable": true
+        }
+      ],
+      "feature_count": 3,
+      "geometry_types": [
+        "LineString",
+        "Point"
+      ],
+      "temporal_fields": [],
+      "warnings": [
+        "Dataset contains mixed geometry types.",
+        "1 feature(s) have null geometry."
+      ]
+    },
+    "evidence": {
+      "schema_version": "1.0.0",
+      "bundle_id": "inspect_dataset:9fdc8752686c9861",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "source": {
+        "uri": "<FIXTURE_URI>",
+        "identity": {
+          "kind": "file",
+          "value": "<FIXTURE_PATH>"
+        },
+        "version": {
+          "modified_at": "<NORMALIZED_FILE_MTIME>"
+        },
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "9fdc8752686c986110d27219d598f75c4bc86b9e99bfa22af8ce358719df5e41"
+      },
+      "gis_metadata": {
+        "format": "GeoJSON",
+        "crs": "OGC:CRS84",
+        "axis_order": "longitude,latitude",
+        "units": "degrees",
+        "extent": [
+          2.34,
+          48.84,
+          2.36,
+          48.86
+        ],
+        "schema": [
+          {
+            "name": "asset_id",
+            "types": [
+              "string"
+            ],
+            "nullable": false
+          },
+          {
+            "name": "value",
+            "types": [
+              "number"
+            ],
+            "nullable": true
+          }
+        ],
+        "row_count": 3,
+        "geometry_types": [
+          "LineString",
+          "Point"
+        ],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "<ENVIRONMENT_DEPENDENT_CANONICAL_PARAMETERS>",
+        "sha256": "<ENVIRONMENT_DEPENDENT_PARAMETER_HASH>"
+      },
+      "execution": {
+        "capability": "inspect_dataset",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "dataset_passport",
+          "sha256": "<ENVIRONMENT_DEPENDENT_OUTPUT_HASH>",
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "geojson_structure",
+              "output_schema"
+            ],
+            "warnings": [
+              "Dataset contains mixed geometry types.",
+              "1 feature(s) have null geometry."
+            ]
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

@@ -15,6 +15,8 @@ allowed_data_sources:
     path_pattern: '/workspace/**'
   - type: filesystem
     path_pattern: '/Users/dara/Projects/**'
+  - type: filesystem
+    root_env: DYMAXION_WORKSPACE_ROOT  # optional explicit root for local tests/dev
 
 denied_hostnames:
   - '*.cityofsacramento.org'

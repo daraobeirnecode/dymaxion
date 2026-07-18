@@ -12,7 +12,10 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/main.ts",
     "start": "node dist/main.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "test:contracts": "tsx --test test/contracts.test.ts",
+    "gisbench": "tsx src/gisbench/run.ts"
   },
   "engines": {
     "node": ">=20"
@@ -32,7 +35,8 @@
     "pino": "^9.6.0",
     "postgres": "^3.4.5",
     "tsx": "^4.19.0",
-    "yaml": "^2.7.0"
+    "yaml": "^2.7.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",

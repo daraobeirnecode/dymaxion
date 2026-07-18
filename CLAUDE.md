@@ -8,7 +8,7 @@ Named for Gerardus Dymaxion. Framed as an operator you delegate to, not a chatbo
 
 ## Stack (containers) — UPDATED 2026-07-14
 
-Framework: **Mastra** (TypeScript agent framework) + **Vercel AI SDK** for LLM providers + **openid-client** for OAuth. NOT using LiteLLM (removed in favor of native TypeScript middleware). See `Framework Decision.md` for reasoning.
+Framework: **Mastra** (TypeScript agent framework) + **Vercel AI SDK** for LLM providers + **openid-client** for OAuth. NOT using LiteLLM in the core runtime. [ADR-0001](docs/adr/0001-phase-0-runtime-and-execution-boundaries.md) is authoritative; conflicting Sprint 1 architecture text is historical.
 
 - **dymaxion-runtime** — TypeScript/Node.js 20+ agent daemon on Mastra
 - **dymaxion-postgres** — Postgres 18 + pgvector + AGE (memory + audit + OAuth tokens)
@@ -20,8 +20,8 @@ Framework: **Mastra** (TypeScript agent framework) + **Vercel AI SDK** for LLM p
 MCP servers (esri, postgres, filesystem, github) are runtime SUBPROCESSES
 spawned per `config/mcp-servers.yaml` — not containers.
 
-Plus:
-- **windows-worker** — Node.js service on the Windows machine for ArcGIS Pro CLI + arcpy (Sprint 1 first-class; Tailscale-connected on split topology, host.docker.internal on Windows-only topology)
+Plus (historical scaffold only):
+- **windows-worker** — optional Node.js service code for ArcGIS Pro CLI + arcpy. Phase 0 execution is disabled pending an allowlisted-job redesign and independent security testing.
 
 Multi-arch: all container images built for linux/amd64 + linux/arm64 — runs natively on Apple Silicon and x86_64 Linux.
 
@@ -41,7 +41,7 @@ Install:
 
 ## Design non-negotiables
 
-- **Skills, not conversation.** Every capability is a real skill folder with SKILL.md + manifest.yaml + executor. No capability lives only in prompts.
+- **Versioned capabilities, not prompt-only behavior.** Production capability behavior has strict schemas, classification, limits, validation and evidence. The 45 Sprint 1 skill folders are historical scaffolds unless independently implemented and tested; native capabilities may use the runtime dispatcher without adding catalog folders.
 - **Human-in-the-loop for consequences.** All destructive operations (write to production, drop table, publish service, delete file) require explicit approval via the originating gateway.
 - **Multi-LLM.** Every LLM call goes through the 6-step middleware chain in `src/llm/middleware.ts`. Provider is configurable per skill via `config/llm-routing.yaml`. No provider is hardcoded.
 - **Persistent memory.** Postgres schema `dymaxion.*` holds messages, projects, preferences, skill history, audit log. Never re-explain.

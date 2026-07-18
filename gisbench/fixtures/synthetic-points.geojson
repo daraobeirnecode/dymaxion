@@ -1,0 +1,28 @@
+{
+  "type": "FeatureCollection",
+  "name": "synthetic_monitoring_sites",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "site-1",
+      "properties": {
+        "site_id": 1,
+        "name": "North Ridge",
+        "observed_at": "2026-01-15T10:00:00Z",
+        "active": true
+      },
+      "geometry": { "type": "Point", "coordinates": [-105.1001, 39.7001] }
+    },
+    {
+      "type": "Feature",
+      "id": "site-2",
+      "properties": {
+        "site_id": 2,
+        "name": "South Mesa",
+        "observed_at": "2026-02-20T11:30:00Z",
+        "active": false
+      },
+      "geometry": { "type": "Point", "coordinates": [-104.9002, 39.6002] }
+    }
+  ]
+}

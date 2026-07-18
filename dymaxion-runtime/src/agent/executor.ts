@@ -15,7 +15,13 @@ import { shouldAttemptAuthoring, draftSkill } from '../skills/author.js';
 import { getSkill } from '../skills/registry.js';
 import { persistIncoming, persistOutgoing, loadRelevant } from '../memory/conversation.js';
 import { getPreference } from '../memory/preferences.js';
-import { createApprovalRequest, awaitDecision } from '../security/approval.js';
+import {
+  createApprovalRequest,
+  awaitDecision,
+  consumeApproval,
+  deriveApprovalTarget,
+  extractCredentialIdentity,
+} from '../security/approval.js';
 import { auditEvent } from '../security/audit.js';
 import { traceRun, flushLangfuse } from '../observability/langfuse.js';
 import { logger } from '../observability/logger.js';
@@ -83,8 +89,14 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
     let totalCost = 0;
 
     for (const step of plan.steps) {
-      if (step.destructive && !step.preApproved) {
-        const req = await createApprovalRequest(runId, step.description, step.input, timeoutMinutes);
+      if (step.destructive) {
+        const approvalTarget = deriveApprovalTarget(step.skill, step.input);
+        const credentialIdentity = extractCredentialIdentity(step.input);
+        const req = await createApprovalRequest(runId, step.description, step.input, {
+          timeoutMinutes,
+          target: approvalTarget,
+          credentialIdentity,
+        });
         await db.update(schema.agentRuns).set({ status: 'awaiting_approval' }).where(eq(schema.agentRuns.id, runId));
         const decision = await gateway
           .requestApproval(target, req)
@@ -97,6 +109,9 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
           await persistOutgoing(message.gateway, message.source_id, note);
           return;
         }
+        // Recompute and atomically consume immediately before dispatch. Any
+        // payload/target/identity change or replay fails closed here.
+        await consumeApproval(req, step.input, approvalTarget, credentialIdentity);
       }
 
       const result = await runSkill(step.skill, step.input, runId);
@@ -130,7 +145,12 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
     if (critique.needsRevision) {
       await auditEvent('run_step', { step: 'critique', notes: critique.notes }, runId);
       for (let i = 0; i < results.length; i++) {
-        if (!results[i].ok && !plan.steps[i].optional && getSkill(plan.steps[i].skill)?.available) {
+        if (
+          !results[i].ok &&
+          !plan.steps[i].optional &&
+          !plan.steps[i].destructive &&
+          getSkill(plan.steps[i].skill)?.available
+        ) {
           const retry = await runSkill(plan.steps[i].skill, plan.steps[i].input, runId);
           results[i] = {
             ok: retry.ok,
@@ -171,7 +191,16 @@ async function finish(runId: string, status: string, narrative: string, costUsd:
 export async function replayRun(runId: string, gateway: Gateway): Promise<void> {
   const [run] = await db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, runId));
   if (!run) throw new Error(`agent run ${runId} not found`);
-  const storedPlan = run.plan as { summary?: string; steps?: Array<{ skill: string; input: Record<string, unknown>; description: string }> };
+  const storedPlan = run.plan as {
+    summary?: string;
+    steps?: Array<{
+      skill: string;
+      input: Record<string, unknown>;
+      description: string;
+      destructive: boolean;
+      optional?: boolean;
+    }>;
+  };
   if (!storedPlan.steps?.length) throw new Error(`agent run ${runId} has no replayable plan`);
 
   const [replay] = await db
@@ -181,7 +210,28 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
 
   let cost = 0;
   const results: StepResult[] = [];
+  const timeoutMinutes = await getPreference<number>('approval_timeout_minutes', 30);
+  const replayTarget: MessageTarget = { gateway: gateway.name, source_id: 'replay' };
   for (const step of storedPlan.steps) {
+    if (step.destructive) {
+      const approvalTarget = deriveApprovalTarget(step.skill, step.input);
+      const credentialIdentity = extractCredentialIdentity(step.input);
+      const request = await createApprovalRequest(replay.id, `Replay: ${step.description}`, step.input, {
+        timeoutMinutes,
+        target: approvalTarget,
+        credentialIdentity,
+      });
+      await db
+        .update(schema.agentRuns)
+        .set({ status: 'awaiting_approval' })
+        .where(eq(schema.agentRuns.id, replay.id));
+      const decision = await gateway
+        .requestApproval(replayTarget, request)
+        .catch(async () => awaitDecision(request));
+      await db.update(schema.agentRuns).set({ status: 'running' }).where(eq(schema.agentRuns.id, replay.id));
+      if (!decision.approved) break;
+      await consumeApproval(request, step.input, approvalTarget, credentialIdentity);
+    }
     const r = await runSkill(step.skill, step.input, replay.id);
     results.push({ ok: r.ok, output: r.output, error: r.error, cost_usd: r.costUsd, duration_ms: r.durationMs });
     cost += r.costUsd;

@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0.0",
+  "id": "reject-boundary-escape",
+  "capability": "inspect_dataset",
+  "input": { "fixture": "../README.md" },
+  "expected": { "outcome": "error", "golden_file": "reject-boundary-escape.json" },
+  "tolerances": { "numeric_absolute": 0, "normalized_fields": ["workspace path"] },
+  "allowed_operations": ["boundary_preflight"],
+  "expected_approval": { "required": false, "decision": "not-requested" }
+}

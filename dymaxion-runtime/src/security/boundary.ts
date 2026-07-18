@@ -1,73 +1,274 @@
-// Employer boundary — structural enforcement of the allow/deny lists in
-// config/employer-boundary.yaml. Called by the skill executor before any
-// external request, file access, or LLM tool dispatch (middleware step 1).
-// There is NO runtime override: changing the boundary means editing the YAML.
+// Deny-by-default employer boundary enforcement. Every capability/tool adapter
+// must call this module before external dispatch or dataset filesystem I/O.
 
+import { existsSync, realpathSync } from 'node:fs';
+import { isIP } from 'node:net';
+import { lookup } from 'node:dns/promises';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../config/loader.js';
-import { auditEvent } from './audit.js';
+import { auditEvent, type AuditEventType } from './audit.js';
 
 export class BoundaryViolation extends Error {
   constructor(
     public readonly kind: 'hostname' | 'path' | 'source',
     public readonly target: string,
+    public readonly reason = 'not_allowed',
   ) {
-    super(`Employer boundary violation (${kind}): ${target}`);
+    super(`Employer boundary violation (${kind}/${reason}): ${target}`);
     this.name = 'BoundaryViolation';
   }
 }
 
-/** Glob-ish match: '*' spans any run of characters (case-insensitive). */
+type AuditFn = (
+  eventType: AuditEventType,
+  payload: Record<string, unknown>,
+  agentRunId?: string,
+) => Promise<void>;
+
+type HostResolver = (hostname: string) => Promise<string[]>;
+
+export interface BoundaryOptions {
+  agentRunId?: string;
+  audit?: AuditFn;
+  resolveHost?: HostResolver;
+}
+
+const MAX_DEPTH = 32;
+const MAX_NODES = 10_000;
+const URI_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+const URL_FIELD = /(?:^|_)(?:url|uri|endpoint)(?:$|_)/i;
+const PATH_FIELD = /(?:^|_)(?:path|paths|file|files|directory|dir)(?:$|_)/i;
+
 function globMatch(pattern: string, value: string): boolean {
-  const re = new RegExp(
-    '^' + pattern.split('*').map(escapeRegExp).join('.*') + '$',
-    'i',
-  );
+  const re = new RegExp(`^${pattern.split('*').map(escapeRegExp).join('.*')}$`, 'i');
   return re.test(value);
 }
 
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function optionsWithDefaults(options: BoundaryOptions = {}): Required<BoundaryOptions> {
+  return {
+    agentRunId: options.agentRunId ?? '',
+    audit: options.audit ?? auditEvent,
+    resolveHost:
+      options.resolveHost ??
+      (async (hostname: string) =>
+        (await lookup(hostname, { all: true, verbatim: true })).map((entry) => entry.address)),
+  };
+}
+
+async function block(
+  kind: BoundaryViolation['kind'],
+  target: string,
+  reason: string,
+  options: Required<BoundaryOptions>,
+): Promise<never> {
+  await options.audit(
+    'boundary_block',
+    { kind, target, reason },
+    options.agentRunId || undefined,
+  );
+  throw new BoundaryViolation(kind, target, reason);
 }
 
 export function isHostnameDenied(hostname: string): boolean {
-  const { boundary } = { boundary: loadConfig().boundary };
-  return boundary.denied_hostnames.some((p) => globMatch(p, hostname));
+  return loadConfig().boundary.denied_hostnames.some((pattern) => globMatch(pattern, hostname));
 }
 
-export function isPathDenied(path: string): boolean {
-  const { denied_paths } = loadConfig().boundary;
-  return denied_paths.some((p) => globMatch(p.replace(/\*\*/g, '*'), path));
+function isPrivateAddress(address: string): boolean {
+  const normalized = address.toLowerCase().replace(/^::ffff:/, '');
+  if (isIP(normalized) === 4) {
+    const [a, b, c] = normalized.split('.').map(Number);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 0 && (c === 0 || c === 2)) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
+      (a === 203 && b === 0 && c === 113) ||
+      a >= 224
+    );
+  }
+  if (isIP(normalized) === 6) {
+    return (
+      normalized === '::' ||
+      normalized === '::1' ||
+      normalized.startsWith('fc') ||
+      normalized.startsWith('fd') ||
+      /^fe[89ab]/.test(normalized) ||
+      normalized.startsWith('2001:db8:') ||
+      normalized.startsWith('ff')
+    );
+  }
+  return true;
 }
 
-export function isPathAllowed(path: string): boolean {
-  if (isPathDenied(path)) return false;
-  const sources = loadConfig().boundary.allowed_data_sources;
-  return sources
-    .filter((s) => s.type === 'filesystem' && s.path_pattern)
-    .some((s) => globMatch(s.path_pattern!.replace(/\*\*/g, '*'), path));
+function allowedUrlPatterns(): string[] {
+  return loadConfig().boundary.allowed_data_sources
+    .map((source) => source.url_pattern)
+    .filter((value): value is string => Boolean(value));
 }
 
-/** Throws BoundaryViolation (and audits) if a URL may not be touched. */
-export async function assertUrlAllowed(url: string, agentRunId?: string): Promise<void> {
-  let hostname: string;
+/** Validate a URL against protocol, credentials, denylist, allowlist, and resolved IPs. */
+export async function assertUrlAllowed(rawUrl: string, supplied: BoundaryOptions = {}): Promise<void> {
+  const options = optionsWithDefaults(supplied);
+  let url: URL;
   try {
-    hostname = new URL(url).hostname;
+    url = new URL(rawUrl);
   } catch {
-    throw new BoundaryViolation('hostname', url);
+    return block('source', rawUrl, 'malformed_url', options);
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return block('source', rawUrl, 'unsupported_url_scheme', options);
+  }
+  if (url.username || url.password) {
+    return block('source', rawUrl, 'embedded_credentials', options);
+  }
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, '');
+  if (!hostname || hostname === 'localhost' || hostname.endsWith('.local')) {
+    return block('hostname', hostname || rawUrl, 'local_hostname', options);
   }
   if (isHostnameDenied(hostname)) {
-    await auditEvent('boundary_block', { url, hostname, reason: 'denied_hostname' }, agentRunId);
-    throw new BoundaryViolation('hostname', hostname);
+    return block('hostname', hostname, 'denied_hostname', options);
+  }
+  if (isIP(hostname) && isPrivateAddress(hostname)) {
+    return block('hostname', hostname, 'private_or_reserved_address', options);
+  }
+  if (!allowedUrlPatterns().some((pattern) => globMatch(pattern, url.href))) {
+    return block('source', rawUrl, 'url_not_allowlisted', options);
+  }
+  const addresses = isIP(hostname) ? [hostname] : await options.resolveHost(hostname).catch(() => []);
+  if (!addresses.length) return block('hostname', hostname, 'dns_resolution_failed', options);
+  if (addresses.some(isPrivateAddress)) {
+    return block('hostname', hostname, 'private_or_reserved_address', options);
   }
   if (loadConfig().boundary.audit_all_external_requests) {
-    await auditEvent('data_query', { url, hostname, boundary: 'allowed' }, agentRunId);
+    await options.audit(
+      'data_query',
+      { url: url.href, hostname, boundary: 'allowed' },
+      options.agentRunId || undefined,
+    );
   }
 }
 
-/** Throws BoundaryViolation (and audits) if a filesystem path may not be touched. */
-export async function assertPathAllowed(path: string, agentRunId?: string): Promise<void> {
-  if (!isPathAllowed(path)) {
-    await auditEvent('boundary_block', { path, reason: 'path_not_allowlisted' }, agentRunId);
-    throw new BoundaryViolation('path', path);
+function nearestRealPath(input: string): string {
+  const absolute = resolve(input);
+  let cursor = absolute;
+  const missing: string[] = [];
+  while (!existsSync(cursor)) {
+    const parent = dirname(cursor);
+    if (parent === cursor) return absolute;
+    missing.unshift(cursor.slice(parent.length + (parent.endsWith(sep) ? 0 : 1)));
+    cursor = parent;
   }
+  return resolve(realpathSync(cursor), ...missing);
+}
+
+function rootFromPattern(pattern: string): string {
+  const wildcard = pattern.indexOf('*');
+  const prefix = wildcard >= 0 ? pattern.slice(0, wildcard) : pattern;
+  return nearestRealPath(prefix.replace(/[\\/]$/, '') || sep);
+}
+
+function allowedFilesystemRoots(): string[] {
+  const roots = loadConfig().boundary.allowed_data_sources.flatMap((source) => {
+    const configured = source.path_pattern ? [rootFromPattern(source.path_pattern)] : [];
+    const envRoot = source.root_env ? process.env[source.root_env] : undefined;
+    return envRoot ? [...configured, nearestRealPath(envRoot)] : configured;
+  });
+  return [...new Set(roots)];
+}
+
+function containedBy(path: string, root: string): boolean {
+  const rel = relative(root, path);
+  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel));
+}
+
+export function canonicalBoundaryPath(input: string): string {
+  if (input.startsWith('file:')) return nearestRealPath(fileURLToPath(new URL(input)));
+  return nearestRealPath(input);
+}
+
+export function isPathDenied(input: string): boolean {
+  const path = canonicalBoundaryPath(input);
+  return loadConfig().boundary.denied_paths.some((pattern) => {
+    const root = rootFromPattern(pattern);
+    return containedBy(path, root);
+  });
+}
+
+export function isPathAllowed(input: string): boolean {
+  const path = canonicalBoundaryPath(input);
+  return !isPathDenied(path) && allowedFilesystemRoots().some((root) => containedBy(path, root));
+}
+
+/** Validate a path after traversal/symlink canonicalization. */
+export async function assertPathAllowed(input: string, supplied: BoundaryOptions = {}): Promise<void> {
+  const options = optionsWithDefaults(supplied);
+  let path: string;
+  try {
+    path = canonicalBoundaryPath(input);
+  } catch {
+    return block('path', input, 'malformed_path', options);
+  }
+  if (!isPathAllowed(path)) return block('path', path, 'path_not_allowlisted', options);
+}
+
+function pathLike(value: string, field: string): boolean {
+  return (
+    value.startsWith('file:') ||
+    isAbsolute(value) ||
+    value.startsWith('./') ||
+    value.startsWith('../') ||
+    (PATH_FIELD.test(field) && value.length > 0)
+  );
+}
+
+/** Recursively enforce all URL/path references in untrusted capability arguments. */
+export async function assertExecutionBoundary(
+  payload: unknown,
+  supplied: BoundaryOptions = {},
+): Promise<void> {
+  const options = optionsWithDefaults(supplied);
+  const seen = new Set<object>();
+  let visited = 0;
+
+  const visit = async (value: unknown, field: string, depth: number): Promise<void> => {
+    visited += 1;
+    if (depth > MAX_DEPTH || visited > MAX_NODES) {
+      return block('source', field, 'boundary_structure_limit', options);
+    }
+    if (typeof value === 'string') {
+      if (value.startsWith('file:')) return assertPathAllowed(value, options);
+      if (URI_SCHEME.test(value)) {
+        if (value.startsWith('http://') || value.startsWith('https://')) {
+          return assertUrlAllowed(value, options);
+        }
+        return block('source', value, 'unsupported_uri_scheme', options);
+      }
+      if (pathLike(value, field)) return assertPathAllowed(value, options);
+      if (URL_FIELD.test(field)) return block('source', value, 'url_field_not_url', options);
+      return;
+    }
+    if (value === null || typeof value !== 'object') return;
+    if (seen.has(value)) return block('source', field, 'cyclic_boundary_payload', options);
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) await visit(item, field, depth + 1);
+    } else {
+      for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+        await visit(item, key, depth + 1);
+      }
+    }
+    seen.delete(value);
+  };
+
+  await visit(payload, '$', 0);
 }

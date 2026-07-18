@@ -51,7 +51,10 @@ export class TelegramGateway implements Gateway {
   private handler: IncomingHandler | null = null;
   private running = false;
   private offset = 0;
-  private readonly pendingApprovals = new Map<string, (r: ApprovalResponse) => void>();
+  private readonly pendingApprovals = new Map<
+    string,
+    { request: ApprovalRequest; resolve: (response: ApprovalResponse) => void }
+  >();
 
   constructor(
     private readonly botToken: string,
@@ -163,14 +166,25 @@ export class TelegramGateway implements Gateway {
     const [action, approvalId] = (cb.data ?? '').split(':');
     if ((action === 'approve' || action === 'reject') && approvalId) {
       const decision = action === 'approve' ? 'approved' : 'rejected';
-      await decideApproval(approvalId, decision, cb.from.first_name ?? String(cb.from.id));
-      this.pendingApprovals.get(approvalId)?.({
-        approved: decision === 'approved',
-        decision,
-        decided_by: cb.from.first_name ?? String(cb.from.id),
+      const decidedBy = cb.from.first_name ?? String(cb.from.id);
+      const accepted = await decideApproval(approvalId, decision, decidedBy);
+      const pending = this.pendingApprovals.get(approvalId);
+      if (pending) {
+        const response: ApprovalResponse = accepted
+          ? {
+              approval_id: approvalId,
+              approved: decision === 'approved',
+              decision,
+              decided_by: decidedBy,
+            }
+          : await awaitDecision(pending.request);
+        pending.resolve(response);
+        this.pendingApprovals.delete(approvalId);
+      }
+      await this.call('answerCallbackQuery', {
+        callback_query_id: cb.id,
+        text: accepted ? decision : 'already decided or expired',
       });
-      this.pendingApprovals.delete(approvalId);
-      await this.call('answerCallbackQuery', { callback_query_id: cb.id, text: decision });
     }
   }
 
@@ -231,9 +245,13 @@ export class TelegramGateway implements Gateway {
   }
 
   async requestApproval(target: MessageTarget, req: ApprovalRequest): Promise<ApprovalResponse> {
+    const timeoutMinutes = Math.max(
+      0,
+      Math.ceil((Date.parse(req.expires_at) - Date.now()) / 60_000),
+    );
     await this.call('sendMessage', {
       chat_id: target.source_id,
-      text: `*Approval required*\n${req.step_description}\n\nExpires in ${req.timeout_minutes} min.`,
+      text: `*Approval required*\n${req.step_description}\n\nExpires in ${timeoutMinutes} min.`,
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
@@ -247,9 +265,13 @@ export class TelegramGateway implements Gateway {
 
     // Resolve on button press, or fall through to DB polling (dashboard decision / expiry).
     return new Promise<ApprovalResponse>((resolve) => {
-      this.pendingApprovals.set(req.id, resolve);
-      void awaitDecision(req).then((r) => {
-        if (this.pendingApprovals.delete(req.id)) resolve(r);
+      this.pendingApprovals.set(req.id, { request: req, resolve });
+      void awaitDecision(req).then((response) => {
+        const pending = this.pendingApprovals.get(req.id);
+        if (pending) {
+          this.pendingApprovals.delete(req.id);
+          pending.resolve(response);
+        }
       });
     });
   }

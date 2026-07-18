@@ -7,9 +7,11 @@ an operator you delegate to, not a chatbot.
 - **Framework**: Mastra (TypeScript) + Vercel AI SDK + openid-client
 - **Providers**: Anthropic (API key), OpenAI / Google / Azure / Cohere (OAuth 2.0), Ollama (local)
 - **Memory**: Postgres 18 + pgvector, Voyage voyage-3-large embeddings
-- **Skills**: 45 real skill folders (SKILL.md + manifest.yaml + executor + tests) — ESRI (14), OSS GIS (14), web/mobile map apps (8), architecture decisions (5), meta/self-authoring (4)
+- **Capabilities**: 45 historical Sprint 1 skill scaffolds plus the Phase 0 native `inspect_dataset` vertical slice; folder presence is not a production-readiness claim
 - **Gateways**: Telegram + CLI + Web (Sprint 1); Teams, Slack, Email, ArcGIS Portal, SMS stubbed
 - **Safety**: employer boundary (structural allow/deny lists), human-in-the-loop approvals for destructive ops, per-tier monthly USD budget caps enforced pre-call, append-only audit log, LangFuse tracing
+
+Architecture authority: [ADR-0001](docs/adr/0001-phase-0-runtime-and-execution-boundaries.md) selects the TypeScript/Mastra/Vercel AI SDK runtime with native middleware, excludes core LiteLLM, and disables Windows execution pending an allowlisted-job redesign and security testing. Conflicting Sprint 1 statements are historical.
 
 ## Install
 
@@ -19,8 +21,8 @@ an operator you delegate to, not a chatbot.
 curl -fsSL https://raw.githubusercontent.com/daraobeirnecode/dymaxion/main/install.sh | bash
 ```
 
-**Windows** (PowerShell as Administrator — sets up WSL2 + Docker Desktop for the
-runtime, then registers the native Windows Worker for ArcGIS Pro + arcpy):
+**Windows** (historical Sprint 1 installer; Phase 0 does not enable the native
+Windows Worker execution endpoints):
 
 ```powershell
 irm https://raw.githubusercontent.com/daraobeirnecode/dymaxion/main/install.ps1 | iex
@@ -37,18 +39,21 @@ You'll be prompted for four values: Anthropic API key, Telegram bot token,
 Telegram chat ID, Voyage API key. Everything else gets strong generated
 defaults. Typical time: 10 minutes warm, 25 cold.
 
-## Topologies
+## Historical topology reference
 
-| | Runtime | Windows Worker | Worker URL |
+The following table describes the Sprint 1 scaffold only. In Phase 0 the Windows
+Worker may be built and health-checked, but all ArcPy/ArcGIS Pro execution is
+disabled regardless of URL configuration.
+
+| | Runtime | Historical Windows Worker | Worker URL |
 | --- | --- | --- | --- |
-| **A — Windows-only** | WSL2 + Docker Desktop | native service, same machine | `http://host.docker.internal:4444` |
-| **B — Split** | Mac Mini (all containers) | Windows laptop over Tailscale | `http://<windows-tailscale-ip>:4444` |
-| **C — Linux/macOS only** | Linux/macOS host | none (or remote later) | unset — ArcGIS Pro skills disabled |
+| **A — Windows-only** | WSL2 + Docker Desktop | disabled native scaffold | not used for execution |
+| **B — Split** | Mac Mini (all containers) | disabled remote scaffold | not used for execution |
+| **C — Linux/macOS only** | Linux/macOS host | none | unset |
 
-Without a Windows Worker, 10 of the 14 ESRI skills still work (they use the
-cross-platform `arcgis` Python API). The four arcpy/Pro-dependent skills
-(`arcpy-script-runner`, `arcgis-pro-project-editor`, `feature-layer-publish`,
-`enterprise-gdb-connect`) toggle availability with the worker's 30s health check.
+The four arcpy/Pro-dependent skill scaffolds remain unavailable until the
+allowlisted-job worker redesign and independent security testing required by
+ADR-0001.
 
 ## What's running after `docker compose up -d`
 
@@ -129,7 +134,7 @@ spend and run only in the sandbox until approved.
 5. Run the installer; verify `bash scripts/health-check.sh`
 6. Telegram: "list your skills" → catalog reply
 7. Admin dashboard reachable on :3001, LangFuse on :3000
-8. (Windows Worker) `windows-worker/install.ps1` on the Windows machine, set `WINDOWS_WORKER_URL` + `WINDOWS_WORKER_SECRET`, `bash scripts/verify-windows-worker.sh`
+8. Windows Worker build/health is historical scaffold verification only; execution remains disabled by ADR-0001
 
 ## Repo map
 

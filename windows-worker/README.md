@@ -1,53 +1,34 @@
-# Dymaxion Windows Worker
+# Dymaxion Windows Worker — Phase 0 scaffold
 
-Small Node.js HTTP service that exposes ArcGIS Pro CLI + arcpy execution to
-the Dymaxion runtime over a REST API. ArcGIS Pro, arcpy, and several Esri
-extensions are Windows-only — this worker closes that gap.
+The Windows Worker is optional and execution-disabled in Phase 0. It may be built to verify the historical transport scaffold, but it does not execute ArcPy scripts or ArcGIS Pro CLI operations. See [`ADR-0001`](../docs/adr/0001-phase-0-runtime-and-execution-boundaries.md).
 
-## Install (elevated PowerShell)
+## Phase 0 API
+
+All endpoints require the configured bearer credential.
+
+| Endpoint | Phase 0 behavior |
+| --- | --- |
+| `GET /health` | Historical environment/readiness report |
+| `POST /arcpy/run` | HTTP 410; prompt-supplied Python cannot execute |
+| `POST /pro-cli/run` | HTTP 410; prompt-supplied Pro operations cannot execute |
+| `POST /files/upload?run_id=&name=` | Authenticated file-transport scaffold |
+| `GET /files/download?run_id=&name=` | Authenticated file-transport scaffold |
+
+The arbitrary-script and unrestricted Pro CLI runners have been removed. Runtime availability remains false even if `WINDOWS_WORKER_URL` is configured.
+
+## Historical installer
+
+`install.ps1` is retained for the historical Sprint 1 scaffold. Running it does not change the Phase 0 disabled-execution policy. Do not treat a successful health response as authorization to run Windows jobs.
+
+A future execution worker requires an allowlisted immutable job catalog, capability-scoped identity, strict schemas and resource limits, bound approvals, evidence, sandboxing, adversarial tests and independent security review before these routes can be replaced.
+
+## Build verification
 
 ```powershell
-irm https://raw.githubusercontent.com/daraobeirnecode/dymaxion/main/windows-worker/install.ps1 | iex
-# or from a clone:
-.\install.ps1
+npm ci
+npm run typecheck
+npm run build
 ```
-
-The installer checks prerequisites (Node 20+, Git, ArcGIS Pro), clones
-CLI-Anything-Arcgis-Pro, builds, generates a shared secret, registers the
-service via NSSM (auto-start on boot), and adds a firewall rule scoped to
-Private + Domain network profiles.
-
-Then on the runtime host, set in `.env`:
-
-```
-WINDOWS_WORKER_URL=http://<tailscale-ip-or-host.docker.internal>:4444
-WINDOWS_WORKER_SECRET=<the secret install.ps1 printed>
-```
-
-## API (all require `Authorization: Bearer <SHARED_WORKER_SECRET>`)
-
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /health` | readiness + capability report (arcpy version, Pro version, disk, load) |
-| `POST /arcpy/run` | execute an arcpy script in `arcgispro-py3` |
-| `POST /pro-cli/run` | invoke a CLI-Anything-Arcgis-Pro operation |
-| `POST /files/upload?run_id=&name=` | shuttle a file to `C:\dymaxion-shared\input\<run-id>\` |
-| `GET /files/download?run_id=&name=` | shuttle a file from `C:\dymaxion-shared\output\<run-id>\` |
-
-The runtime polls `/health` every 30s; the ArcGIS-Pro-dependent skills
-(`arcpy-script-runner`, `arcgis-pro-project-editor`, `feature-layer-publish`,
-`enterprise-gdb-connect`) toggle availability with worker status.
-
-## Security
-
-- Shared-secret Bearer auth (constant-time compare); optional
-  `ALLOWED_RUNTIME_HOSTS` allowlist
-- Binds 0.0.0.0:4444; firewall restricts to Private + Domain profiles
-- Execution scope confined to `C:\dymaxion-shared` — scripts referencing
-  paths outside the share are rejected pre-execution
-- Employer boundary denied-path patterns are passed in each request and
-  enforced before execution
-- All actions logged to `logs\worker-YYYY-MM-DD.log`
 
 ## Uninstall
 

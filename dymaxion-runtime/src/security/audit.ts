@@ -17,6 +17,7 @@ export type AuditEventType =
   | 'budget_block'
   | 'approval_requested'
   | 'approval_decided'
+  | 'approval_consumed'
   | 'skill_invocation'
   | 'skill_proposed'
   | 'run_step'

@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "error": "inspect_dataset resource limit exceeded: 672 bytes > 100 bytes",
+  "cost_usd": 0
+}

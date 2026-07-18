@@ -4,6 +4,7 @@
 
 import { logger } from '../observability/logger.js';
 import { auditEvent } from '../security/audit.js';
+import { assertExecutionBoundary, assertUrlAllowed } from '../security/boundary.js';
 
 export interface WorkerHealth {
   status: string;
@@ -26,7 +27,12 @@ export function workerConfigured(): boolean {
 }
 
 export function workerAvailable(): boolean {
-  return available;
+  return false;
+}
+
+/** Phase 0 deliberately disables prompt-addressable Windows execution. */
+export function workerExecutionEnabled(): boolean {
+  return false;
 }
 
 export function workerHealth(): WorkerHealth | null {
@@ -41,11 +47,12 @@ function headers(): Record<string, string> {
 }
 
 export async function checkWorkerHealth(): Promise<boolean> {
-  if (!workerConfigured()) {
+  if (!workerConfigured() || !workerExecutionEnabled()) {
     available = false;
     return false;
   }
   try {
+    await assertUrlAllowed(`${process.env.WINDOWS_WORKER_URL}/health`);
     const res = await fetch(`${process.env.WINDOWS_WORKER_URL}/health`, {
       headers: headers(),
       signal: AbortSignal.timeout(10_000),
@@ -89,13 +96,24 @@ export interface WorkerRunResult {
   outputs?: Record<string, unknown>;
 }
 
+const WORKER_DISABLED_MESSAGE =
+  'Windows Worker execution is disabled in Phase 0 pending an allowlisted job catalog and independent security testing.';
+
+function assertWorkerExecutionEnabled(): void {
+  if (!workerExecutionEnabled()) throw new Error(WORKER_DISABLED_MESSAGE);
+}
+
 async function post(path: string, body: unknown, timeoutSeconds: number): Promise<WorkerRunResult> {
+  assertWorkerExecutionEnabled();
   if (!workerAvailable()) {
     throw new Error(
       'Windows Worker unreachable — try again when the Windows machine is online, or use the arcgis Python API skill as an alternative.',
     );
   }
-  const res = await fetch(`${process.env.WINDOWS_WORKER_URL}${path}`, {
+  const targetUrl = `${process.env.WINDOWS_WORKER_URL}${path}`;
+  await assertUrlAllowed(targetUrl);
+  await assertExecutionBoundary(body);
+  const res = await fetch(targetUrl, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify(body),
@@ -111,6 +129,7 @@ export async function runArcpy(params: {
   timeout_seconds?: number;
   run_id?: string;
 }): Promise<WorkerRunResult> {
+  assertWorkerExecutionEnabled();
   await auditEvent('worker_dispatch', { endpoint: '/arcpy/run', run_id: params.run_id }, params.run_id);
   return post('/arcpy/run', { timeout_seconds: 300, ...params }, params.timeout_seconds ?? 300);
 }
@@ -120,6 +139,7 @@ export async function runProCli(params: {
   timeout_seconds?: number;
   [key: string]: unknown;
 }): Promise<WorkerRunResult> {
+  assertWorkerExecutionEnabled();
   await auditEvent('worker_dispatch', { endpoint: '/pro-cli/run', operation: params.operation });
   return post('/pro-cli/run', { timeout_seconds: 120, ...params }, params.timeout_seconds ?? 120);
 }

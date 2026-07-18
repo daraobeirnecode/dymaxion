@@ -35,7 +35,6 @@ export interface PlanStep {
   description: string;
   input: Record<string, unknown>;
   destructive: boolean;
-  preApproved?: boolean;
   optional?: boolean;
   timeout_seconds?: number;
 }
@@ -61,12 +60,19 @@ export interface ApprovalRequest {
   agent_run_id: string;
   step_description: string;
   payload: Record<string, unknown>;
-  timeout_minutes: number;
+  payload_hash: string;
+  target: string;
+  credential_identity: string | null;
+  requested_at: string;
+  expires_at: string;
 }
 
+export type ApprovalDecision = 'approved' | 'rejected' | 'expired';
+
 export interface ApprovalResponse {
+  approval_id: string;
   approved: boolean;
-  decision: 'approved' | 'rejected' | 'expired';
+  decision: ApprovalDecision;
   decided_by: string;
 }
 

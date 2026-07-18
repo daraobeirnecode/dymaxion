@@ -2,6 +2,7 @@
 // workhorse tier, grounded in: recalled memory, applicable skills (with
 // availability + destructive flags), and knowledge-base context.
 
+import { allCapabilities } from '../capabilities/registry.js';
 import { callLLM } from '../llm/middleware.js';
 import { applicableSkills } from '../skills/registry.js';
 import type { IncomingMessage, Plan, PlanStep } from '../gateways/common.js';
@@ -28,13 +29,25 @@ export async function plan(
   agentRunId: string,
 ): Promise<Plan> {
   const skills = applicableSkills(intent.domain);
-  const catalog = skills.map((s) => ({
-    slug: s.manifest.slug,
-    description: s.manifest.description,
-    inputs: (s.manifest.inputs ?? []).map((i) => `${i.name}${i.required ? '*' : ''}`),
-    destructive: s.manifest.destructive,
-    available: s.available,
-  }));
+  const capabilities = allCapabilities();
+  const catalog = [
+    ...skills.map((skill) => ({
+      slug: skill.manifest.slug,
+      description: skill.manifest.description,
+      inputs: (skill.manifest.inputs ?? []).map((input) => `${input.name}${input.required ? '*' : ''}`),
+      destructive: skill.manifest.destructive,
+      available: skill.available,
+      kind: 'historical-skill',
+    })),
+    ...capabilities.map((capability) => ({
+      slug: capability.manifest.slug,
+      description: capability.manifest.description,
+      inputs: capability.inputSummary,
+      destructive: capability.manifest.classification !== 'read',
+      available: true,
+      kind: 'native-capability',
+    })),
+  ];
 
   const context = [
     memory.recent.length
@@ -63,18 +76,44 @@ export async function plan(
     ? (JSON.parse(jsonMatch[0]) as { summary: string; steps: Array<Partial<PlanStep>> })
     : { summary: 'no plan produced', steps: [] };
 
-  const bySlug = new Map(skills.map((s) => [s.manifest.slug, s]));
+  const executable = new Map<
+    string,
+    { description: string; destructive: boolean; timeoutSeconds: number }
+  >([
+    ...skills.map(
+      (skill) =>
+        [
+          skill.manifest.slug,
+          {
+            description: skill.manifest.description,
+            destructive: skill.manifest.destructive || skill.manifest.requires_approval,
+            timeoutSeconds: skill.manifest.budget.max_duration_seconds,
+          },
+        ] as const,
+    ),
+    ...capabilities.map(
+      (capability) =>
+        [
+          capability.manifest.slug,
+          {
+            description: capability.manifest.description,
+            destructive: capability.manifest.classification !== 'read',
+            timeoutSeconds: Math.ceil(capability.manifest.resource_limits.max_duration_ms / 1_000),
+          },
+        ] as const,
+    ),
+  ]);
   const steps: PlanStep[] = (parsed.steps ?? [])
-    .filter((s) => s.skill && bySlug.has(s.skill))
-    .map((s, i) => {
-      const skill = bySlug.get(s.skill!)!;
+    .filter((step) => step.skill && executable.has(step.skill))
+    .map((step, index) => {
+      const descriptor = executable.get(step.skill!)!;
       return {
-        index: i,
-        skill: s.skill!,
-        description: s.description ?? skill.manifest.description,
-        input: (s.input as Record<string, unknown>) ?? {},
-        destructive: skill.manifest.destructive || skill.manifest.requires_approval,
-        timeout_seconds: skill.manifest.budget.max_duration_seconds,
+        index,
+        skill: step.skill!,
+        description: step.description ?? descriptor.description,
+        input: (step.input as Record<string, unknown>) ?? {},
+        destructive: descriptor.destructive,
+        timeout_seconds: descriptor.timeoutSeconds,
       };
     });
 

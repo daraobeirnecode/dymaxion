@@ -20,7 +20,7 @@ import {
 } from '../common.js';
 import { awaitDecision, decideApproval } from '../../security/approval.js';
 import { allSkills } from '../../skills/registry.js';
-import { workerAvailable, workerConfigured } from '../../worker/client.js';
+import { workerAvailable, workerConfigured, workerExecutionEnabled } from '../../worker/client.js';
 import { logger } from '../../observability/logger.js';
 
 const PORT = Number(process.env.RUNTIME_HTTP_PORT ?? 8787);
@@ -110,7 +110,13 @@ export class WebGateway implements Gateway {
         status: 'ok',
         skills_registered: skills.length,
         skills_available: skills.filter((s) => s.available).length,
-        windows_worker: workerConfigured() ? (workerAvailable() ? 'available' : 'unreachable') : 'not-configured',
+        windows_worker: !workerExecutionEnabled()
+          ? 'disabled-phase-0'
+          : workerConfigured()
+            ? workerAvailable()
+              ? 'available'
+              : 'unreachable'
+            : 'not-configured',
       }),
     );
   }
@@ -120,12 +126,12 @@ export class WebGateway implements Gateway {
       decision?: 'approved' | 'rejected';
       decided_by?: string;
     };
-    if (!id || !body.decision) {
-      res.writeHead(400).end(JSON.stringify({ error: 'decision required' }));
+    if (!id || (body.decision !== 'approved' && body.decision !== 'rejected')) {
+      res.writeHead(400).end(JSON.stringify({ error: 'approved or rejected decision required' }));
       return;
     }
-    await decideApproval(id, body.decision, body.decided_by ?? 'admin-dashboard');
-    res.writeHead(200).end(JSON.stringify({ ok: true }));
+    const accepted = await decideApproval(id, body.decision, body.decided_by ?? 'admin-dashboard');
+    res.writeHead(accepted ? 200 : 409).end(JSON.stringify({ ok: accepted }));
   }
 
   private emit(sessionId: string, event: string, data: unknown): void {
@@ -166,7 +172,8 @@ export class WebGateway implements Gateway {
     this.emit(target.source_id, 'approval_required', {
       approval_id: req.id,
       description: req.step_description,
-      timeout_minutes: req.timeout_minutes,
+      expires_at: req.expires_at,
+      target: req.target,
     });
     // Decision arrives via POST /api/approvals/:id (chat UI button or dashboard).
     return awaitDecision(req);
