@@ -16,6 +16,13 @@ identity and reports:
   ISO-8601 (`-1`/`0`/absent → `null`), sharing → `public | org | shared |
   private | unknown`, service classification from authoritative ArcGIS item
   types only (never title text);
+- canonical output ordering independent of server page/record order: users
+  sort by `username`, groups and items by `id`, derived services by
+  `item_id`; summaries and the output hash are computed from the sorted
+  records, so the same logical organization always produces the same report
+  and artifact hash. Request evidence stays in dispatch order. Duplicate
+  stable IDs/usernames across pages fail closed (no silent double-counting),
+  as does a server-reported total lower than the records actually retrieved;
 - ownership, sharing, and staleness summaries (raw counts, kept separate from
   derived findings; the staleness threshold is an explicit input recorded in
   the output and evidence);
@@ -46,7 +53,8 @@ identity and reports:
 | Limit | Value |
 |---|---|
 | `page_size` | 1–100 (ArcGIS REST `num` maximum), default 100 |
-| `max_records` (per section) | 1–2000, default 500 |
+| `max_records` input (per retrieved section: users, groups, items) | 1–2000, default 500 |
+| Manifest `resource_limits.max_records` (total output ceiling) | 8000 = 2000 × (3 retrieved sections + derived services) |
 | `stale_after_days` | 1–3650, default 365 |
 | Pages per section | 25 |
 | Bytes per response | 2 MiB |

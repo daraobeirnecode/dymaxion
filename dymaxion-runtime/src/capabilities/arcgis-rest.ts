@@ -38,10 +38,22 @@ const SECRET_PARAM = /((?:^|[?&"'\s,{])(?:token|apikey|api[_-]key|password|secre
 const MAX_ERROR_DETAIL_CHARS = 240;
 
 const URL_USERINFO = /(https?:\/\/)[^/\s@"']+@/gi;
+// Header-style credentials: "Authorization: Bearer <v>", "Authorization: Basic <v>",
+// bare "Bearer/Basic <v>" scheme values, and "X-Api-Key: <v>" style headers.
+const AUTH_HEADER = /\b((?:proxy-)?authorization\s*:\s*)(?:(bearer|basic)\s+)?[^\s"',;}]+/gi;
+const AUTH_SCHEME = /\b(bearer|basic)\s+[A-Za-z0-9+/=._~-]{8,}/gi;
+const API_KEY_HEADER = /\b((?:x-)?api[-_]?key\s*:\s*)[^\s"',;}]+/gi;
 
-/** Redact token-like values and URL userinfo so secrets never reach errors, logs, or evidence. */
+/** Redact token-like values, URL userinfo, and header-style credentials so
+ * secrets never reach errors, logs, or evidence. */
 export function redactSecrets(text: string): string {
-  return text.replace(URL_USERINFO, '$1<redacted>@').replace(SECRET_PARAM, '$1<redacted>');
+  return text
+    .replace(URL_USERINFO, '$1<redacted>@')
+    .replace(AUTH_HEADER, (_match, prefix: string, scheme?: string) =>
+      `${prefix}${scheme ? `${scheme} ` : ''}<redacted>`)
+    .replace(AUTH_SCHEME, '$1 <redacted>')
+    .replace(API_KEY_HEADER, '$1<redacted>')
+    .replace(SECRET_PARAM, '$1<redacted>');
 }
 
 function sanitizeErrorDetail(text: string): string {
@@ -278,6 +290,11 @@ export async function paginateArcGis(options: ArcGisPaginationOptions): Promise<
     start = envelope.nextStart;
   }
 
+  if (totalReported !== null && totalReported < records.length) {
+    throw new Error(
+      `arcgis request '${options.name}' reported total ${totalReported} lower than the ${records.length} records retrieved; inconsistent pagination is not trusted`,
+    );
+  }
   if (!truncated && totalReported !== null && totalReported > records.length) {
     truncated = true;
     truncationReasons.push(

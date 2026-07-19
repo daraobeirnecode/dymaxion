@@ -181,6 +181,9 @@ test('inspect_arcgis_org is a strict read-only versioned capability with no cred
   assert.equal(inspectArcgisOrgCapability.manifest.slug, 'inspect_arcgis_org');
   assert.equal(inspectArcgisOrgCapability.manifest.classification, 'read');
   assert.equal(inspectArcgisOrgCapability.manifest.version, '1.0.0');
+  // Input max_records is per retrieved section (users/groups/items, each ≤ 2000);
+  // the manifest states the honest total output ceiling including derived services.
+  assert.equal(inspectArcgisOrgCapability.manifest.resource_limits.max_records, 8_000);
   assert.ok(allCapabilities().some((c) => c.manifest.slug === 'inspect_arcgis_org'));
 
   const schema = inspectArcgisOrgCapability.inputSchema;
@@ -367,6 +370,118 @@ test('repeated or non-advancing pagination cursors fail closed', async () => {
   assert.equal(result.ok, false);
   assert.match(result.error ?? '', /repeated or non-advancing pagination cursor/);
   assert.equal(transport.calls.length, 2); // portal self + one page, no runaway loop
+});
+
+test('report and output hash are canonical regardless of server page/record order', async () => {
+  const itemBodies = (order: 'forward' | 'reversed') => {
+    const all = [
+      { id: 'o1aaaaaaaaaaaaaa', title: 'Alpha', owner: 'ada.analyst', type: 'Feature Service', access: 'public', created: 1, modified: epoch('2026-07-01T00:00:00.000Z'), url: 'https://services.arcgis.com/a/FeatureServer' },
+      { id: 'o2bbbbbbbbbbbbbb', title: 'Beta', owner: 'greg.gis', type: 'Web Map', access: 'strange-value', created: 2, modified: epoch('2024-01-01T00:00:00.000Z') },
+      { id: 'o3cccccccccccccc', title: 'Gamma', owner: 'ada.analyst', type: 'Map Service', access: 'org', created: 3, modified: epoch('2026-06-01T00:00:00.000Z'), url: 'https://services.arcgis.com/c/MapServer' },
+    ];
+    const ordered = order === 'forward' ? all : [all[2], all[1], all[0]];
+    return {
+      page1: { total: 3, nextStart: 3, results: ordered.slice(0, 2) },
+      page2: { total: 3, nextStart: -1, results: ordered.slice(2) },
+    };
+  };
+  const userBodies = (order: 'forward' | 'reversed') => {
+    const all = [
+      { username: 'ada.analyst', fullName: 'Ada Analyst', role: 'org_admin', created: 1, modified: 2, lastLogin: -1 },
+      { username: 'greg.gis', fullName: 'Greg GIS', role: 'org_user', created: 3, modified: 4, lastLogin: 0 },
+    ];
+    return { total: 2, nextStart: -1, users: order === 'forward' ? all : [...all].reverse() };
+  };
+  const run = async (order: 'forward' | 'reversed') => {
+    const items = itemBodies(order);
+    const transport = fixtureTransport({
+      [`${REST}/portals/${ORG}?f=json`]: { body: portalSelfBody },
+      [`${REST}/portals/${ORG}/users?f=json&start=1&num=2`]: { body: userBodies(order) },
+      [`${REST}/search?f=json&q=orgid%3A${ORG}&sortField=created&sortOrder=asc&start=1&num=2`]: { body: items.page1 },
+      [`${REST}/search?f=json&q=orgid%3A${ORG}&sortField=created&sortOrder=asc&start=3&num=2`]: { body: items.page2 },
+    });
+    const result = await runSkill(
+      'inspect_arcgis_org',
+      { portal_url: PORTAL, org_id: ORG, include: ['users', 'items', 'services'], page_size: 2, max_records: 10 },
+      RUN_ID,
+      testDependencies(transport),
+    );
+    assert.equal(result.ok, true, result.error);
+    return result.output as any;
+  };
+  const forward = await run('forward');
+  const reversed = await run('reversed');
+
+  // Identical report (records, summaries, warnings) and identical output hash;
+  // only the per-request evidence bodies may differ.
+  assert.deepEqual(reversed.report, forward.report);
+  assert.equal(reversed.evidence.outputs[0].sha256, forward.evidence.outputs[0].sha256);
+  assert.deepEqual(
+    forward.report.items.records.map((r: { id: string }) => r.id),
+    ['o1aaaaaaaaaaaaaa', 'o2bbbbbbbbbbbbbb', 'o3cccccccccccccc'],
+  );
+  assert.deepEqual(
+    forward.report.users.records.map((r: { username: string }) => r.username),
+    ['ada.analyst', 'greg.gis'],
+  );
+  assert.deepEqual(
+    forward.report.services.records.map((r: { item_id: string }) => r.item_id),
+    ['o1aaaaaaaaaaaaaa', 'o3cccccccccccccc'],
+  );
+  // Request evidence stays in dispatch order in both runs.
+  assert.deepEqual(
+    forward.evidence.requests.map((r: { name: string }) => r.name),
+    ['portal_self', 'users:page1', 'items:page1', 'items:page2'],
+  );
+  assert.deepEqual(
+    reversed.evidence.requests.map((r: { name: string }) => r.name),
+    forward.evidence.requests.map((r: { name: string }) => r.name),
+  );
+});
+
+test('duplicate stable ids across pages fail closed instead of double-counting', async () => {
+  const dupe = { id: 'dupaaaaaaaaaaaaa', owner: 'a', type: 'Web Map', access: 'org', created: 1, modified: epoch('2026-07-01T00:00:00.000Z') };
+  const transport = fixtureTransport({
+    [`${REST}/portals/${ORG}?f=json`]: { body: portalSelfBody },
+    [`${REST}/search?f=json&q=orgid%3A${ORG}&sortField=created&sortOrder=asc&start=1&num=2`]: {
+      body: { total: 3, nextStart: 3, results: [dupe, { ...dupe, id: 'uniqbbbbbbbbbbbb' }] },
+    },
+    [`${REST}/search?f=json&q=orgid%3A${ORG}&sortField=created&sortOrder=asc&start=3&num=2`]: {
+      body: { total: 3, nextStart: -1, results: [dupe] }, // same id again
+    },
+  });
+  const result = await runSkill(
+    'inspect_arcgis_org',
+    { portal_url: PORTAL, org_id: ORG, include: ['items'], page_size: 2, max_records: 10 },
+    RUN_ID,
+    testDependencies(transport),
+  );
+  assert.equal(result.ok, false);
+  assert.match(result.error ?? '', /duplicate stable id 'dupaaaaaaaaaaaaa'/);
+});
+
+test('server totals lower than retrieved records fail closed', async () => {
+  const transport = fixtureTransport({
+    [`${REST}/portals/${ORG}?f=json`]: { body: portalSelfBody },
+    [`${REST}/search?f=json&q=orgid%3A${ORG}&sortField=created&sortOrder=asc&start=1&num=10`]: {
+      body: {
+        total: 1,
+        nextStart: -1,
+        results: [
+          { id: 'lowaaaaaaaaaaaaa', owner: 'a', type: 'Web Map', access: 'org', modified: 1 },
+          { id: 'lowbbbbbbbbbbbbb', owner: 'a', type: 'Web Map', access: 'org', modified: 1 },
+        ],
+      },
+    },
+  });
+  const result = await runSkill(
+    'inspect_arcgis_org',
+    { portal_url: PORTAL, org_id: ORG, include: ['items'], page_size: 10, max_records: 10 },
+    RUN_ID,
+    testDependencies(transport),
+  );
+  assert.equal(result.ok, false);
+  assert.match(result.error ?? '', /reported total 1 lower than the 2 records retrieved/);
 });
 
 test('malformed pagination envelopes fail closed', async () => {
@@ -688,6 +803,48 @@ test('credential-bearing service URLs in item metadata never leak into output or
   for (const canary of canaries) {
     assert.ok(!serialized.includes(canary), `canary ${canary} leaked into serialized result`);
   }
+});
+
+test('redactSecrets removes header-style Authorization and API-key credentials', async () => {
+  assert.equal(
+    redactSecrets('failed with Authorization: Bearer CANARY_HDR_BEARER_1a2b'),
+    'failed with Authorization: Bearer <redacted>',
+  );
+  assert.equal(
+    redactSecrets('sent authorization: Basic CANARY_HDR_BASIC_3c4d'),
+    'sent authorization: Basic <redacted>',
+  );
+  assert.equal(
+    redactSecrets('Authorization: CANARY_HDR_RAW_5e6f was rejected'),
+    'Authorization: <redacted> was rejected',
+  );
+  assert.equal(
+    redactSecrets('retry with Bearer CANARY_SCHEME_ONLY_7g8h attached'),
+    'retry with Bearer <redacted> attached',
+  );
+  assert.equal(
+    redactSecrets('X-Api-Key: CANARY_XAPI_9i0j and api-key: CANARY_APIHDR_1k2l'),
+    'X-Api-Key: <redacted> and api-key: <redacted>',
+  );
+
+  // Propagation: header credentials inside an ArcGIS error envelope must be
+  // redacted before the message can reach a thrown error.
+  const transport = fixtureTransport({
+    [`${REST}/portals/${ORG}?f=json`]: {
+      body: {
+        error: {
+          code: 403,
+          message: 'Denied. Authorization: Bearer CANARY_ENVELOPE_BEARER_3m4n and X-Api-Key: CANARY_ENVELOPE_KEY_5o6p sent',
+        },
+      },
+    },
+  });
+  const result = await runSkill('inspect_arcgis_org', { ...baseInput }, RUN_ID, testDependencies(transport));
+  assert.equal(result.ok, false);
+  assert.match(result.error ?? '', /error envelope \(code 403\)/);
+  assert.ok(!result.error?.includes('CANARY_ENVELOPE_BEARER_3m4n'), 'bearer canary leaked');
+  assert.ok(!result.error?.includes('CANARY_ENVELOPE_KEY_5o6p'), 'api-key canary leaked');
+  assert.match(result.error ?? '', /Bearer <redacted>/);
 });
 
 test('redactSecrets covers URL userinfo and every credential query parameter', () => {

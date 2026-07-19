@@ -18,13 +18,19 @@ import type { BoundaryOptions } from '../security/boundary.js';
 import {
   fetchArcGisTransport,
   paginateArcGis,
+  redactSecrets,
   requestArcGisJson,
   type ArcGisRequestEvidence,
   type ArcGisRestTransport,
 } from './arcgis-rest.js';
 
 const CAPABILITY_VERSION = '1.0.0';
+// `max_records` bounds each independently retrieved section (users, groups,
+// items). The manifest ceiling is the honest total output volume: three
+// retrieved sections plus the services section derived from items.
 const MAX_RECORDS_PER_SECTION = 2_000;
+const RETRIEVED_SECTION_COUNT = 3; // users, groups, items
+const MAX_TOTAL_OUTPUT_RECORDS = MAX_RECORDS_PER_SECTION * (RETRIEVED_SECTION_COUNT + 1);
 const DEFAULT_MAX_RECORDS = 500;
 const DEFAULT_PAGE_SIZE = 100;
 const ARCGIS_MAX_PAGE_SIZE = 100;
@@ -359,6 +365,38 @@ function staleness(input: StalenessInput): { stale: boolean | null; days: number
   return { stale: days > input.thresholdDays, days };
 }
 
+interface NormalizedEntry<T> {
+  key: string;
+  record: T;
+  warnings: string[];
+}
+
+/**
+ * Canonicalize one section: reject duplicate stable keys (overlapping pages
+ * must never silently double-count), sort records by their stable key so the
+ * report and output hash are independent of server page/record order, and
+ * emit per-record warnings in that same canonical order.
+ */
+function finalizeSection<T>(
+  entries: Array<NormalizedEntry<T>>,
+  section: string,
+  keyName: string,
+  warnings: string[],
+): T[] {
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    if (seen.has(entry.key)) {
+      throw new Error(
+        `arcgis '${section}' returned duplicate ${keyName} '${redactSecrets(entry.key).slice(0, 80)}'; overlapping pages are not trusted`,
+      );
+    }
+    seen.add(entry.key);
+  }
+  entries.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  for (const entry of entries) warnings.push(...entry.warnings);
+  return entries.map((entry) => entry.record);
+}
+
 interface RetrievalBudget {
   deadline: number;
   bytesUsed: number;
@@ -486,23 +524,31 @@ async function executeInspectArcgisOrg(
     );
     requests.push(...page.requests);
     truncationReasons.push(...page.truncationReasons);
-    const records = page.records.flatMap((record, index) => {
+    const skipped: string[] = [];
+    const entries = page.records.flatMap((record, index) => {
       const username = optionalString(record.username);
       if (username === null) {
-        warnings.push(`users record ${index}: missing username; record skipped as incomplete`);
+        skipped.push(`users record ${index}: missing username; record skipped as incomplete`);
         return [];
       }
+      const recordWarnings: string[] = [];
       return [
         {
-          username,
-          full_name: optionalString(record.fullName),
-          role: optionalString(record.role),
-          created_at: normalizeEpochMs(record.created, `user '${username}' created`, warnings),
-          modified_at: normalizeEpochMs(record.modified, `user '${username}' modified`, warnings),
-          last_login_at: normalizeEpochMs(record.lastLogin, `user '${username}' lastLogin`, warnings),
+          key: username,
+          warnings: recordWarnings,
+          record: {
+            username,
+            full_name: optionalString(record.fullName),
+            role: optionalString(record.role),
+            created_at: normalizeEpochMs(record.created, `user '${username}' created`, recordWarnings),
+            modified_at: normalizeEpochMs(record.modified, `user '${username}' modified`, recordWarnings),
+            last_login_at: normalizeEpochMs(record.lastLogin, `user '${username}' lastLogin`, recordWarnings),
+          },
         },
       ];
     });
+    const records = finalizeSection(entries, 'users', 'username', warnings);
+    warnings.push(...skipped);
     users = {
       total_reported: page.totalReported,
       retrieved_count: records.length,
@@ -530,23 +576,31 @@ async function executeInspectArcgisOrg(
     );
     requests.push(...page.requests);
     truncationReasons.push(...page.truncationReasons);
-    const records = page.records.flatMap((record, index) => {
+    const skipped: string[] = [];
+    const entries = page.records.flatMap((record, index) => {
       const id = optionalString(record.id);
       if (id === null) {
-        warnings.push(`groups record ${index}: missing id; record skipped as incomplete`);
+        skipped.push(`groups record ${index}: missing id; record skipped as incomplete`);
         return [];
       }
+      const recordWarnings: string[] = [];
       return [
         {
-          id,
-          title: optionalString(record.title),
-          owner: optionalString(record.owner),
-          access: normalizeSharing(record.access, `group '${id}' access`, warnings),
-          created_at: normalizeEpochMs(record.created, `group '${id}' created`, warnings),
-          modified_at: normalizeEpochMs(record.modified, `group '${id}' modified`, warnings),
+          key: id,
+          warnings: recordWarnings,
+          record: {
+            id,
+            title: optionalString(record.title),
+            owner: optionalString(record.owner),
+            access: normalizeSharing(record.access, `group '${id}' access`, recordWarnings),
+            created_at: normalizeEpochMs(record.created, `group '${id}' created`, recordWarnings),
+            modified_at: normalizeEpochMs(record.modified, `group '${id}' modified`, recordWarnings),
+          },
         },
       ];
     });
+    const records = finalizeSection(entries, 'groups', 'id', warnings);
+    warnings.push(...skipped);
     groups = {
       total_reported: page.totalReported,
       retrieved_count: records.length,
@@ -579,21 +633,23 @@ async function executeInspectArcgisOrg(
     );
     requests.push(...page.requests);
     truncationReasons.push(...page.truncationReasons);
-    const records = page.records.flatMap((record, index) => {
+    const skipped: string[] = [];
+    const entries = page.records.flatMap((record, index) => {
       const id = optionalString(record.id);
       if (id === null) {
-        warnings.push(`items record ${index}: missing id; record skipped as incomplete`);
+        skipped.push(`items record ${index}: missing id; record skipped as incomplete`);
         return [];
       }
+      const recordWarnings: string[] = [];
       const type = optionalString(record.type);
       const serviceBacked = type !== null && SERVICE_ITEM_TYPES.has(type);
       const serviceUrl = serviceBacked
-        ? normalizeServiceUrl(record.url, `item '${id}' url`, warnings)
+        ? normalizeServiceUrl(record.url, `item '${id}' url`, recordWarnings)
         : null;
       if (serviceBacked && serviceUrl === null) {
-        warnings.push(`item '${id}': service-backed type '${type}' has no usable service URL`);
+        recordWarnings.push(`item '${id}': service-backed type '${type}' has no usable service URL`);
       }
-      const modifiedAt = normalizeEpochMs(record.modified, `item '${id}' modified`, warnings);
+      const modifiedAt = normalizeEpochMs(record.modified, `item '${id}' modified`, recordWarnings);
       const stale = staleness({ modifiedAt, nowMs, thresholdDays: staleAfterDays });
       const sizeBytes =
         typeof record.size === 'number' && Number.isInteger(record.size) && record.size >= 0
@@ -601,21 +657,29 @@ async function executeInspectArcgisOrg(
           : null;
       return [
         {
-          id,
-          title: optionalString(record.title),
-          owner: optionalString(record.owner),
-          type,
-          access: normalizeSharing(record.access, `item '${id}' access`, warnings),
-          created_at: normalizeEpochMs(record.created, `item '${id}' created`, warnings),
-          modified_at: modifiedAt,
-          size_bytes: sizeBytes,
-          service_backed: serviceBacked,
-          service_url: serviceUrl,
-          stale: stale.stale,
-          days_since_modified: stale.days,
+          key: id,
+          warnings: recordWarnings,
+          record: {
+            id,
+            title: optionalString(record.title),
+            owner: optionalString(record.owner),
+            type,
+            access: normalizeSharing(record.access, `item '${id}' access`, recordWarnings),
+            created_at: normalizeEpochMs(record.created, `item '${id}' created`, recordWarnings),
+            modified_at: modifiedAt,
+            size_bytes: sizeBytes,
+            service_backed: serviceBacked,
+            service_url: serviceUrl,
+            stale: stale.stale,
+            days_since_modified: stale.days,
+          },
         },
       ];
     });
+    // Canonical item order (by id) also fixes the derived services order and
+    // makes ownership/sharing/staleness summaries independent of page order.
+    const records = finalizeSection(entries, 'items', 'stable id', warnings);
+    warnings.push(...skipped);
     items = {
       total_reported: page.totalReported,
       retrieved_count: records.length,
@@ -805,7 +869,9 @@ export const inspectArcgisOrgCapability: CapabilityDefinition<
     allowed_hosts: ['*.maps.arcgis.com', '*.arcgis.com'],
     allowed_sources: ['arcgis_portal'],
     resource_limits: {
-      max_records: MAX_RECORDS_PER_SECTION,
+      // Honest output ceiling: up to MAX_RECORDS_PER_SECTION records for each
+      // of users/groups/items plus the derived services section.
+      max_records: MAX_TOTAL_OUTPUT_RECORDS,
       max_bytes: MAX_TOTAL_BYTES,
       max_duration_ms: MAX_DURATION_MS,
       max_cost_usd: 0,
