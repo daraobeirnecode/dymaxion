@@ -524,11 +524,11 @@ async function executeInspectArcgisOrg(
     );
     requests.push(...page.requests);
     truncationReasons.push(...page.truncationReasons);
-    const skipped: string[] = [];
-    const entries = page.records.flatMap((record, index) => {
+    let skippedCount = 0;
+    const entries = page.records.flatMap((record) => {
       const username = optionalString(record.username);
       if (username === null) {
-        skipped.push(`users record ${index}: missing username; record skipped as incomplete`);
+        skippedCount += 1;
         return [];
       }
       const recordWarnings: string[] = [];
@@ -548,7 +548,9 @@ async function executeInspectArcgisOrg(
       ];
     });
     const records = finalizeSection(entries, 'users', 'username', warnings);
-    warnings.push(...skipped);
+    if (skippedCount > 0) {
+      warnings.push(`users: ${skippedCount} incomplete record(s) missing username were skipped`);
+    }
     users = {
       total_reported: page.totalReported,
       retrieved_count: records.length,
@@ -576,11 +578,11 @@ async function executeInspectArcgisOrg(
     );
     requests.push(...page.requests);
     truncationReasons.push(...page.truncationReasons);
-    const skipped: string[] = [];
-    const entries = page.records.flatMap((record, index) => {
+    let skippedCount = 0;
+    const entries = page.records.flatMap((record) => {
       const id = optionalString(record.id);
       if (id === null) {
-        skipped.push(`groups record ${index}: missing id; record skipped as incomplete`);
+        skippedCount += 1;
         return [];
       }
       const recordWarnings: string[] = [];
@@ -600,7 +602,9 @@ async function executeInspectArcgisOrg(
       ];
     });
     const records = finalizeSection(entries, 'groups', 'id', warnings);
-    warnings.push(...skipped);
+    if (skippedCount > 0) {
+      warnings.push(`groups: ${skippedCount} incomplete record(s) missing id were skipped`);
+    }
     groups = {
       total_reported: page.totalReported,
       retrieved_count: records.length,
@@ -633,11 +637,11 @@ async function executeInspectArcgisOrg(
     );
     requests.push(...page.requests);
     truncationReasons.push(...page.truncationReasons);
-    const skipped: string[] = [];
-    const entries = page.records.flatMap((record, index) => {
+    let skippedCount = 0;
+    const entries = page.records.flatMap((record) => {
       const id = optionalString(record.id);
       if (id === null) {
-        skipped.push(`items record ${index}: missing id; record skipped as incomplete`);
+        skippedCount += 1;
         return [];
       }
       const recordWarnings: string[] = [];
@@ -679,7 +683,9 @@ async function executeInspectArcgisOrg(
     // Canonical item order (by id) also fixes the derived services order and
     // makes ownership/sharing/staleness summaries independent of page order.
     const records = finalizeSection(entries, 'items', 'stable id', warnings);
-    warnings.push(...skipped);
+    if (skippedCount > 0) {
+      warnings.push(`items: ${skippedCount} incomplete record(s) missing stable id were skipped`);
+    }
     items = {
       total_reported: page.totalReported,
       retrieved_count: records.length,

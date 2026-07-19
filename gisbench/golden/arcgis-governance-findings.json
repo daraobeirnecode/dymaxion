@@ -185,7 +185,7 @@
       "warnings": [
         "item 'dddddddddddddddddddddddddddddd03': service-backed type 'Feature Service' has no usable service URL",
         "item 'dddddddddddddddddddddddddddddd05' access: unrecognized sharing value was labelled 'unknown'",
-        "items record 5: missing id; record skipped as incomplete"
+        "items: 1 incomplete record(s) missing stable id were skipped"
       ],
       "truncation": {
         "truncated": false,
@@ -246,7 +246,7 @@
       "outputs": [
         {
           "name": "arcgis_org_inventory",
-          "sha256": "3869584b68313e05ba79b776c2bfd5cb0a12ed2ae4536aa10a861094218d0563",
+          "sha256": "1d741de083cfbf337b7c6aa15c6bf919d55b61dcef1ae1fe7f315633fcc5fef6",
           "validation": {
             "valid": true,
             "checks": [
@@ -259,7 +259,7 @@
             "warnings": [
               "item 'dddddddddddddddddddddddddddddd03': service-backed type 'Feature Service' has no usable service URL",
               "item 'dddddddddddddddddddddddddddddd05' access: unrecognized sharing value was labelled 'unknown'",
-              "items record 5: missing id; record skipped as incomplete"
+              "items: 1 incomplete record(s) missing stable id were skipped"
             ]
           }
         }

@@ -34,7 +34,61 @@ export interface ArcGisRequestEvidence {
   bytes: number;
 }
 
-const SECRET_PARAM = /((?:^|[?&"'\s,{])(?:token|apikey|api[_-]key|password|secret|authorization|signature|code|refresh[_-]?token|access[_-]?token)(?:=|"\s*:\s*"))([^&\s"']+)/gi;
+// Any key=value or "key":"value" pair; the key is tested against
+// isCredentialKey so compound conventional names (client_secret, oauth_token,
+// private_key, …) are caught without redacting ordinary prose.
+const KEY_VALUE_PAIR = /(^|[?&"'\s,{(])([A-Za-z0-9_.-]+)(=|"\s*:\s*")([^&\s"']+)/g;
+const EXACT_CREDENTIAL_KEYS = new Set([
+  'token',
+  'secret',
+  'key',
+  'password',
+  'passwd',
+  'pwd',
+  'credential',
+  'credentials',
+  'auth',
+  'authorization',
+  'apikey',
+  'signature',
+  'sig',
+  'code',
+]);
+// Compound names: any separator-delimited suffix of a credential word, e.g.
+// client_secret, oauth_token, refresh_token, id_token, private_key, api_key,
+// access_key, db_password, x-api-key, session.token.
+const CREDENTIAL_SUFFIX = /(?:^|[_.-])(?:token|secret|key|password|passwd|credential|credentials|apikey)$/;
+// Reviewed allowlist of conventional collapsed/camelCase compound credential
+// names that survive lowercasing without a separator (kept narrow on purpose:
+// no broad endsWith matching that would redact ordinary keys like 'monkey').
+const COLLAPSED_CREDENTIAL_KEYS = new Set([
+  'clientsecret',
+  'accesstoken',
+  'refreshtoken',
+  'idtoken',
+  'privatekey',
+  'accesskeyid',
+  'secretaccesskey',
+  'sessiontoken',
+  'authtoken',
+  'apitoken',
+  'appsecret',
+  'secretkey',
+]);
+
+function isCredentialKey(name: string): boolean {
+  const normalized = name.toLowerCase();
+  if (EXACT_CREDENTIAL_KEYS.has(normalized) || COLLAPSED_CREDENTIAL_KEYS.has(normalized)) {
+    return true;
+  }
+  if (CREDENTIAL_SUFFIX.test(normalized)) return true;
+  // camelCase compounds: split case boundaries, then re-test the suffix rule
+  // (clientSecret → client_secret). Names without case boundaries ('monkey')
+  // are unaffected.
+  const decompounded = name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  return decompounded !== normalized && CREDENTIAL_SUFFIX.test(decompounded);
+}
+
 const MAX_ERROR_DETAIL_CHARS = 240;
 
 const URL_USERINFO = /(https?:\/\/)[^/\s@"']+@/gi;
@@ -53,7 +107,8 @@ export function redactSecrets(text: string): string {
       `${prefix}${scheme ? `${scheme} ` : ''}<redacted>`)
     .replace(AUTH_SCHEME, '$1 <redacted>')
     .replace(API_KEY_HEADER, '$1<redacted>')
-    .replace(SECRET_PARAM, '$1<redacted>');
+    .replace(KEY_VALUE_PAIR, (match, prefix: string, name: string, separator: string) =>
+      isCredentialKey(name) ? `${prefix}${name}${separator}<redacted>` : match);
 }
 
 function sanitizeErrorDetail(text: string): string {

@@ -847,6 +847,139 @@ test('redactSecrets removes header-style Authorization and API-key credentials',
   assert.match(result.error ?? '', /Bearer <redacted>/);
 });
 
+test('redactSecrets covers compound credential keys without shredding ordinary prose', async () => {
+  const compounds = [
+    'client_secret=CANARY_CLIENT_SECRET_a1b2',
+    'oauth_token=CANARY_OAUTH_TOKEN_c3d4',
+    'refresh_token=CANARY_REFRESH_e5f6',
+    'id_token=CANARY_IDTOKEN_g7h8',
+    'private_key=CANARY_PRIVKEY_i9j0',
+    'api_key=CANARY_APIKEY2_k1l2',
+    'access_key=CANARY_ACCESSKEY_m3n4',
+    'db_password=CANARY_DBPASS_o5p6',
+    'session.token=CANARY_SESSTOKEN_q7r8',
+    'x-api-key=CANARY_XAPIKEY_s9t0',
+  ];
+  for (const pair of compounds) {
+    const redacted = redactSecrets(`request with ${pair} failed`);
+    assert.ok(!redacted.includes('CANARY_'), `canary survived redaction of '${pair}'`);
+    assert.ok(redacted.includes('=<redacted>'), `no redaction marker for '${pair}'`);
+  }
+  assert.equal(
+    redactSecrets('{"client_secret":"CANARY_JSON_SECRET_u1v2","org":"demo"}'),
+    '{"client_secret":"<redacted>","org":"demo"}',
+  );
+  // Ordinary prose and non-credential keys stay intact.
+  assert.equal(redactSecrets('the token was expired'), 'the token was expired');
+  assert.equal(redactSecrets('zip_code=95814&start=1&num=10&sortField=created'), 'zip_code=95814&start=1&num=10&sortField=created');
+  assert.equal(redactSecrets('orgid:DEMOORG123 owner=ada.analyst total=5'), 'orgid:DEMOORG123 owner=ada.analyst total=5');
+
+  // Envelope propagation: compound keys inside an ArcGIS error envelope are
+  // redacted before the message reaches the thrown error.
+  const transport = fixtureTransport({
+    [`${REST}/portals/${ORG}?f=json`]: {
+      body: {
+        error: {
+          code: 400,
+          message: 'invalid_client: client_secret=CANARY_ENV_CLIENT_SECRET_w3x4 and refresh_token=CANARY_ENV_REFRESH_y5z6 rejected',
+        },
+      },
+    },
+  });
+  const result = await runSkill('inspect_arcgis_org', { ...baseInput }, RUN_ID, testDependencies(transport));
+  assert.equal(result.ok, false);
+  assert.match(result.error ?? '', /error envelope \(code 400\)/);
+  assert.ok(!result.error?.includes('CANARY_ENV_CLIENT_SECRET_w3x4'), 'client_secret canary leaked');
+  assert.ok(!result.error?.includes('CANARY_ENV_REFRESH_y5z6'), 'refresh_token canary leaked');
+  assert.match(result.error ?? '', /client_secret=<redacted>/);
+});
+
+test('skipped-record diagnostics are canonical: reversed mixed records keep report and hash identical', async () => {
+  const run = async (order: 'forward' | 'reversed') => {
+    const all = [
+      { id: 'k1aaaaaaaaaaaaaa', title: 'Valid A', owner: 'ada.analyst', type: 'Web Map', access: 'org', created: 1, modified: epoch('2026-07-01T00:00:00.000Z') },
+      { title: 'No Id Fragment', owner: 'greg.gis', type: 'Web Map', access: 'private', created: 2 },
+      { id: 'k2bbbbbbbbbbbbbb', title: 'Valid B', owner: 'greg.gis', type: 'Web Map', access: 'mystery', created: 3, modified: epoch('2024-01-01T00:00:00.000Z') },
+    ];
+    const results = order === 'forward' ? all : [...all].reverse();
+    const transport = fixtureTransport({
+      [`${REST}/portals/${ORG}?f=json`]: { body: portalSelfBody },
+      [`${REST}/search?f=json&q=orgid%3A${ORG}&sortField=created&sortOrder=asc&start=1&num=10`]: {
+        body: { total: 3, nextStart: -1, results },
+      },
+    });
+    const result = await runSkill(
+      'inspect_arcgis_org',
+      { portal_url: PORTAL, org_id: ORG, include: ['items'], page_size: 10, max_records: 10 },
+      RUN_ID,
+      testDependencies(transport),
+    );
+    assert.equal(result.ok, true, result.error);
+    return result.output as any;
+  };
+  const forward = await run('forward');
+  const reversed = await run('reversed');
+
+  assert.deepEqual(reversed.report, forward.report);
+  assert.equal(reversed.evidence.outputs[0].sha256, forward.evidence.outputs[0].sha256);
+  // The skip diagnostic is aggregate and index-free.
+  assert.ok(forward.report.warnings.includes('items: 1 incomplete record(s) missing stable id were skipped'));
+  assert.ok(!JSON.stringify(forward.report.warnings).match(/record \d+/));
+  assert.equal(forward.report.items.retrieved_count, 2);
+  // Request evidence remains truthful: same dispatch order, but the reversed
+  // page body is a different document with a different hash.
+  assert.deepEqual(
+    forward.evidence.requests.map((r: { name: string }) => r.name),
+    reversed.evidence.requests.map((r: { name: string }) => r.name),
+  );
+  assert.notEqual(forward.evidence.requests[1].sha256, reversed.evidence.requests[1].sha256);
+});
+
+test('redactSecrets covers camelCase collapsed compound credential keys', async () => {
+  const camelPairs = [
+    'clientSecret=CANARY_CAMEL_CLIENTSECRET_a1',
+    'accessToken=CANARY_CAMEL_ACCESSTOKEN_b2',
+    'refreshToken=CANARY_CAMEL_REFRESH_c3',
+    'idToken=CANARY_CAMEL_IDTOKEN_d4',
+    'privateKey=CANARY_CAMEL_PRIVKEY_e5',
+    'accessKeyId=CANARY_CAMEL_AKID_f6',
+    'secretAccessKey=CANARY_CAMEL_SAK_g7',
+    'sessionToken=CANARY_CAMEL_SESSION_h8',
+    'authToken=CANARY_CAMEL_AUTH_i9',
+  ];
+  for (const pair of camelPairs) {
+    const redacted = redactSecrets(`request with ${pair} failed`);
+    assert.ok(!redacted.includes('CANARY_'), `canary survived redaction of '${pair}'`);
+    assert.ok(redacted.includes('=<redacted>'), `no redaction marker for '${pair}'`);
+  }
+  assert.equal(
+    redactSecrets('{"secretAccessKey":"CANARY_CAMEL_JSON_j0","region":"us-west-2"}'),
+    '{"secretAccessKey":"<redacted>","region":"us-west-2"}',
+  );
+  // Ordinary keys and prose stay intact — no broad endsWith matching.
+  assert.equal(redactSecrets('monkey=banana&donkey=gray&start=1'), 'monkey=banana&donkey=gray&start=1');
+  assert.equal(redactSecrets('the accessToken was expired'), 'the accessToken was expired');
+  assert.equal(redactSecrets('itemId=abc123&orgId=DEMOORG123'), 'itemId=abc123&orgId=DEMOORG123');
+
+  // Envelope propagation for camelCase keys.
+  const transport = fixtureTransport({
+    [`${REST}/portals/${ORG}?f=json`]: {
+      body: {
+        error: {
+          code: 401,
+          message: 'invalid_grant: clientSecret=CANARY_ENV_CAMELSECRET_k1 and sessionToken=CANARY_ENV_CAMELSESSION_l2 rejected',
+        },
+      },
+    },
+  });
+  const result = await runSkill('inspect_arcgis_org', { ...baseInput }, RUN_ID, testDependencies(transport));
+  assert.equal(result.ok, false);
+  assert.match(result.error ?? '', /error envelope \(code 401\)/);
+  assert.ok(!result.error?.includes('CANARY_ENV_CAMELSECRET_k1'), 'clientSecret canary leaked');
+  assert.ok(!result.error?.includes('CANARY_ENV_CAMELSESSION_l2'), 'sessionToken canary leaked');
+  assert.match(result.error ?? '', /clientSecret=<redacted>/);
+});
+
 test('redactSecrets covers URL userinfo and every credential query parameter', () => {
   assert.equal(
     redactSecrets('see https://CANARY_USER_NAME_8y2w:CANARY_USERINFO_PW_9x1z@host.example/x'),
