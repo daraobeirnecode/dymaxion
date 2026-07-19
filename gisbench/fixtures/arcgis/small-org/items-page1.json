@@ -1,0 +1,39 @@
+{
+  "total": 3,
+  "start": 1,
+  "num": 10,
+  "nextStart": -1,
+  "results": [
+    {
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb01",
+      "title": "Hydrants",
+      "owner": "ada.analyst",
+      "type": "Feature Service",
+      "access": "public",
+      "created": 1672531200000,
+      "modified": 1782864000000,
+      "size": 2048,
+      "url": "https://services.arcgis.com/DEMOORG123/arcgis/rest/services/Hydrants/FeatureServer"
+    },
+    {
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb02",
+      "title": "Old Basemap Notes",
+      "owner": "greg.gis",
+      "type": "Web Map",
+      "access": "private",
+      "created": 1640995200000,
+      "modified": 1714521600000,
+      "size": 512
+    },
+    {
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb03",
+      "title": "Mystery Layer Service",
+      "owner": "ada.analyst",
+      "type": "CSV",
+      "access": "weird-access-value",
+      "created": 1685577600000,
+      "modified": -1,
+      "size": 100
+    }
+  ]
+}

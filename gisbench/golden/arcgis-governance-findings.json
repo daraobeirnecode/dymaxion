@@ -1,0 +1,276 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "report": {
+      "schema_version": "1.0.0",
+      "portal": {
+        "url": "https://demo-org.maps.arcgis.com",
+        "org_id": "DEMOORG123",
+        "name": "Demo Synthetic Org",
+        "url_key": "demo-org",
+        "access": "public",
+        "created_at": "2020-01-01T00:00:00.000Z",
+        "modified_at": "2026-06-01T00:00:00.000Z"
+      },
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "parameters": {
+        "include": [
+          "items",
+          "services"
+        ],
+        "stale_after_days": 180,
+        "page_size": 10,
+        "max_records": 10,
+        "item_owner": null
+      },
+      "caveats": [
+        "Inventory covers only content visible to the configured identity at the approved portal; it is not proof of a complete organization inventory.",
+        "1 item(s) have no usable modification timestamp; staleness is unknown for them."
+      ],
+      "users": null,
+      "groups": null,
+      "items": {
+        "total_reported": 6,
+        "retrieved_count": 5,
+        "truncated": false,
+        "records": [
+          {
+            "id": "dddddddddddddddddddddddddddddd01",
+            "title": "Roads",
+            "owner": "ops.admin",
+            "type": "Feature Service",
+            "access": "public",
+            "created_at": "2023-01-01T00:00:00.000Z",
+            "modified_at": "2026-07-10T00:00:00.000Z",
+            "size_bytes": 8192,
+            "service_backed": true,
+            "service_url": "https://services.arcgis.com/DEMOORG123/arcgis/rest/services/Roads/FeatureServer",
+            "stale": false,
+            "days_since_modified": 8
+          },
+          {
+            "id": "dddddddddddddddddddddddddddddd02",
+            "title": "Legacy Basemap",
+            "owner": "ops.admin",
+            "type": "Map Service",
+            "access": "org",
+            "created_at": "2022-01-01T00:00:00.000Z",
+            "modified_at": "2025-06-01T00:00:00.000Z",
+            "size_bytes": 16384,
+            "service_backed": true,
+            "service_url": "https://demo-org.maps.arcgis.com/server/rest/services/LegacyBasemap/MapServer",
+            "stale": true,
+            "days_since_modified": 412
+          },
+          {
+            "id": "dddddddddddddddddddddddddddddd03",
+            "title": "Abandoned Survey Layer",
+            "owner": "legacy.user",
+            "type": "Feature Service",
+            "access": "shared",
+            "created_at": "2022-06-15T00:00:00.000Z",
+            "modified_at": "2024-02-01T00:00:00.000Z",
+            "size_bytes": 2048,
+            "service_backed": true,
+            "service_url": null,
+            "stale": true,
+            "days_since_modified": 898
+          },
+          {
+            "id": "dddddddddddddddddddddddddddddd04",
+            "title": "Weekly Ops Map",
+            "owner": "ops.admin",
+            "type": "Web Map",
+            "access": "private",
+            "created_at": "2023-02-01T00:00:00.000Z",
+            "modified_at": "2026-07-01T00:00:00.000Z",
+            "size_bytes": 256,
+            "service_backed": false,
+            "service_url": null,
+            "stale": false,
+            "days_since_modified": 17
+          },
+          {
+            "id": "dddddddddddddddddddddddddddddd05",
+            "title": "Field Notes Upload",
+            "owner": "legacy.user",
+            "type": "CSV",
+            "access": "unknown",
+            "created_at": "2023-03-01T00:00:00.000Z",
+            "modified_at": null,
+            "size_bytes": 64,
+            "service_backed": false,
+            "service_url": null,
+            "stale": null,
+            "days_since_modified": null
+          }
+        ]
+      },
+      "services": {
+        "total_reported": null,
+        "retrieved_count": 3,
+        "truncated": false,
+        "records": [
+          {
+            "item_id": "dddddddddddddddddddddddddddddd01",
+            "title": "Roads",
+            "owner": "ops.admin",
+            "type": "Feature Service",
+            "service_url": "https://services.arcgis.com/DEMOORG123/arcgis/rest/services/Roads/FeatureServer",
+            "access": "public",
+            "stale": false
+          },
+          {
+            "item_id": "dddddddddddddddddddddddddddddd02",
+            "title": "Legacy Basemap",
+            "owner": "ops.admin",
+            "type": "Map Service",
+            "service_url": "https://demo-org.maps.arcgis.com/server/rest/services/LegacyBasemap/MapServer",
+            "access": "org",
+            "stale": true
+          },
+          {
+            "item_id": "dddddddddddddddddddddddddddddd03",
+            "title": "Abandoned Survey Layer",
+            "owner": "legacy.user",
+            "type": "Feature Service",
+            "service_url": null,
+            "access": "shared",
+            "stale": true
+          }
+        ]
+      },
+      "ownership_summary": [
+        {
+          "owner": "ops.admin",
+          "item_count": 3
+        },
+        {
+          "owner": "legacy.user",
+          "item_count": 2
+        }
+      ],
+      "sharing_summary": {
+        "public": 1,
+        "org": 1,
+        "shared": 1,
+        "private": 1,
+        "unknown": 1
+      },
+      "staleness": {
+        "threshold_days": 180,
+        "evaluated_at": "2026-07-18T12:00:00.000Z",
+        "stale_item_count": 2,
+        "unknown_modified_count": 1,
+        "findings": [
+          {
+            "item_id": "dddddddddddddddddddddddddddddd03",
+            "title": "Abandoned Survey Layer",
+            "owner": "legacy.user",
+            "type": "Feature Service",
+            "modified_at": "2024-02-01T00:00:00.000Z",
+            "days_since_modified": 898
+          },
+          {
+            "item_id": "dddddddddddddddddddddddddddddd02",
+            "title": "Legacy Basemap",
+            "owner": "ops.admin",
+            "type": "Map Service",
+            "modified_at": "2025-06-01T00:00:00.000Z",
+            "days_since_modified": 412
+          }
+        ]
+      },
+      "warnings": [
+        "item 'dddddddddddddddddddddddddddddd03': service-backed type 'Feature Service' has no usable service URL",
+        "item 'dddddddddddddddddddddddddddddd05' access: unrecognized sharing value was labelled 'unknown'",
+        "items record 5: missing id; record skipped as incomplete"
+      ],
+      "truncation": {
+        "truncated": false,
+        "reasons": []
+      }
+    },
+    "evidence": {
+      "schema_version": "1.1.0",
+      "bundle_id": "inspect_arcgis_org:96fd0d0c521413b1",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "requests": [
+        {
+          "name": "portal_self",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/portals/DEMOORG123?f=json",
+          "status": 200,
+          "sha256": "96fd0d0c521413b14f243356c8ece86f9d3d6aa6446e136afbb54c0a6bc1e6a3",
+          "bytes": 160
+        },
+        {
+          "name": "items:page1",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/search?f=json&q=orgid%3ADEMOORG123&sortField=created&sortOrder=asc&start=1&num=10",
+          "status": 200,
+          "sha256": "7c7640a2943300b1fb7b7e778b71dd1811fea0aa269b6b14063b0fa796be6fef",
+          "bytes": 1748
+        }
+      ],
+      "source": {
+        "uri": "https://demo-org.maps.arcgis.com/sharing/rest/portals/DEMOORG123?f=json",
+        "identity": {
+          "kind": "arcgis_org",
+          "value": "DEMOORG123"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "96fd0d0c521413b14f243356c8ece86f9d3d6aa6446e136afbb54c0a6bc1e6a3"
+      },
+      "gis_metadata": {
+        "format": "ArcGIS Portal REST JSON",
+        "crs": null,
+        "axis_order": null,
+        "units": null,
+        "extent": null,
+        "schema": [],
+        "row_count": 5,
+        "geometry_types": [],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "{\"include\":[\"items\",\"services\"],\"item_owner\":null,\"max_records\":10,\"org_id\":\"DEMOORG123\",\"page_size\":10,\"portal_url\":\"https://demo-org.maps.arcgis.com\",\"stale_after_days\":180}",
+        "sha256": "45e720bd0b2f208b8cb71eeb583afd28e1f60579a48771ba7e4f16d722ab20a0"
+      },
+      "execution": {
+        "capability": "inspect_arcgis_org",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "arcgis_org_inventory",
+          "sha256": "3869584b68313e05ba79b776c2bfd5cb0a12ed2ae4536aa10a861094218d0563",
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "boundary_preflight",
+              "arcgis_envelope",
+              "pagination",
+              "output_schema"
+            ],
+            "warnings": [
+              "item 'dddddddddddddddddddddddddddddd03': service-backed type 'Feature Service' has no usable service URL",
+              "item 'dddddddddddddddddddddddddddddd05' access: unrecognized sharing value was labelled 'unknown'",
+              "items record 5: missing id; record skipped as incomplete"
+            ]
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

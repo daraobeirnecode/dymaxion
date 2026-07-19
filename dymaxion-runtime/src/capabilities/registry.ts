@@ -1,9 +1,14 @@
 import { readFile, stat } from 'node:fs/promises';
 import type { CapabilityDefinition, CapabilityExecutionContext } from '../contracts/capability.js';
+import { inspectArcgisOrgCapability } from './inspect-arcgis-org.js';
 import { inspectDatasetCapability } from './inspect-dataset.js';
 
 const capabilities = new Map<string, CapabilityDefinition<unknown, unknown>>([
   [inspectDatasetCapability.manifest.slug, inspectDatasetCapability as CapabilityDefinition<unknown, unknown>],
+  [
+    inspectArcgisOrgCapability.manifest.slug,
+    inspectArcgisOrgCapability as CapabilityDefinition<unknown, unknown>,
+  ],
 ]);
 
 export function getCapability(slug: string): CapabilityDefinition<unknown, unknown> | undefined {

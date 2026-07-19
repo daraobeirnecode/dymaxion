@@ -7,7 +7,7 @@ an operator you delegate to, not a chatbot.
 - **Framework**: TypeScript + Vercel AI SDK + openid-client; Mastra is retained as development-only compatibility scaffolding in Phase 0
 - **Providers**: Anthropic (API key), OpenAI / Google / Azure / Cohere (OAuth 2.0), Ollama (local)
 - **Memory**: Postgres 18 + pgvector, Voyage voyage-3-large embeddings
-- **Capabilities**: 45 historical Sprint 1 skill scaffolds plus the Phase 0 native `inspect_dataset` vertical slice; folder presence is not a production-readiness claim
+- **Capabilities**: two implemented native capabilities — the Phase 0 `inspect_dataset` GeoJSON slice and the Phase 1A read-only `inspect_arcgis_org` organization inventory ([docs](docs/capabilities/inspect-arcgis-org.md)) — plus 45 historical Sprint 1 skill scaffolds; folder presence is not a production-readiness claim, and the remaining roadmap capabilities are not implemented
 - **Gateways**: Telegram + CLI + Web (Sprint 1); Teams, Slack, Email, ArcGIS Portal, SMS stubbed
 - **Safety**: employer boundary (structural allow/deny lists), human-in-the-loop approvals for destructive ops, per-tier monthly USD budget caps enforced pre-call, append-only audit log, LangFuse tracing
 

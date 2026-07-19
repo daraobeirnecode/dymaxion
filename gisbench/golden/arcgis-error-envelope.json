@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "error": "arcgis request 'portal_self' returned error envelope (code 499): Token Required. token=<redacted> was rejected",
+  "cost_usd": 0
+}

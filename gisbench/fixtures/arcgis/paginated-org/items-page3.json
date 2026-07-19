@@ -1,0 +1,19 @@
+{
+  "total": 5,
+  "start": 5,
+  "num": 2,
+  "nextStart": -1,
+  "results": [
+    {
+      "id": "cccccccccccccccccccccccccccccc05",
+      "title": "Parcels Archive Index",
+      "owner": "ada.analyst",
+      "type": "Feature Service",
+      "access": "public",
+      "created": 1685577600000,
+      "modified": 1782864000000,
+      "size": 4096,
+      "url": "https://services.arcgis.com/DEMOORG123/arcgis/rest/services/ParcelsArchive/FeatureServer"
+    }
+  ]
+}

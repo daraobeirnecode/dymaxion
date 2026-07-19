@@ -1,0 +1,28 @@
+{
+  "total": 5,
+  "start": 1,
+  "num": 2,
+  "nextStart": 3,
+  "results": [
+    {
+      "id": "cccccccccccccccccccccccccccccc01",
+      "title": "Parcels 2023 Q1",
+      "owner": "ada.analyst",
+      "type": "Web Map",
+      "access": "org",
+      "created": 1675209600000,
+      "modified": 1782864000000,
+      "size": 1024
+    },
+    {
+      "id": "cccccccccccccccccccccccccccccc02",
+      "title": "Parcels 2023 Q2",
+      "owner": "ada.analyst",
+      "type": "Web Map",
+      "access": "org",
+      "created": 1677628800000,
+      "modified": 1782864000000,
+      "size": 1024
+    }
+  ]
+}

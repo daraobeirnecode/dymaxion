@@ -1,0 +1,270 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "report": {
+      "schema_version": "1.0.0",
+      "portal": {
+        "url": "https://demo-org.maps.arcgis.com",
+        "org_id": "DEMOORG123",
+        "name": "Demo Synthetic Org",
+        "url_key": "demo-org",
+        "access": "public",
+        "created_at": "2020-01-01T00:00:00.000Z",
+        "modified_at": "2026-06-01T00:00:00.000Z"
+      },
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "parameters": {
+        "include": [
+          "users",
+          "groups",
+          "items",
+          "services"
+        ],
+        "stale_after_days": 365,
+        "page_size": 10,
+        "max_records": 10,
+        "item_owner": null
+      },
+      "caveats": [
+        "Inventory covers only content visible to the configured identity at the approved portal; it is not proof of a complete organization inventory.",
+        "1 item(s) have no usable modification timestamp; staleness is unknown for them."
+      ],
+      "users": {
+        "total_reported": 2,
+        "retrieved_count": 2,
+        "truncated": false,
+        "records": [
+          {
+            "username": "ada.analyst",
+            "full_name": "Ada Analyst",
+            "role": "org_admin",
+            "created_at": "2021-03-01T00:00:00.000Z",
+            "modified_at": "2026-05-01T00:00:00.000Z",
+            "last_login_at": "2026-07-01T08:00:00.000Z"
+          },
+          {
+            "username": "greg.gis",
+            "full_name": "Greg GIS",
+            "role": "org_publisher",
+            "created_at": "2022-06-15T00:00:00.000Z",
+            "modified_at": "2024-01-01T00:00:00.000Z",
+            "last_login_at": null
+          }
+        ]
+      },
+      "groups": {
+        "total_reported": 1,
+        "retrieved_count": 1,
+        "truncated": false,
+        "records": [
+          {
+            "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa01",
+            "title": "Operations",
+            "owner": "ada.analyst",
+            "access": "org",
+            "created_at": "2021-04-01T00:00:00.000Z",
+            "modified_at": "2026-01-01T00:00:00.000Z"
+          }
+        ]
+      },
+      "items": {
+        "total_reported": 3,
+        "retrieved_count": 3,
+        "truncated": false,
+        "records": [
+          {
+            "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb01",
+            "title": "Hydrants",
+            "owner": "ada.analyst",
+            "type": "Feature Service",
+            "access": "public",
+            "created_at": "2023-01-01T00:00:00.000Z",
+            "modified_at": "2026-07-01T00:00:00.000Z",
+            "size_bytes": 2048,
+            "service_backed": true,
+            "service_url": "https://services.arcgis.com/DEMOORG123/arcgis/rest/services/Hydrants/FeatureServer",
+            "stale": false,
+            "days_since_modified": 17
+          },
+          {
+            "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb02",
+            "title": "Old Basemap Notes",
+            "owner": "greg.gis",
+            "type": "Web Map",
+            "access": "private",
+            "created_at": "2022-01-01T00:00:00.000Z",
+            "modified_at": "2024-05-01T00:00:00.000Z",
+            "size_bytes": 512,
+            "service_backed": false,
+            "service_url": null,
+            "stale": true,
+            "days_since_modified": 808
+          },
+          {
+            "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb03",
+            "title": "Mystery Layer Service",
+            "owner": "ada.analyst",
+            "type": "CSV",
+            "access": "unknown",
+            "created_at": "2023-06-01T00:00:00.000Z",
+            "modified_at": null,
+            "size_bytes": 100,
+            "service_backed": false,
+            "service_url": null,
+            "stale": null,
+            "days_since_modified": null
+          }
+        ]
+      },
+      "services": {
+        "total_reported": null,
+        "retrieved_count": 1,
+        "truncated": false,
+        "records": [
+          {
+            "item_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb01",
+            "title": "Hydrants",
+            "owner": "ada.analyst",
+            "type": "Feature Service",
+            "service_url": "https://services.arcgis.com/DEMOORG123/arcgis/rest/services/Hydrants/FeatureServer",
+            "access": "public",
+            "stale": false
+          }
+        ]
+      },
+      "ownership_summary": [
+        {
+          "owner": "ada.analyst",
+          "item_count": 2
+        },
+        {
+          "owner": "greg.gis",
+          "item_count": 1
+        }
+      ],
+      "sharing_summary": {
+        "public": 1,
+        "org": 0,
+        "shared": 0,
+        "private": 1,
+        "unknown": 1
+      },
+      "staleness": {
+        "threshold_days": 365,
+        "evaluated_at": "2026-07-18T12:00:00.000Z",
+        "stale_item_count": 1,
+        "unknown_modified_count": 1,
+        "findings": [
+          {
+            "item_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb02",
+            "title": "Old Basemap Notes",
+            "owner": "greg.gis",
+            "type": "Web Map",
+            "modified_at": "2024-05-01T00:00:00.000Z",
+            "days_since_modified": 808
+          }
+        ]
+      },
+      "warnings": [
+        "item 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb03' access: unrecognized sharing value was labelled 'unknown'"
+      ],
+      "truncation": {
+        "truncated": false,
+        "reasons": []
+      }
+    },
+    "evidence": {
+      "schema_version": "1.1.0",
+      "bundle_id": "inspect_arcgis_org:96fd0d0c521413b1",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "requests": [
+        {
+          "name": "portal_self",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/portals/DEMOORG123?f=json",
+          "status": 200,
+          "sha256": "96fd0d0c521413b14f243356c8ece86f9d3d6aa6446e136afbb54c0a6bc1e6a3",
+          "bytes": 160
+        },
+        {
+          "name": "users:page1",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/portals/DEMOORG123/users?f=json&start=1&num=10",
+          "status": 200,
+          "sha256": "dd308fa817b74bf116952c4948c061f8292ac7a0019e64b66063e182fcdff662",
+          "bytes": 475
+        },
+        {
+          "name": "groups:page1",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/community/groups?f=json&q=orgid%3ADEMOORG123&sortField=created&sortOrder=asc&start=1&num=10",
+          "status": 200,
+          "sha256": "e9d9f7ae7fc518272d2d9bed6e80e4c016c3f6b27ed2481575dfc5391154ae05",
+          "bytes": 289
+        },
+        {
+          "name": "items:page1",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/search?f=json&q=orgid%3ADEMOORG123&sortField=created&sortOrder=asc&start=1&num=10",
+          "status": 200,
+          "sha256": "de2e7ac67f12007e0fefae1c2fbc8d6e180e05ad464d7c3dbe487b1ed4698467",
+          "bytes": 963
+        }
+      ],
+      "source": {
+        "uri": "https://demo-org.maps.arcgis.com/sharing/rest/portals/DEMOORG123?f=json",
+        "identity": {
+          "kind": "arcgis_org",
+          "value": "DEMOORG123"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "96fd0d0c521413b14f243356c8ece86f9d3d6aa6446e136afbb54c0a6bc1e6a3"
+      },
+      "gis_metadata": {
+        "format": "ArcGIS Portal REST JSON",
+        "crs": null,
+        "axis_order": null,
+        "units": null,
+        "extent": null,
+        "schema": [],
+        "row_count": 6,
+        "geometry_types": [],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "{\"include\":[\"users\",\"groups\",\"items\",\"services\"],\"item_owner\":null,\"max_records\":10,\"org_id\":\"DEMOORG123\",\"page_size\":10,\"portal_url\":\"https://demo-org.maps.arcgis.com\",\"stale_after_days\":365}",
+        "sha256": "31a3d06dcabfa8583e2e337ba52a376849e9e99c283d34506bc2c33356373e7c"
+      },
+      "execution": {
+        "capability": "inspect_arcgis_org",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "arcgis_org_inventory",
+          "sha256": "972722868a00c3e99c316839f9cd566ba0d8cce72b4896b499da873cae3189e5",
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "boundary_preflight",
+              "arcgis_envelope",
+              "pagination",
+              "output_schema"
+            ],
+            "warnings": [
+              "item 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb03' access: unrecognized sharing value was labelled 'unknown'"
+            ]
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

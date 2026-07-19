@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "id": "arcgis-items-pagination",
+  "capability": "inspect_arcgis_org",
+  "input": {
+    "fixture": "arcgis/paginated-org",
+    "capability_input": {
+      "portal_url": "https://demo-org.maps.arcgis.com",
+      "org_id": "DEMOORG123",
+      "include": ["items"],
+      "page_size": 2,
+      "max_records": 10,
+      "stale_after_days": 365
+    }
+  },
+  "expected": { "outcome": "success", "golden_file": "arcgis-items-pagination.json" },
+  "tolerances": { "numeric_absolute": 0, "normalized_fields": [] },
+  "allowed_operations": ["boundary_preflight", "arcgis_request", "paginate", "derive_inventory", "hash_sha256"],
+  "expected_approval": { "required": false, "decision": "not-requested" }
+}
