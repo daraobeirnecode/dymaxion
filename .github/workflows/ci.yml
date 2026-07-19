@@ -15,12 +15,19 @@ concurrency:
 jobs:
   source-integrity:
     runs-on: ubuntu-latest
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Validate patch integrity
-        run: git diff --check HEAD^ HEAD
+        run: |
+          test -n "$BASE_SHA"
+          git cat-file -e "${BASE_SHA}^{commit}"
+          git diff --check "$BASE_SHA" HEAD
+      - name: Reject binary, NUL, oversized, symlink, or credential-bearing changed files
+        run: python scripts/ci_source_integrity.py "$BASE_SHA" HEAD
 
   runtime:
     runs-on: ubuntu-latest
