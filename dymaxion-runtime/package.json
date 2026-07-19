@@ -18,7 +18,7 @@
     "gisbench": "tsx src/gisbench/run.ts"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.16",

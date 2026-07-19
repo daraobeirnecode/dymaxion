@@ -64,6 +64,14 @@ function configuredLimit(name: 'WORKER_MAX_UPLOAD_BYTES' | 'WORKER_MAX_DOWNLOAD_
 
 class UploadTooLarge extends Error {}
 
+/** Read at most the descriptor size approved before response headers were sent. */
+export function createBoundedDownloadStream(target: string, fd: number, size: number) {
+  if (!Number.isSafeInteger(size) || size <= 0) {
+    throw new Error('bounded download stream requires a positive safe-integer size');
+  }
+  return createReadStream(target, { fd, autoClose: true, start: 0, end: size - 1 });
+}
+
 /** POST /files/upload?run_id=<id>&name=<filename> — bounded raw body upload. */
 export async function handleUpload(
   req: IncomingMessage,
@@ -148,5 +156,10 @@ export async function handleDownload(
     'Content-Type': 'application/octet-stream',
     'Content-Length': String(size),
   });
-  createReadStream(target, { fd, autoClose: true }).pipe(res);
+  if (size === 0) {
+    closeSync(fd);
+    res.end();
+    return;
+  }
+  createBoundedDownloadStream(target, fd, size).pipe(res);
 }

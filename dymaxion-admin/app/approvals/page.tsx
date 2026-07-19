@@ -47,15 +47,20 @@ export default async function ApprovalsPage() {
                   run {shortId(req.agentRunId)}
                 </Link>
               </div>
-              <p className="text-sm text-neutral-200">{req.stepDescription}</p>
+              <p className="text-sm text-neutral-200">
+                <span className="text-neutral-500">Model-authored description (untrusted): </span>
+                {req.stepDescription}
+              </p>
               <dl className="grid gap-1 text-xs text-neutral-400 md:grid-cols-2">
                 <div><dt className="inline text-neutral-500">Target: </dt><dd className="inline font-mono break-all">{req.target}</dd></div>
                 <div><dt className="inline text-neutral-500">Credential: </dt><dd className="inline font-mono">{req.credentialIdentity ?? 'invalid historical row'}</dd></div>
                 <div><dt className="inline text-neutral-500">Expires: </dt><dd className="inline font-mono">{fmtDate(req.expiresAt)}</dd></div>
                 <div><dt className="inline text-neutral-500">Payload hash: </dt><dd className="inline font-mono">{req.payloadHash}</dd></div>
               </dl>
-              <details>
-                <summary className="cursor-pointer text-xs text-neutral-500">step payload</summary>
+              <details open>
+                <summary className="cursor-pointer text-xs font-semibold text-neutral-300">
+                  Exact payload to execute — review before deciding
+                </summary>
                 <pre className="code-block mt-2">{prettyJson(req.stepPayload)}</pre>
               </details>
               <DecisionButtons endpoint={`/api/approvals/${req.id}`} />

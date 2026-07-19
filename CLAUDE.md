@@ -10,7 +10,7 @@ Named for Gerardus Dymaxion. Framed as an operator you delegate to, not a chatbo
 
 Framework: **Mastra** (TypeScript agent framework) + **Vercel AI SDK** for LLM providers + **openid-client** for OAuth. NOT using LiteLLM in the core runtime. [ADR-0001](docs/adr/0001-phase-0-runtime-and-execution-boundaries.md) is authoritative; conflicting Sprint 1 architecture text is historical.
 
-- **dymaxion-runtime** — TypeScript/Node.js 20+ agent daemon on Mastra
+- **dymaxion-runtime** — TypeScript/Node.js 22+ agent daemon on Mastra
 - **dymaxion-postgres** — Postgres 18 + pgvector + AGE (memory + audit + OAuth tokens)
 - **dymaxion-langfuse** — LLM observability (self-hosted)
 - **dymaxion-whisper** — voice-memo transcription (faster-whisper)

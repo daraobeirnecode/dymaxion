@@ -23,6 +23,7 @@ import { allSkills } from '../../skills/registry.js';
 import { workerAvailable, workerConfigured, workerExecutionEnabled } from '../../worker/client.js';
 import { logger } from '../../observability/logger.js';
 import { authenticateInternalApproval } from '../../security/internal-approval-auth.js';
+import { approvalReview } from '../../security/approval-review.js';
 
 const PORT = Number(process.env.RUNTIME_HTTP_PORT ?? 8787);
 
@@ -175,10 +176,8 @@ export class WebGateway implements Gateway {
 
   async requestApproval(target: MessageTarget, req: ApprovalRequest): Promise<ApprovalResponse> {
     this.emit(target.source_id, 'approval_required', {
-      approval_id: req.id,
-      description: req.step_description,
-      expires_at: req.expires_at,
-      target: req.target,
+      ...approvalReview(req),
+      payload: req.payload,
     });
     // Decision arrives via POST /api/approvals/:id (chat UI button or dashboard).
     return awaitDecision(req);

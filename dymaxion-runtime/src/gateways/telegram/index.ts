@@ -20,6 +20,10 @@ import {
   type StepResult,
 } from '../common.js';
 import { decideApproval, awaitDecision } from '../../security/approval.js';
+import {
+  chunkApprovalReview,
+  formatApprovalReview,
+} from '../../security/approval-review.js';
 import { logger } from '../../observability/logger.js';
 
 interface TgUpdate {
@@ -315,23 +319,26 @@ export class TelegramGateway implements Gateway {
   }
 
   async requestApproval(target: MessageTarget, req: ApprovalRequest): Promise<ApprovalResponse> {
-    const timeoutMinutes = Math.max(
-      0,
-      Math.ceil((Date.parse(req.expires_at) - Date.now()) / 60_000),
-    );
-    await this.call('sendMessage', {
-      chat_id: target.source_id,
-      text: `*Approval required*\n${req.step_description}\n\nExpires in ${timeoutMinutes} min.`,
-      parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: 'Approve', callback_data: `approve:${req.id}` },
-            { text: 'Reject', callback_data: `reject:${req.id}` },
-          ],
-        ],
-      },
-    });
+    const chunks = chunkApprovalReview(formatApprovalReview(req));
+    for (const [index, chunk] of chunks.entries()) {
+      const isFinalChunk = index === chunks.length - 1;
+      await this.call('sendMessage', {
+        chat_id: target.source_id,
+        text: chunk,
+        ...(isFinalChunk
+          ? {
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    { text: 'Approve exact payload above', callback_data: `approve:${req.id}` },
+                    { text: 'Reject', callback_data: `reject:${req.id}` },
+                  ],
+                ],
+              },
+            }
+          : {}),
+      });
+    }
 
     // Resolve on button press, or fall through to DB polling (dashboard decision / expiry).
     return new Promise<ApprovalResponse>((resolve) => {

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -12,7 +14,11 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import test from 'node:test';
-import { handleUpload, safeJoin } from '../dist/file-shuttler.js';
+import {
+  createBoundedDownloadStream,
+  handleUpload,
+  safeJoin,
+} from '../dist/file-shuttler.js';
 import { phase0RouteDisabled } from '../dist/phase0-policy.js';
 
 function responseRecorder() {
@@ -109,6 +115,22 @@ test('a failed exclusive upload never deletes a pre-existing destination', async
       /EEXIST|exists/i,
     );
     assert.equal(readFileSync(destination, 'utf8'), 'preserve-me');
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test('download stream cannot exceed the descriptor size approved before file growth', async () => {
+  const parent = mkdtempSync(resolve(tmpdir(), 'dymaxion-worker-'));
+  const target = resolve(parent, 'growing.bin');
+  writeFileSync(target, 'abc');
+  const fd = openSync(target, 'r');
+  try {
+    const stream = createBoundedDownloadStream(target, fd, 3);
+    appendFileSync(target, 'defghijkl');
+    const chunks = [];
+    for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+    assert.equal(Buffer.concat(chunks).toString('utf8'), 'abc');
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }

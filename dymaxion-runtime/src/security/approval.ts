@@ -9,7 +9,6 @@ import {
   type ApprovalResponse,
   type ApprovalDecision,
 } from '../gateways/common.js';
-import { auditEvent, type AuditEventType } from './audit.js';
 
 export interface ApprovalRecord {
   id: string;
@@ -58,16 +57,9 @@ export interface ApprovalStore {
   consumeAtomic(id: string, binding: ApprovalBinding, now: Date): Promise<ApprovalRecord | null>;
 }
 
-type AuditFn = (
-  eventType: AuditEventType,
-  payload: Record<string, unknown>,
-  agentRunId?: string,
-) => Promise<void>;
-
 export interface ApprovalDependencies {
   store?: ApprovalStore;
   now?: () => Date;
-  audit?: AuditFn;
   sleep?: (milliseconds: number) => Promise<void>;
 }
 
@@ -91,21 +83,35 @@ function mapRow(row: typeof schema.approvalRequests.$inferSelect): ApprovalRecor
 
 class PostgresApprovalStore implements ApprovalStore {
   async create(draft: ApprovalDraft): Promise<ApprovalRecord> {
-    const [row] = await db
-      .insert(schema.approvalRequests)
-      .values({
-        id: draft.id,
-        agentRunId: draft.agentRunId,
-        stepDescription: draft.stepDescription,
-        stepPayload: draft.payload,
-        payloadHash: draft.payloadHash,
-        target: draft.target,
-        credentialIdentity: draft.credentialIdentity,
-        requestedAt: draft.requestedAt,
-        expiresAt: draft.expiresAt,
-      })
-      .returning();
-    return mapRow(row);
+    return db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(schema.approvalRequests)
+        .values({
+          id: draft.id,
+          agentRunId: draft.agentRunId,
+          stepDescription: draft.stepDescription,
+          stepPayload: draft.payload,
+          payloadHash: draft.payloadHash,
+          target: draft.target,
+          credentialIdentity: draft.credentialIdentity,
+          requestedAt: draft.requestedAt,
+          expiresAt: draft.expiresAt,
+        })
+        .returning();
+      await tx.insert(schema.auditLog).values({
+        eventType: 'approval_requested',
+        payload: {
+          approval_id: row.id,
+          step_description: row.stepDescription,
+          payload_hash: row.payloadHash,
+          target: row.target,
+          credential_identity: row.credentialIdentity,
+          expires_at: row.expiresAt.toISOString(),
+        },
+        agentRunId: row.agentRunId,
+      });
+      return mapRow(row);
+    });
   }
 
   async get(id: string): Promise<ApprovalRecord | null> {
@@ -123,33 +129,65 @@ class PostgresApprovalStore implements ApprovalStore {
     decidedBy: string,
     now: Date,
   ): Promise<ApprovalRecord | null> {
-    const [row] = await db
-      .update(schema.approvalRequests)
-      .set({ decision, decidedBy, respondedAt: now })
-      .where(
-        and(
-          eq(schema.approvalRequests.id, id),
-          isNull(schema.approvalRequests.decision),
-          gt(schema.approvalRequests.expiresAt, now),
-        ),
-      )
-      .returning();
-    return row ? mapRow(row) : null;
+    return db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(schema.approvalRequests)
+        .set({ decision, decidedBy, respondedAt: now })
+        .where(
+          and(
+            eq(schema.approvalRequests.id, id),
+            isNull(schema.approvalRequests.decision),
+            gt(schema.approvalRequests.expiresAt, now),
+          ),
+        )
+        .returning();
+      if (!row) return null;
+      await tx.insert(schema.auditLog).values({
+        eventType: 'approval_decided',
+        payload: {
+          approval_id: id,
+          decision,
+          decided_by: decidedBy,
+          payload_hash: row.payloadHash,
+          target: row.target,
+          credential_identity: row.credentialIdentity,
+          expires_at: row.expiresAt.toISOString(),
+        },
+        agentRunId: row.agentRunId,
+      });
+      return mapRow(row);
+    });
   }
 
   async expireAtomic(id: string, now: Date): Promise<ApprovalRecord | null> {
-    const [row] = await db
-      .update(schema.approvalRequests)
-      .set({ decision: 'expired', decidedBy: 'system', respondedAt: now })
-      .where(
-        and(
-          eq(schema.approvalRequests.id, id),
-          isNull(schema.approvalRequests.decision),
-          lte(schema.approvalRequests.expiresAt, now),
-        ),
-      )
-      .returning();
-    return row ? mapRow(row) : null;
+    return db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(schema.approvalRequests)
+        .set({ decision: 'expired', decidedBy: 'system', respondedAt: now })
+        .where(
+          and(
+            eq(schema.approvalRequests.id, id),
+            isNull(schema.approvalRequests.decision),
+            lte(schema.approvalRequests.expiresAt, now),
+          ),
+        )
+        .returning();
+      if (!row) return null;
+      await tx.insert(schema.auditLog).values({
+        eventType: 'approval_decided',
+        payload: {
+          approval_id: id,
+          decision: 'expired',
+          decided_by: 'system',
+          payload_hash: row.payloadHash,
+          target: row.target,
+          credential_identity: row.credentialIdentity,
+          expires_at: row.expiresAt.toISOString(),
+        },
+        agentRunId: row.agentRunId,
+      });
+      return mapRow(row);
+    });
   }
 
   async consumeAtomic(id: string, binding: ApprovalBinding, now: Date): Promise<ApprovalRecord | null> {
@@ -157,22 +195,35 @@ class PostgresApprovalStore implements ApprovalStore {
       binding.credentialIdentity === null
         ? isNull(schema.approvalRequests.credentialIdentity)
         : eq(schema.approvalRequests.credentialIdentity, binding.credentialIdentity);
-    const [row] = await db
-      .update(schema.approvalRequests)
-      .set({ consumedAt: now })
-      .where(
-        and(
-          eq(schema.approvalRequests.id, id),
-          eq(schema.approvalRequests.decision, 'approved'),
-          isNull(schema.approvalRequests.consumedAt),
-          gt(schema.approvalRequests.expiresAt, now),
-          eq(schema.approvalRequests.payloadHash, binding.payloadHash),
-          eq(schema.approvalRequests.target, binding.target),
-          identityCondition,
-        ),
-      )
-      .returning();
-    return row ? mapRow(row) : null;
+    return db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(schema.approvalRequests)
+        .set({ consumedAt: now })
+        .where(
+          and(
+            eq(schema.approvalRequests.id, id),
+            eq(schema.approvalRequests.decision, 'approved'),
+            isNull(schema.approvalRequests.consumedAt),
+            gt(schema.approvalRequests.expiresAt, now),
+            eq(schema.approvalRequests.payloadHash, binding.payloadHash),
+            eq(schema.approvalRequests.target, binding.target),
+            identityCondition,
+          ),
+        )
+        .returning();
+      if (!row) return null;
+      await tx.insert(schema.auditLog).values({
+        eventType: 'approval_consumed',
+        payload: {
+          approval_id: id,
+          payload_hash: binding.payloadHash,
+          target: binding.target,
+          credential_identity: binding.credentialIdentity,
+        },
+        agentRunId: row.agentRunId,
+      });
+      return mapRow(row);
+    });
   }
 }
 
@@ -241,7 +292,6 @@ function deps(supplied: ApprovalDependencies = {}) {
   return {
     store: supplied.store ?? postgresStore,
     now: supplied.now ?? (() => new Date()),
-    audit: supplied.audit ?? auditEvent,
     sleep: supplied.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds))),
   };
 }
@@ -294,7 +344,7 @@ export async function createApprovalRequest(
   options: { timeoutMinutes: number; target: string; credentialIdentity: string },
   supplied: ApprovalDependencies = {},
 ): Promise<ApprovalRequest> {
-  const { store, now, audit } = deps(supplied);
+  const { store, now } = deps(supplied);
   if (!options.target.trim()) throw new Error('approval target is required');
   if (!options.credentialIdentity.trim()) throw new Error('trusted credential identity is required');
   const requestedAt = now();
@@ -310,18 +360,6 @@ export async function createApprovalRequest(
     requestedAt,
     expiresAt,
   });
-  await audit(
-    'approval_requested',
-    {
-      approval_id: record.id,
-      step_description: stepDescription,
-      payload_hash: record.payloadHash,
-      target: record.target,
-      credential_identity: record.credentialIdentity,
-      expires_at: record.expiresAt.toISOString(),
-    },
-    agentRunId,
-  );
   return publicRequest(record);
 }
 
@@ -331,18 +369,13 @@ export async function decideApproval(
   decidedBy: string,
   supplied: ApprovalDependencies = {},
 ): Promise<boolean> {
-  const { store, now, audit } = deps(supplied);
+  const { store, now } = deps(supplied);
   const instant = now();
   const record = await store.decideAtomic(approvalId, decision, decidedBy, instant);
   if (!record) {
     await store.expireAtomic(approvalId, instant);
     return false;
   }
-  await audit(
-    'approval_decided',
-    { approval_id: approvalId, decision, decided_by: decidedBy },
-    record.agentRunId,
-  );
   return true;
 }
 
@@ -353,7 +386,7 @@ export async function consumeApproval(
   credentialIdentity: string,
   supplied: ApprovalDependencies = {},
 ): Promise<ApprovalRecord> {
-  const { store, now, audit } = deps(supplied);
+  const { store, now } = deps(supplied);
   const binding: ApprovalBinding = {
     payloadHash: sha256Canonical(payload),
     target,
@@ -372,11 +405,6 @@ export async function consumeApproval(
     await store.expireAtomic(request.id, instant);
     throw new Error('approval expired, already consumed, or not consumable');
   }
-  await audit(
-    'approval_consumed',
-    { approval_id: request.id, payload_hash: binding.payloadHash, target },
-    request.agent_run_id,
-  );
   return record;
 }
 

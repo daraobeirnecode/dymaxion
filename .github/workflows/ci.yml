@@ -46,6 +46,15 @@ jobs:
         run: node dist/main.js smoke-test
       - name: Reject moderate, high, or critical production advisories
         run: npm audit --omit=dev --audit-level=moderate
+      - name: Build exact runtime production dependency stage
+        run: docker build --target production-deps -t dymaxion-runtime-production-deps:ci .
+      - name: Audit the dependency tree copied into the runtime image
+        run: |
+          docker run --rm dymaxion-runtime-production-deps:ci npm audit --omit=dev --audit-level=low
+          if docker run --rm dymaxion-runtime-production-deps:ci npm ls @mastra/core; then
+            echo '@mastra/core must not be present in the production image tree' >&2
+            exit 1
+          fi
 
   admin:
     runs-on: ubuntu-latest

@@ -57,16 +57,16 @@ if [ ${#need_install[@]} -gt 0 ]; then
   else
     echo "Install manually:" >&2
     echo "  Docker: https://docs.docker.com/engine/install/" >&2
-    echo "  Node 20+: https://nodejs.org" >&2
+    echo "  Node 22+: https://nodejs.org" >&2
     echo "  git, curl: use your distro package manager" >&2
     exit 1
   fi
 fi
 
-# Node version gate (20+)
+# Node version gate (22+)
 node_major="$(node --version | sed 's/^v\([0-9]*\).*/\1/')"
-if [ "$node_major" -lt 20 ]; then
-  echo "Node 20+ required (found $(node --version))." >&2
+if [ "$node_major" -lt 22 ]; then
+  echo "Node 22+ required (found $(node --version))." >&2
   exit 1
 fi
 

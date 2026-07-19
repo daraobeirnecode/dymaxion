@@ -6,7 +6,7 @@
 
 **Architecture:** Keep the TypeScript/Mastra/Vercel AI SDK runtime. Add strict versioned Zod contracts and a native capability path alongside the historical skill scaffolds. Put recursive boundary preflight ahead of dispatch/I/O, and make approval decisions and consumption atomic through a persistence interface backed by Postgres in production and an explicitly atomic in-memory store in tests.
 
-**Tech Stack:** TypeScript 5.8, Node 20+, Zod, Drizzle/Postgres, Node test runner through tsx, local GeoJSON fixtures.
+**Tech Stack:** TypeScript 5.8, Node 22+, Zod, Drizzle/Postgres, Node test runner through tsx, local GeoJSON fixtures.
 
 ---
 
