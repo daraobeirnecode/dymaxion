@@ -94,6 +94,7 @@ activation remains disabled until a separately reviewed sandbox/promotion design
 #   Web:      the HTTPS URL printed by `tailscale serve status` → Chat
 docker exec -it dymaxion-runtime dymaxion            # CLI REPL
 docker exec -it dymaxion-runtime dymaxion status     # state + recent runs
+# batch invocation is limited to trusted non-destructive skills
 docker exec -it dymaxion-runtime dymaxion run --skill gdal-format-convert --input '{"input_path":"/workspace/data/x.shp","output_format":"GPKG"}'
 docker exec -it dymaxion-runtime dymaxion project switch elk-grove
 
@@ -111,6 +112,11 @@ docker compose logs -f dymaxion-runtime
 docker compose restart
 git pull && docker compose up -d --build   # upgrade
 ```
+
+`dymaxion run --skill` fails closed for manifests marked `destructive` or
+`requires_approval` (and for non-read native capabilities). Run those through
+the interactive CLI, Telegram, or Web gateway so the exact bound operation is
+presented and its approval is atomically consumed at the shared execution sink.
 
 ## Configure
 

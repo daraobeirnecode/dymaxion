@@ -18,14 +18,19 @@ import { getPreference } from '../memory/preferences.js';
 import {
   createApprovalRequest,
   awaitDecision,
-  consumeApproval,
   deriveApprovalTarget,
 } from '../security/approval.js';
 import { auditEvent } from '../security/audit.js';
 import { resolveExecutionCredentialIdentity } from '../security/execution-identity.js';
 import { traceRun, flushLangfuse } from '../observability/langfuse.js';
 import { logger } from '../observability/logger.js';
-import type { Gateway, IncomingMessage, MessageTarget, StepResult } from '../gateways/common.js';
+import type {
+  ApprovalRequest,
+  Gateway,
+  IncomingMessage,
+  MessageTarget,
+  StepResult,
+} from '../gateways/common.js';
 
 export async function runAgent(message: IncomingMessage, gateway: Gateway): Promise<void> {
   const started = Date.now();
@@ -89,6 +94,7 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
     let totalCost = 0;
 
     for (const step of plan.steps) {
+      let approvalRequest: ApprovalRequest | undefined;
       if (step.destructive) {
         const approvalTarget = deriveApprovalTarget(step.skill, step.input);
         const credentialIdentity = resolveExecutionCredentialIdentity(step.skill);
@@ -97,6 +103,7 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
           target: approvalTarget,
           credentialIdentity,
         });
+        approvalRequest = req;
         await db.update(schema.agentRuns).set({ status: 'awaiting_approval' }).where(eq(schema.agentRuns.id, runId));
         const decision = await gateway
           .requestApproval(target, req)
@@ -109,17 +116,9 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
           await persistOutgoing(message.gateway, message.source_id, note);
           return;
         }
-        // Recompute and atomically consume immediately before dispatch. Any
-        // payload/target/identity change or replay fails closed here.
-        await consumeApproval(
-          req,
-          step.input,
-          deriveApprovalTarget(step.skill, step.input),
-          resolveExecutionCredentialIdentity(step.skill),
-        );
       }
 
-      const result = await runSkill(step.skill, step.input, runId);
+      const result = await runSkill(step.skill, step.input, runId, { approvalRequest });
       const stepResult: StepResult = {
         ok: result.ok,
         output: result.output,
@@ -218,6 +217,7 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
   const timeoutMinutes = await getPreference<number>('approval_timeout_minutes', 30);
   const replayTarget: MessageTarget = { gateway: gateway.name, source_id: 'replay' };
   for (const step of storedPlan.steps) {
+    let approvalRequest: ApprovalRequest | undefined;
     if (step.destructive) {
       const approvalTarget = deriveApprovalTarget(step.skill, step.input);
       const credentialIdentity = resolveExecutionCredentialIdentity(step.skill);
@@ -226,6 +226,7 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
         target: approvalTarget,
         credentialIdentity,
       });
+      approvalRequest = request;
       await db
         .update(schema.agentRuns)
         .set({ status: 'awaiting_approval' })
@@ -235,14 +236,8 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
         .catch(async () => awaitDecision(request));
       await db.update(schema.agentRuns).set({ status: 'running' }).where(eq(schema.agentRuns.id, replay.id));
       if (!decision.approved) break;
-      await consumeApproval(
-        request,
-        step.input,
-        deriveApprovalTarget(step.skill, step.input),
-        resolveExecutionCredentialIdentity(step.skill),
-      );
     }
-    const r = await runSkill(step.skill, step.input, replay.id);
+    const r = await runSkill(step.skill, step.input, replay.id, { approvalRequest });
     results.push({ ok: r.ok, output: r.output, error: r.error, cost_usd: r.costUsd, duration_ms: r.durationMs });
     cost += r.costUsd;
     if (!r.ok) break;

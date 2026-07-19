@@ -84,6 +84,15 @@ test('approval is bound to canonical payload, exact target, identity, and expiry
     /not consumable/i,
   );
 
+  const forgedRunRequest = {
+    ...req,
+    agent_run_id: 'run-other',
+  };
+  await assert.rejects(
+    () => consumeApproval(forgedRunRequest, payload, target, credentialIdentity, dependencies(store)),
+    /not consumable/i,
+  );
+
   const consumed = await consumeApproval(
     req,
     payload,

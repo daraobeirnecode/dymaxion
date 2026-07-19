@@ -39,6 +39,7 @@ interface ApprovalDraft {
 }
 
 interface ApprovalBinding {
+  agentRunId: string;
   payloadHash: string;
   target: string;
   credentialIdentity: string;
@@ -202,6 +203,7 @@ class PostgresApprovalStore implements ApprovalStore {
         .where(
           and(
             eq(schema.approvalRequests.id, id),
+            eq(schema.approvalRequests.agentRunId, binding.agentRunId),
             eq(schema.approvalRequests.decision, 'approved'),
             isNull(schema.approvalRequests.consumedAt),
             gt(schema.approvalRequests.expiresAt, now),
@@ -216,6 +218,7 @@ class PostgresApprovalStore implements ApprovalStore {
         eventType: 'approval_consumed',
         payload: {
           approval_id: id,
+          agent_run_id: binding.agentRunId,
           payload_hash: binding.payloadHash,
           target: binding.target,
           credential_identity: binding.credentialIdentity,
@@ -272,6 +275,7 @@ export class InMemoryApprovalStore implements ApprovalStore {
     const record = this.records.get(id);
     if (
       !record ||
+      record.agentRunId !== binding.agentRunId ||
       record.decision !== 'approved' ||
       record.consumedAt !== null ||
       record.expiresAt <= now ||
@@ -388,6 +392,7 @@ export async function consumeApproval(
 ): Promise<ApprovalRecord> {
   const { store, now } = deps(supplied);
   const binding: ApprovalBinding = {
+    agentRunId: request.agent_run_id,
     payloadHash: sha256Canonical(payload),
     target,
     credentialIdentity,

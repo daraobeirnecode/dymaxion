@@ -8,10 +8,13 @@ import { eq } from 'drizzle-orm';
 import { executeCapability, getCapability } from '../capabilities/registry.js';
 import type { CapabilityExecutionContext } from '../contracts/capability.js';
 import { db, schema } from '../db/client.js';
+import type { ApprovalRequest } from '../gateways/common.js';
 import { recordInvocationOutcome } from '../memory/skill-history.js';
 import { logger } from '../observability/logger.js';
 import { auditEvent, type AuditEventType } from '../security/audit.js';
+import { consumeApproval, deriveApprovalTarget } from '../security/approval.js';
 import { assertExecutionBoundary, type BoundaryOptions } from '../security/boundary.js';
+import { resolveExecutionCredentialIdentity } from '../security/execution-identity.js';
 import { runArcpy, runProCli } from '../worker/client.js';
 import { getSkill, type RegisteredSkill } from './registry.js';
 
@@ -50,6 +53,7 @@ export interface RunSkillDependencies {
   audit: AuditFn;
   boundaryOptions: BoundaryOptions;
   capabilityContext: CapabilityExecutionContext;
+  approvalRequest?: ApprovalRequest;
 }
 
 const databaseRecorder: InvocationRecorder = {
@@ -101,6 +105,7 @@ function resolveDependencies(
       agentRunId,
       ...(supplied.capabilityContext ?? {}),
     },
+    approvalRequest: supplied.approvalRequest,
   };
 }
 
@@ -153,6 +158,25 @@ export async function runSkill(
     }
     // Must remain before invocation persistence and all execution adapters.
     await assertExecutionBoundary(validatedInput, dependencies.boundaryOptions);
+
+    const requiresApproval = capability
+      ? capability.manifest.classification !== 'read'
+      : Boolean(skill?.manifest.destructive || skill?.manifest.requires_approval);
+    if (requiresApproval) {
+      const request = dependencies.approvalRequest;
+      if (!request) throw new Error(`approval required before executing '${slug}'`);
+      if (request.agent_run_id !== agentRunId) {
+        throw new Error('approval binding mismatch: agent run changed');
+      }
+      // Re-resolve trusted bindings and atomically consume at the shared sink,
+      // immediately before invocation persistence and dispatch.
+      await consumeApproval(
+        request,
+        validatedInput,
+        deriveApprovalTarget(slug, validatedInput),
+        resolveExecutionCredentialIdentity(slug),
+      );
+    }
   } catch (error) {
     return {
       ok: false,
