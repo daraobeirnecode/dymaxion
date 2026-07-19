@@ -1,0 +1,9 @@
+{
+  "operationalLayers": [
+    { "itemId": "4444dddd4444dddd4444dddd4444dd02" },
+    { "itemId": "not-a-valid-item-id" },
+    { "url": "https://synthuser:SYNTHETICFAKEVALUE222@services.arcgis.com/synthetic/arcgis/rest/services/Locked/FeatureServer" },
+    { "url": "ftp://tiles.example.com/not-http" },
+    { "url": "https://services.arcgis.com/synthetic/arcgis/rest/services/Roads/FeatureServer?token=SYNTHETICFAKEVALUE333#fragment" }
+  ]
+}

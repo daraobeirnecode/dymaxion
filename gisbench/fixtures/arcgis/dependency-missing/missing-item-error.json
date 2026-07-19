@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": 400,
+    "message": "Item does not exist or is inaccessible. token=SYNTHETICFAKEVALUE111",
+    "details": []
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "description": "Synthetic Web Mapping Application → Web Map → item/service dependency chain. All ids, titles, owners, and URLs are invented; no real ArcGIS item was queried.",
+  "routes": [
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/aaaa0000aaaa0000aaaa0000aaaa0001?f=json",
+      "body_file": "app-meta.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/aaaa0000aaaa0000aaaa0000aaaa0001/data?f=json",
+      "body_file": "app-data.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/bbbb0000bbbb0000bbbb0000bbbb0002?f=json",
+      "body_file": "map-meta.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/bbbb0000bbbb0000bbbb0000bbbb0002/data?f=json",
+      "body_file": "map-data.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/cccc0000cccc0000cccc0000cccc0003?f=json",
+      "body_file": "layer-meta.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/dddd0000dddd0000dddd0000dddd0004?f=json",
+      "body_file": "table-meta.json"
+    }
+  ]
+}

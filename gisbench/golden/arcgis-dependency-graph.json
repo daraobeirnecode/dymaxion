@@ -1,0 +1,300 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "report": {
+      "schema_version": "1.0.0",
+      "portal": {
+        "url": "https://demo-org.maps.arcgis.com"
+      },
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "parameters": {
+        "root_item_ids": [
+          "aaaa0000aaaa0000aaaa0000aaaa0001"
+        ],
+        "max_depth": 4,
+        "max_nodes": 200,
+        "max_edges": 400,
+        "max_requests": 200,
+        "max_response_bytes": 2097152,
+        "max_total_response_bytes": 8388608,
+        "max_duration_ms": 30000
+      },
+      "roots": [
+        "item:aaaa0000aaaa0000aaaa0000aaaa0001"
+      ],
+      "nodes": [
+        {
+          "id": "item:aaaa0000aaaa0000aaaa0000aaaa0001",
+          "kind": "item",
+          "item_id": "aaaa0000aaaa0000aaaa0000aaaa0001",
+          "service_url": null,
+          "type": "Web Mapping Application",
+          "title": "Hydrant Viewer",
+          "owner": "ada.analyst",
+          "access": "public",
+          "support": "expandable",
+          "expanded": true,
+          "depth": 0,
+          "is_root": true,
+          "impact": {
+            "upstream_count": 0,
+            "downstream_count": 5
+          }
+        },
+        {
+          "id": "item:bbbb0000bbbb0000bbbb0000bbbb0002",
+          "kind": "item",
+          "item_id": "bbbb0000bbbb0000bbbb0000bbbb0002",
+          "service_url": null,
+          "type": "Web Map",
+          "title": "Hydrant Operations Map",
+          "owner": "ada.analyst",
+          "access": "org",
+          "support": "expandable",
+          "expanded": true,
+          "depth": 1,
+          "is_root": false,
+          "impact": {
+            "upstream_count": 1,
+            "downstream_count": 4
+          }
+        },
+        {
+          "id": "item:cccc0000cccc0000cccc0000cccc0003",
+          "kind": "item",
+          "item_id": "cccc0000cccc0000cccc0000cccc0003",
+          "service_url": null,
+          "type": "Feature Service",
+          "title": "Hydrants",
+          "owner": "ada.analyst",
+          "access": "public",
+          "support": "terminal",
+          "expanded": false,
+          "depth": 2,
+          "is_root": false,
+          "impact": {
+            "upstream_count": 2,
+            "downstream_count": 0
+          }
+        },
+        {
+          "id": "item:dddd0000dddd0000dddd0000dddd0004",
+          "kind": "item",
+          "item_id": "dddd0000dddd0000dddd0000dddd0004",
+          "service_url": null,
+          "type": "Feature Service",
+          "title": "Inspections Table",
+          "owner": "greg.gis",
+          "access": "private",
+          "support": "terminal",
+          "expanded": false,
+          "depth": 2,
+          "is_root": false,
+          "impact": {
+            "upstream_count": 2,
+            "downstream_count": 0
+          }
+        },
+        {
+          "id": "service:11ed298f74d245330c3f4a3c81cec68706d0ef8635d84546c9c5168add424319",
+          "kind": "service",
+          "item_id": null,
+          "service_url": "https://tiles.arcgis.com/synthetic/arcgis/rest/services/Topo/MapServer",
+          "type": null,
+          "title": null,
+          "owner": null,
+          "access": "unknown",
+          "support": "service_reference",
+          "expanded": false,
+          "depth": 2,
+          "is_root": false,
+          "impact": {
+            "upstream_count": 2,
+            "downstream_count": 0
+          }
+        },
+        {
+          "id": "service:2f50f2bb3567ad501d8d296c6e35be3b907361e9b77600dbdaa9c41ee5055083",
+          "kind": "service",
+          "item_id": null,
+          "service_url": "https://services.arcgis.com/synthetic/arcgis/rest/services/Hydrants/FeatureServer/0",
+          "type": null,
+          "title": null,
+          "owner": null,
+          "access": "unknown",
+          "support": "service_reference",
+          "expanded": false,
+          "depth": 2,
+          "is_root": false,
+          "impact": {
+            "upstream_count": 2,
+            "downstream_count": 0
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "item:aaaa0000aaaa0000aaaa0000aaaa0001",
+          "to": "item:bbbb0000bbbb0000bbbb0000bbbb0002",
+          "relationship": "web_map",
+          "locator": "map.itemId"
+        },
+        {
+          "from": "item:aaaa0000aaaa0000aaaa0000aaaa0001",
+          "to": "item:bbbb0000bbbb0000bbbb0000bbbb0002",
+          "relationship": "web_map",
+          "locator": "values.webmap"
+        },
+        {
+          "from": "item:bbbb0000bbbb0000bbbb0000bbbb0002",
+          "to": "item:cccc0000cccc0000cccc0000cccc0003",
+          "relationship": "operational_layer",
+          "locator": "operationalLayers[].itemId"
+        },
+        {
+          "from": "item:bbbb0000bbbb0000bbbb0000bbbb0002",
+          "to": "item:dddd0000dddd0000dddd0000dddd0004",
+          "relationship": "table",
+          "locator": "tables[].itemId"
+        },
+        {
+          "from": "item:bbbb0000bbbb0000bbbb0000bbbb0002",
+          "to": "service:11ed298f74d245330c3f4a3c81cec68706d0ef8635d84546c9c5168add424319",
+          "relationship": "basemap_layer",
+          "locator": "baseMap.baseMapLayers[].url"
+        },
+        {
+          "from": "item:bbbb0000bbbb0000bbbb0000bbbb0002",
+          "to": "service:2f50f2bb3567ad501d8d296c6e35be3b907361e9b77600dbdaa9c41ee5055083",
+          "relationship": "operational_layer",
+          "locator": "operationalLayers[].url"
+        }
+      ],
+      "cycles": [],
+      "unresolved_references": [],
+      "totals": {
+        "node_count": 6,
+        "edge_count": 6,
+        "item_node_count": 4,
+        "service_node_count": 2,
+        "request_count": 6
+      },
+      "truncation": {
+        "truncated": false,
+        "reasons": []
+      },
+      "caveats": [
+        "The graph covers only content visible to the configured identity at the approved portal; it is not proof of a complete dependency inventory.",
+        "Only explicitly supported Web Mapping Application and Web Map JSON paths are traversed; references outside those paths are not discovered.",
+        "Service URLs are sanitized terminal references; the services themselves were never contacted or verified."
+      ],
+      "warnings": []
+    },
+    "evidence": {
+      "schema_version": "1.1.0",
+      "bundle_id": "trace_arcgis_dependencies:e62791fe7728e8be",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "requests": [
+        {
+          "name": "item_meta:aaaa0000aaaa0000aaaa0000aaaa0001",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/aaaa0000aaaa0000aaaa0000aaaa0001?f=json",
+          "status": 200,
+          "sha256": "e62791fe7728e8becb1b90ad7dea38af98c4bd776111730561ab8c49e1c4ad68",
+          "bytes": 161
+        },
+        {
+          "name": "item_data:aaaa0000aaaa0000aaaa0000aaaa0001",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/aaaa0000aaaa0000aaaa0000aaaa0001/data?f=json",
+          "status": 200,
+          "sha256": "2fd15ed758a94e67c20ed4e9eea5c37b375e6e1db3040b0e6045307ee4be186f",
+          "bytes": 166
+        },
+        {
+          "name": "item_meta:bbbb0000bbbb0000bbbb0000bbbb0002",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/bbbb0000bbbb0000bbbb0000bbbb0002?f=json",
+          "status": 200,
+          "sha256": "bf86081265777970a28b3bc59a3e2697c20cc800821de979cf17e2b9be91e237",
+          "bytes": 150
+        },
+        {
+          "name": "item_data:bbbb0000bbbb0000bbbb0000bbbb0002",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/bbbb0000bbbb0000bbbb0000bbbb0002/data?f=json",
+          "status": 200,
+          "sha256": "43951b8b0ca5772547bc306e95e5297b6ce5b4d28c847b2c40c8be6e239d41f3",
+          "bytes": 399
+        },
+        {
+          "name": "item_meta:cccc0000cccc0000cccc0000cccc0003",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/cccc0000cccc0000cccc0000cccc0003?f=json",
+          "status": 200,
+          "sha256": "ad2b751a131ec5f964bc1f9ebb1f288567a6be8b6c822f978efa1b1a5cb1ae07",
+          "bytes": 147
+        },
+        {
+          "name": "item_meta:dddd0000dddd0000dddd0000dddd0004",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/dddd0000dddd0000dddd0000dddd0004?f=json",
+          "status": 200,
+          "sha256": "bb8143feafa1789f913f919475b20ec0aa7d5983582ae9757494e8b5f147025b",
+          "bytes": 154
+        }
+      ],
+      "source": {
+        "uri": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/aaaa0000aaaa0000aaaa0000aaaa0001?f=json",
+        "identity": {
+          "kind": "arcgis_dependency_roots",
+          "value": "aaaa0000aaaa0000aaaa0000aaaa0001"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "e62791fe7728e8becb1b90ad7dea38af98c4bd776111730561ab8c49e1c4ad68"
+      },
+      "gis_metadata": {
+        "format": "ArcGIS Portal REST JSON",
+        "crs": null,
+        "axis_order": null,
+        "units": null,
+        "extent": null,
+        "schema": [],
+        "row_count": 6,
+        "geometry_types": [],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "{\"max_depth\":4,\"max_duration_ms\":30000,\"max_edges\":400,\"max_nodes\":200,\"max_requests\":200,\"max_response_bytes\":2097152,\"max_total_response_bytes\":8388608,\"portal_url\":\"https://demo-org.maps.arcgis.com\",\"root_item_ids\":[\"aaaa0000aaaa0000aaaa0000aaaa0001\"]}",
+        "sha256": "d27ac9854671aa138add1eba7815a7fd5fed5c20db5b28eaf1660845c173c7d4"
+      },
+      "execution": {
+        "capability": "trace_arcgis_dependencies",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "arcgis_dependency_graph",
+          "sha256": "519c67331755fff4835610146f663ba4545bed93755602d80734b43ff8c84410",
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "boundary_preflight",
+              "arcgis_envelope",
+              "graph_ceilings",
+              "canonical_ordering",
+              "output_schema"
+            ],
+            "warnings": []
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

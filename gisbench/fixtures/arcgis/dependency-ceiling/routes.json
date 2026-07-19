@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic Web Map with three item references, traversed under a two-node ceiling: only the first reference becomes a node and the rest are honestly truncated. All ids are invented.",
+  "routes": [
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/5555eeee5555eeee5555eeee5555ee01?f=json",
+      "body_file": "map-meta.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/5555eeee5555eeee5555eeee5555ee01/data?f=json",
+      "body_file": "map-data.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/6666ffff6666ffff6666ffff6666ff02?f=json",
+      "body_file": "layer-one-meta.json"
+    }
+  ]
+}

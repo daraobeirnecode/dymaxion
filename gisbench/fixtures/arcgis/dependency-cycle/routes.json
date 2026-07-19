@@ -1,0 +1,21 @@
+{
+  "description": "Two synthetic Web Maps that reference each other (a cycle) with a duplicated reference that must deduplicate canonically. All ids and titles are invented.",
+  "routes": [
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/1111aaaa1111aaaa1111aaaa1111aa01?f=json",
+      "body_file": "map-a-meta.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/1111aaaa1111aaaa1111aaaa1111aa01/data?f=json",
+      "body_file": "map-a-data.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/2222bbbb2222bbbb2222bbbb2222bb02?f=json",
+      "body_file": "map-b-meta.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/2222bbbb2222bbbb2222bbbb2222bb02/data?f=json",
+      "body_file": "map-b-data.json"
+    }
+  ]
+}

@@ -29,5 +29,20 @@ to any real ArcGIS endpoint to author them; CC0 test fixtures.
 - `arcgis/error-envelope-org/`: HTTP 200 ArcGIS error envelope (code 499) whose message embeds the fake string `token=SYNTHETICFAKEVALUE000` to prove redaction; not a real credential.
 - `arcgis/denied-org/`: intentionally empty route set for the denied-hostname boundary task; any request against it fails the task.
 
+## Phase 1B ArcGIS dependency fixtures (`arcgis/dependency-*`)
+
+Each subdirectory serves synthetic item metadata/data responses for the
+`trace_arcgis_dependencies` capability via the same exact-URL fixture
+transport (`/sharing/rest/content/items/{id}` and `.../{id}/data` with
+`f=json`). Every 32-hex item ID, title, owner, and service URL is invented;
+no request was made to any real ArcGIS endpoint to author them; CC0 test
+fixtures.
+
+- `arcgis/dependency-app/`: a Web Mapping Application referencing a Web Map that references a Feature Service item, a table item, an operational-layer service URL, and a basemap service URL.
+- `arcgis/dependency-cycle/`: two Web Maps referencing each other, with one reference duplicated to prove canonical edge deduplication.
+- `arcgis/dependency-missing/`: a Web Map with a missing-item reference (HTTP 200 error envelope), a malformed item id, a credential-bearing URL, an `ftp://` URL, and a query-bearing URL. The embedded `SYNTHETICFAKEVALUE111`/`222`/`333` strings are fake redaction canaries, not real credentials.
+- `arcgis/dependency-ceiling/`: a Web Map with three item references traversed under a two-node ceiling to prove honest truncation.
+- `arcgis/dependency-denied/`: intentionally empty route set for the denied-portal boundary task; any request against it fails the task.
+
 The coordinates, attributes, identifiers, and timestamps are invented. They
 are not suitable for operational decisions.

@@ -1,6 +1,6 @@
 # GISBench
 
-GISBench contains exactly ten reproducible golden tasks across the two
+GISBench contains exactly fifteen reproducible golden tasks across the three
 implemented native capabilities.
 
 Phase 0 — deterministic `inspect_dataset` (local GeoJSON):
@@ -19,6 +19,19 @@ ArcGIS Portal REST, no network access):
 8. deterministic ownership/sharing/staleness governance findings;
 9. ArcGIS REST error-envelope rejection (HTTP 200 envelope, secret redaction);
 10. employer-boundary rejection of a denied hostname before any request.
+
+Phase 1B — deterministic read-only `trace_arcgis_dependencies`
+(fixture-backed ArcGIS Portal REST item metadata/data, no network access):
+
+11. valid Web Mapping Application → Web Map → item/service dependency graph
+    with sanitized, never-dispatched service leaves and impact summaries;
+12. cycle detection with canonical duplicate-reference deduplication;
+13. missing-item, malformed-id, credential-bearing-URL, and
+    unsupported-scheme handling with deterministic warnings and zero secret
+    leakage;
+14. honest node-ceiling truncation with explicit reasons;
+15. employer-boundary rejection of a denied portal hostname before any
+    request.
 
 Each versioned task declares its golden output/error, numeric tolerance,
 explicitly normalized environment-dependent fields, permitted operations, and
@@ -39,5 +52,6 @@ normalizes only checkout-dependent source paths, filesystem modification
 time, and hashes/canonical parameter fields that incorporate those paths;
 ArcGIS tasks are fully deterministic and normalize nothing. Evidence hashes
 (source, canonical parameters, output artifacts, per-request bodies) are
-validated before comparison. GISBench remains an evaluation scaffold — ten
-tasks toward the 100-task roadmap goal, not a claim of broad GIS coverage.
+validated before comparison. GISBench remains an evaluation scaffold —
+fifteen tasks toward the 100-task roadmap goal, not a claim of broad GIS
+coverage.

@@ -7,7 +7,9 @@ import type { ArcGisRestTransport } from '../capabilities/arcgis-rest.js';
 import { runSkill, type RunSkillDependencies } from '../skills/executor.js';
 import { sha256Canonical, sha256Text } from '../contracts/canonical.js';
 
-const TASK_COUNT = 10; // 5 Phase 0 inspect_dataset + 5 Phase 1A inspect_arcgis_org
+// 5 Phase 0 inspect_dataset + 5 Phase 1A inspect_arcgis_org
+// + 5 Phase 1B trace_arcgis_dependencies
+const TASK_COUNT = 15;
 
 const ExpectationSchema = z
   .object({
@@ -74,7 +76,31 @@ const ArcgisTaskSchema = z
   })
   .strict();
 
-const TaskSchema = z.discriminatedUnion('capability', [DatasetTaskSchema, ArcgisTaskSchema]);
+const TraceTaskSchema = z
+  .object({
+    schema_version: z.literal('1.0.0'),
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    capability: z.literal('trace_arcgis_dependencies'),
+    input: z
+      .object({
+        fixture: z.string().regex(/^arcgis\/[a-z0-9-]+$/),
+        capability_input: z.record(z.unknown()),
+      })
+      .strict(),
+    expected: ExpectationSchema,
+    tolerances: ToleranceSchema,
+    allowed_operations: z.array(
+      z.enum(['boundary_preflight', 'arcgis_request', 'derive_graph', 'hash_sha256']),
+    ),
+    expected_approval: ApprovalExpectationSchema,
+  })
+  .strict();
+
+const TaskSchema = z.discriminatedUnion('capability', [
+  DatasetTaskSchema,
+  ArcgisTaskSchema,
+  TraceTaskSchema,
+]);
 
 type TaskDefinition = z.infer<typeof TaskSchema>;
 
@@ -179,12 +205,38 @@ function validateArcgisEvidenceHashes(output: Record<string, unknown>): void {
   assert.equal(outputs[0]?.sha256, sha256Canonical(report), 'evidence output hash must validate');
 }
 
+function validateTraceEvidenceHashes(output: Record<string, unknown>): void {
+  const report = output.report as Record<string, unknown>;
+  const evidence = output.evidence as Record<string, unknown>;
+  assert.ok(report && evidence, 'successful result requires report and evidence');
+  const source = evidence.source as Record<string, unknown>;
+  const parameters = evidence.parameters as Record<string, unknown>;
+  const outputs = evidence.outputs as Array<Record<string, unknown>>;
+  const requests = evidence.requests as Array<Record<string, unknown>>;
+  assert.ok(Array.isArray(requests) && requests.length >= 1, 'retrieval evidence requires request records');
+  assert.match(String(requests[0]?.name), /^item_meta:[a-f0-9]{32}$/);
+  assert.equal(
+    source.sha256,
+    requests[0]?.sha256,
+    'evidence source hash must match the first item metadata request hash',
+  );
+  assert.equal(
+    parameters.sha256,
+    sha256Text(String(parameters.canonical_json)),
+    'evidence parameter hash must validate',
+  );
+  assert.ok(Array.isArray(outputs) && outputs.length === 1, 'exactly one output artifact is required');
+  assert.equal(outputs[0]?.name, 'arcgis_dependency_graph');
+  assert.equal(outputs[0]?.sha256, sha256Canonical(report), 'evidence output hash must validate');
+}
+
 function validateEvidenceHashes(normalized: Record<string, unknown>, capability: TaskDefinition['capability']): void {
   if (normalized.ok !== true) return;
   assert.ok(normalized.output && typeof normalized.output === 'object', 'successful result requires output');
   const output = normalized.output as Record<string, unknown>;
   if (capability === 'inspect_dataset') validateDatasetEvidenceHashes(output);
-  else validateArcgisEvidenceHashes(output);
+  else if (capability === 'inspect_arcgis_org') validateArcgisEvidenceHashes(output);
+  else validateTraceEvidenceHashes(output);
 }
 
 export function normalizeResult(
@@ -334,7 +386,7 @@ async function executeDatasetTask(
 }
 
 async function executeArcgisTask(
-  task: z.infer<typeof ArcgisTaskSchema>,
+  task: z.infer<typeof ArcgisTaskSchema> | z.infer<typeof TraceTaskSchema>,
   roots: TaskRoots,
 ): Promise<{ normalized: unknown; operations: string[] }> {
   const operations = new Set<string>(['boundary_preflight']);
@@ -363,7 +415,7 @@ async function executeArcgisTask(
     dependencies,
   );
   if (result.ok) {
-    operations.add('derive_inventory');
+    operations.add(task.capability === 'inspect_arcgis_org' ? 'derive_inventory' : 'derive_graph');
     operations.add('hash_sha256');
   }
   assertTaskExpectations(task, result.ok, operations);
@@ -409,7 +461,7 @@ export async function runGisBench(updateGoldens = false): Promise<GisBenchResult
   assert.equal(
     taskFiles.length,
     TASK_COUNT,
-    `GISBench must contain exactly ${TASK_COUNT} tasks (5 Phase 0 + 5 Phase 1A)`,
+    `GISBench must contain exactly ${TASK_COUNT} tasks (5 Phase 0 + 5 Phase 1A + 5 Phase 1B)`,
   );
   if (updateGoldens) await mkdir(join(benchmark, 'golden'), { recursive: true });
 
