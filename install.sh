@@ -57,16 +57,16 @@ if [ ${#need_install[@]} -gt 0 ]; then
   else
     echo "Install manually:" >&2
     echo "  Docker: https://docs.docker.com/engine/install/" >&2
-    echo "  Node 20+: https://nodejs.org" >&2
+    echo "  Node 22+: https://nodejs.org" >&2
     echo "  git, curl: use your distro package manager" >&2
     exit 1
   fi
 fi
 
-# Node version gate (20+)
+# Node version gate (22+)
 node_major="$(node --version | sed 's/^v\([0-9]*\).*/\1/')"
-if [ "$node_major" -lt 20 ]; then
-  echo "Node 20+ required (found $(node --version))." >&2
+if [ "$node_major" -lt 22 ]; then
+  echo "Node 22+ required (found $(node --version))." >&2
   exit 1
 fi
 
@@ -90,6 +90,7 @@ if [ ! -f .env ]; then
   read -r -p "Telegram bot token (from @BotFather): "    telegram_token
   read -r -p "Your Telegram chat ID: "                   telegram_chat_id
   read -r -p "Voyage API key (for embeddings): "         voyage_key
+  read -r -p "Tailscale login allowed to approve (email/login): " admin_identity
 
   # Generate strong random secrets
   postgres_password="$(openssl rand -hex 24)"
@@ -97,12 +98,15 @@ if [ ! -f .env ]; then
   langfuse_salt="$(openssl rand -hex 16)"
   langfuse_enc_key="$(openssl rand -hex 32)"
   oauth_enc_key="$(openssl rand -hex 32)"
+  runtime_internal_token="$(openssl rand -hex 32)"
 
   sed -i.bak \
     -e "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$anthropic_key|" \
     -e "s|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=$telegram_token|" \
     -e "s|^TELEGRAM_ADMIN_CHAT_ID=.*|TELEGRAM_ADMIN_CHAT_ID=$telegram_chat_id|" \
     -e "s|^VOYAGE_API_KEY=.*|VOYAGE_API_KEY=$voyage_key|" \
+    -e "s|^DYMAXION_ADMIN_IDENTITIES=.*|DYMAXION_ADMIN_IDENTITIES=$admin_identity|" \
+    -e "s|^RUNTIME_INTERNAL_TOKEN=.*|RUNTIME_INTERNAL_TOKEN=$runtime_internal_token|" \
     -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$postgres_password|" \
     -e "s|^LANGFUSE_NEXTAUTH_SECRET=.*|LANGFUSE_NEXTAUTH_SECRET=$langfuse_secret|" \
     -e "s|^LANGFUSE_SALT=.*|LANGFUSE_SALT=$langfuse_salt|" \
@@ -111,14 +115,8 @@ if [ ! -f .env ]; then
     .env
   rm -f .env.bak
 
-  # Tailscale-only admin binding when a Tailscale IP is present
-  if command -v tailscale >/dev/null 2>&1; then
-    ts_ip="$(tailscale ip -4 2>/dev/null | head -n1 || true)"
-    if [ -n "$ts_ip" ]; then
-      sed -i.bak -e "s|^ADMIN_BIND_HOST=.*|ADMIN_BIND_HOST=$ts_ip|" .env && rm -f .env.bak
-      echo "==> Admin dashboard will bind to Tailscale IP $ts_ip (tailnet-only)."
-    fi
-  fi
+  # ADMIN_BIND_HOST deliberately stays on loopback. Directly binding the
+  # dashboard to a tailnet IP would let clients spoof identity headers.
 
   # Optional remote Windows Worker (Topology B/C)
   echo ""
@@ -146,6 +144,9 @@ fi
 # Start stack
 echo "==> Starting Docker Compose stack..."
 docker compose up -d --build
+
+echo "==> Approval dashboard authentication requires Tailscale Serve."
+echo "    Configure it with: tailscale serve --bg localhost:3001"
 
 # Wait for healthchecks
 echo "==> Waiting for services to become healthy (up to 3 minutes)..."

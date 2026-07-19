@@ -3,22 +3,33 @@
 # stage does arch-specific work, so `docker buildx build --platform
 # linux/amd64,linux/arm64` produces both natively.
 
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-FROM node:20-slim
+# This exact lockfile-resolved production tree is copied into the final image.
+# CI builds and audits this stage independently, avoiding the heavyweight GIS
+# system packages while proving the Node dependency boundary actually shipped.
+FROM node:22-slim AS production-deps
+WORKDIR /app
+ENV NODE_ENV=production
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+FROM node:22-slim AS runtime
 
 # --- OS + geospatial CLI stack -----------------------------------------
+# Fiona currently falls back to a source build on linux/arm64, so both GDAL
+# and Python development headers are runtime-image build prerequisites.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl wget jq ca-certificates \
-    python3 python3-pip python3-venv python3-gdal \
+    python3 python3-dev python3-pip python3-venv python3-gdal \
     postgresql-client \
-    gdal-bin proj-bin \
+    gdal-bin libgdal-dev proj-bin \
     osmium-tool \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
@@ -53,9 +64,9 @@ RUN pip3 install --break-system-packages --no-cache-dir uv
 # (windows-worker/), never installed here.
 
 WORKDIR /app
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=production-deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-COPY package.json ./
+COPY package.json package-lock.json ./
 
 # `docker exec -it dymaxion-runtime dymaxion` → REPL
 RUN printf '#!/bin/sh\nexec node /app/dist/cli.js "$@"\n' > /usr/local/bin/dymaxion && \

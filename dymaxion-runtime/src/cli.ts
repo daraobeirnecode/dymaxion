@@ -4,7 +4,7 @@
 //
 //   dymaxion                                  interactive REPL
 //   dymaxion query "<text>"                   one-shot request
-//   dymaxion run --skill <slug> --input <json> batch skill invocation
+//   dymaxion run --skill <slug> --input <json> non-destructive batch invocation
 //   dymaxion project switch <slug>            set active project
 //   dymaxion status                           runtime state + recent activity
 

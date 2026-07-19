@@ -1,19 +1,14 @@
 // The self-authoring meta-capability (backs the skill-draft meta skill).
 // Flow per Fable 5 Prompt §SKILL AUTHORING:
 //   1. read failing run log  2. similar-skill search  3. fork recommendation
-//   4. draft via reasoning-tier LLM  5. pre-flight lint  6. save to
-//   skills/proposed/ + dymaxion.proposed_skills  7. notify operator
-// Approval (dashboard or Telegram button) moves the folder to active/ and
-// hot-reloads the registry.
+//   4. draft via reasoning-tier LLM  5. pre-flight lint  6. save review
+//   artifacts to dymaxion.proposed_skills  7. notify operator.
+// Phase 0 never promotes model-authored files into the executable catalog.
 
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { desc, eq } from 'drizzle-orm';
 import { db, schema } from '../db/client.js';
 import { callLLM } from '../llm/middleware.js';
 import { embedOne } from '../memory/embedding.js';
 import { lintProposedExecutor, lintReport } from './validator.js';
-import { loadSkills } from './registry.js';
 import { auditEvent } from '../security/audit.js';
 import { logger } from '../observability/logger.js';
 import { sql as dsql } from 'drizzle-orm';
@@ -29,6 +24,13 @@ export interface DraftOutcome {
   action: 'forked-recommendation' | 'proposed' | 'rejected';
   detail: string;
   proposedId?: string;
+}
+
+export function validateProposedSkillSlug(value: string): string {
+  if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(value)) {
+    throw new Error('generated skill slug must be 1-64 lowercase letters, digits, or hyphens');
+  }
+  return value;
 }
 
 export function shouldAttemptAuthoring(stepError: string): boolean {
@@ -87,14 +89,10 @@ export async function draftSkill(params: {
     return { action: 'rejected', detail: lintReport(findings) };
   }
 
-  // 6. save to skills/proposed/<slug>/ + DB row
+  // 6. Save review artifacts in the database only. Phase 0 deliberately does
+  // not write model-authored files into the executable skill catalog.
   const slugMatch = manifestYaml.match(/^slug:\s*(\S+)/m);
-  const slug = slugMatch?.[1] ?? `drafted-${Date.now()}`;
-  const proposedDir = join(process.env.SKILLS_DIR ?? '/workspace/skills', 'proposed', slug);
-  mkdirSync(proposedDir, { recursive: true });
-  writeFileSync(join(proposedDir, 'SKILL.md'), skillMd);
-  writeFileSync(join(proposedDir, 'manifest.yaml'), manifestYaml);
-  writeFileSync(join(proposedDir, 'executor.py'), executorPy);
+  const slug = validateProposedSkillSlug(slugMatch?.[1] ?? `drafted-${Date.now()}`);
 
   const [row] = await db
     .insert(schema.proposedSkills)
@@ -111,34 +109,19 @@ export async function draftSkill(params: {
   // 7. operator notification happens in the agent loop (originating gateway).
   return {
     action: 'proposed',
-    detail: `Drafted new skill '${slug}'. Review in the admin dashboard (Skills → Proposed) and approve to register.`,
+    detail: `Drafted new skill '${slug}' for review. Activation is disabled in Phase 0.`,
     proposedId: row.id,
   };
 }
 
-/** Approval hook — used by admin dashboard + Telegram button. */
+/** Phase 0 never promotes model-authored files into the executable catalog. */
 export async function approveProposedSkill(proposedId: string, decidedBy: string): Promise<void> {
-  const [row] = await db
-    .select()
-    .from(schema.proposedSkills)
-    .where(eq(schema.proposedSkills.id, proposedId))
-    .orderBy(desc(schema.proposedSkills.proposedAt));
-  if (!row) throw new Error(`proposed skill ${proposedId} not found`);
-
-  // Move to active/ under the 'meta' category namespace for self-authored skills.
-  const activeDir = join(process.env.SKILLS_DIR ?? '/workspace/skills', 'active', 'meta', row.slug);
-  mkdirSync(activeDir, { recursive: true });
-  writeFileSync(join(activeDir, 'SKILL.md'), row.skillMd);
-  writeFileSync(join(activeDir, 'manifest.yaml'), row.manifestYaml);
-  for (const [file, contents] of Object.entries(row.scripts as Record<string, string>)) {
-    writeFileSync(join(activeDir, file), contents);
-  }
-  await db
-    .update(schema.proposedSkills)
-    .set({ status: 'approved', reviewedAt: new Date(), reviewNotes: `approved by ${decidedBy}` })
-    .where(eq(schema.proposedSkills.id, proposedId));
-  await loadSkills(); // hot swap
-  await auditEvent('skill_proposed', { proposedId, outcome: 'approved', decidedBy });
+  await auditEvent('skill_proposed', {
+    proposedId,
+    outcome: 'activation-blocked-phase-0',
+    decidedBy,
+  });
+  throw new Error('model-authored skill activation is disabled in Phase 0');
 }
 
 function extractBlock(text: string, label: string): string | null {

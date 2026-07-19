@@ -5,6 +5,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { McpServerConfig } from '../config/loader.js';
 import { logger } from '../observability/logger.js';
+import { assertExecutionBoundary, type BoundaryOptions } from '../security/boundary.js';
 
 export interface McpToolInfo {
   name: string;
@@ -16,13 +17,22 @@ export class McpConnection {
   private client: Client | null = null;
   private transport: StdioClientTransport | null = null;
 
-  constructor(public readonly config: McpServerConfig) {}
+  constructor(
+    public readonly config: McpServerConfig,
+    private readonly boundaryOptions: BoundaryOptions = {},
+  ) {}
 
   async connect(): Promise<void> {
+    const inherited = ['PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL'] as const;
+    const safeEnvironment = Object.fromEntries(
+      inherited.flatMap((name) =>
+        process.env[name] === undefined ? [] : [[name, process.env[name] as string]],
+      ),
+    );
     this.transport = new StdioClientTransport({
       command: this.config.command,
       args: this.config.args,
-      env: { ...process.env, ...(this.config.env ?? {}) } as Record<string, string>,
+      env: { ...safeEnvironment, ...(this.config.env ?? {}) },
     });
     this.client = new Client(
       { name: 'dymaxion-runtime', version: '0.1.0' },
@@ -44,6 +54,7 @@ export class McpConnection {
 
   async callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     if (!this.client) throw new Error(`MCP '${this.config.name}' not connected`);
+    await assertExecutionBoundary(args, this.boundaryOptions);
     const res = await this.client.callTool({ name, arguments: args });
     return res.content;
   }

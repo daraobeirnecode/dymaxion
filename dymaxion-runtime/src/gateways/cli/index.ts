@@ -17,7 +17,8 @@ import {
   type PlanStep,
   type StepResult,
 } from '../common.js';
-import { decideApproval } from '../../security/approval.js';
+import { awaitDecision, decideApproval } from '../../security/approval.js';
+import { formatApprovalReview } from '../../security/approval-review.js';
 
 export class CliGateway implements Gateway {
   readonly name = 'cli';
@@ -61,12 +62,13 @@ export class CliGateway implements Gateway {
   }
 
   async requestApproval(_target: MessageTarget, req: ApprovalRequest): Promise<ApprovalResponse> {
-    process.stdout.write(`\nAPPROVAL REQUIRED: ${req.step_description}\nApprove? [y/N] `);
+    process.stdout.write(`\n${formatApprovalReview(req)}\nApprove this exact payload? [y/N] `);
     const answer = await this.readLine();
     const approved = /^y(es)?$/i.test(answer.trim());
     const decision = approved ? 'approved' : 'rejected';
-    await decideApproval(req.id, decision, 'cli-operator');
-    return { approved, decision, decided_by: 'cli-operator' };
+    const accepted = await decideApproval(req.id, decision, 'cli-operator');
+    if (!accepted) return awaitDecision(req);
+    return { approval_id: req.id, approved, decision, decided_by: 'cli-operator' };
   }
 
   private readLine(): Promise<string> {

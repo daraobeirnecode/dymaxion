@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0.0",
+  "id": "reject-malformed-geojson",
+  "capability": "inspect_dataset",
+  "input": { "fixture": "malformed.geojson" },
+  "expected": { "outcome": "error", "golden_file": "reject-malformed-geojson.json" },
+  "tolerances": { "numeric_absolute": 0, "normalized_fields": [] },
+  "allowed_operations": ["boundary_preflight", "stat", "read_file", "parse_geojson"],
+  "expected_approval": { "required": false, "decision": "not-requested" }
+}

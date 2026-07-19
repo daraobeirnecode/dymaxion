@@ -4,12 +4,14 @@ A long-running, multi-LLM, memory-having, skill-authoring agent for ESRI and
 Open Source GIS work. Named for Buckminster Fuller's Dymaxion Map. Framed as
 an operator you delegate to, not a chatbot.
 
-- **Framework**: Mastra (TypeScript) + Vercel AI SDK + openid-client
+- **Framework**: TypeScript + Vercel AI SDK + openid-client; Mastra is retained as development-only compatibility scaffolding in Phase 0
 - **Providers**: Anthropic (API key), OpenAI / Google / Azure / Cohere (OAuth 2.0), Ollama (local)
 - **Memory**: Postgres 18 + pgvector, Voyage voyage-3-large embeddings
-- **Skills**: 45 real skill folders (SKILL.md + manifest.yaml + executor + tests) — ESRI (14), OSS GIS (14), web/mobile map apps (8), architecture decisions (5), meta/self-authoring (4)
+- **Capabilities**: 45 historical Sprint 1 skill scaffolds plus the Phase 0 native `inspect_dataset` vertical slice; folder presence is not a production-readiness claim
 - **Gateways**: Telegram + CLI + Web (Sprint 1); Teams, Slack, Email, ArcGIS Portal, SMS stubbed
 - **Safety**: employer boundary (structural allow/deny lists), human-in-the-loop approvals for destructive ops, per-tier monthly USD budget caps enforced pre-call, append-only audit log, LangFuse tracing
+
+Architecture authority: [ADR-0001](docs/adr/0001-phase-0-runtime-and-execution-boundaries.md) selects the TypeScript/Vercel AI SDK runtime with native middleware and a Mastra-compatible migration path, excludes core LiteLLM, and disables Windows execution pending an allowlisted-job redesign and security testing. Conflicting Sprint 1 statements are historical.
 
 ## Install
 
@@ -19,8 +21,8 @@ an operator you delegate to, not a chatbot.
 curl -fsSL https://raw.githubusercontent.com/daraobeirnecode/dymaxion/main/install.sh | bash
 ```
 
-**Windows** (PowerShell as Administrator — sets up WSL2 + Docker Desktop for the
-runtime, then registers the native Windows Worker for ArcGIS Pro + arcpy):
+**Windows** (historical Sprint 1 installer; Phase 0 does not enable the native
+Windows Worker execution endpoints):
 
 ```powershell
 irm https://raw.githubusercontent.com/daraobeirnecode/dymaxion/main/install.ps1 | iex
@@ -33,22 +35,26 @@ git clone https://github.com/daraobeirnecode/dymaxion ~/dymaxion
 cd ~/dymaxion && ./setup.sh        # .\setup.ps1 on Windows
 ```
 
-You'll be prompted for four values: Anthropic API key, Telegram bot token,
-Telegram chat ID, Voyage API key. Everything else gets strong generated
-defaults. Typical time: 10 minutes warm, 25 cold.
+You'll be prompted for five values: Anthropic API key, Telegram bot token,
+Telegram chat ID, Voyage API key, and the stable Tailscale login allowed to use
+the control plane. Everything else gets strong generated defaults. Typical
+time: 10 minutes warm, 25 cold.
 
-## Topologies
+## Historical topology reference
 
-| | Runtime | Windows Worker | Worker URL |
+The following table describes the Sprint 1 scaffold only. In Phase 0 the Windows
+Worker may be built and health-checked, but all ArcPy/ArcGIS Pro execution is
+disabled regardless of URL configuration.
+
+| | Runtime | Historical Windows Worker | Worker URL |
 | --- | --- | --- | --- |
-| **A — Windows-only** | WSL2 + Docker Desktop | native service, same machine | `http://host.docker.internal:4444` |
-| **B — Split** | Mac Mini (all containers) | Windows laptop over Tailscale | `http://<windows-tailscale-ip>:4444` |
-| **C — Linux/macOS only** | Linux/macOS host | none (or remote later) | unset — ArcGIS Pro skills disabled |
+| **A — Windows-only** | WSL2 + Docker Desktop | disabled native scaffold | not used for execution |
+| **B — Split** | Mac Mini (all containers) | disabled remote scaffold | not used for execution |
+| **C — Linux/macOS only** | Linux/macOS host | none | unset |
 
-Without a Windows Worker, 10 of the 14 ESRI skills still work (they use the
-cross-platform `arcgis` Python API). The four arcpy/Pro-dependent skills
-(`arcpy-script-runner`, `arcgis-pro-project-editor`, `feature-layer-publish`,
-`enterprise-gdb-connect`) toggle availability with the worker's 30s health check.
+The four arcpy/Pro-dependent skill scaffolds remain unavailable until the
+allowlisted-job worker redesign and independent security testing required by
+ADR-0001.
 
 ## What's running after `docker compose up -d`
 
@@ -58,24 +64,37 @@ cross-platform `arcgis` Python API). The four arcpy/Pro-dependent skills
 | dymaxion-langfuse | LLM observability | http://localhost:3000 (set `LANGFUSE_PORT` in `.env` if 3000 is taken) |
 | dymaxion-whisper | voice-memo transcription | internal :8000 |
 | dymaxion-runtime | the agent daemon + runtime API | internal :8787 |
-| dymaxion-admin | dashboard + web chat + OAuth callbacks | http://$ADMIN_BIND_HOST:3001 |
+| dymaxion-admin | dashboard + web chat + OAuth callbacks | loopback :3001 behind Tailscale Serve |
 | dymaxion-skill-sandbox | Docker-in-Docker for proposed skills | internal |
 
 MCP servers (esri, postgres, filesystem, github) run as runtime subprocesses
 per `config/mcp-servers.yaml` — not as containers.
 
-Set `ADMIN_BIND_HOST` in `.env` to your Tailscale IP (e.g. `100.117.65.43`) so
-the dashboard is reachable only inside your tailnet. The installer does this
-automatically when Tailscale is detected.
+Keep `ADMIN_BIND_HOST=127.0.0.1`, set `DYMAXION_ADMIN_IDENTITIES` to the exact
+comma-separated Tailscale login(s) allowed to approve, then expose the dashboard
+through the authenticating proxy: `tailscale serve --bg localhost:3001`.
+Do not bind port 3001 directly to a tailnet IP: approval authentication relies
+on Serve stripping spoofed identity headers and injecting `Tailscale-User-Login`.
+
+Every destructive skill also needs an exact trusted identity mapping in
+`DYMAXION_CREDENTIAL_IDENTITIES_JSON`, for example
+`{"edit_feature_service":"arcgis:prod-org:user-123"}`. This is the account the
+runtime will actually use, not a value accepted from an agent plan. Missing
+mappings fail closed before an approval is created.
+
+Model-authored skill drafts are stored as review records only. Phase 0 does not
+write them into `skills/active`, hot-load them, or accept an “approve” action;
+activation remains disabled until a separately reviewed sandbox/promotion design exists.
 
 ## Operate
 
 ```bash
 # talk to it
 #   Telegram: message your bot
-#   Web:      http://$ADMIN_BIND_HOST:3001 → Chat
+#   Web:      the HTTPS URL printed by `tailscale serve status` → Chat
 docker exec -it dymaxion-runtime dymaxion            # CLI REPL
 docker exec -it dymaxion-runtime dymaxion status     # state + recent runs
+# batch invocation is limited to trusted non-destructive skills
 docker exec -it dymaxion-runtime dymaxion run --skill gdal-format-convert --input '{"input_path":"/workspace/data/x.shp","output_format":"GPKG"}'
 docker exec -it dymaxion-runtime dymaxion project switch elk-grove
 
@@ -93,6 +112,11 @@ docker compose logs -f dymaxion-runtime
 docker compose restart
 git pull && docker compose up -d --build   # upgrade
 ```
+
+`dymaxion run --skill` fails closed for manifests marked `destructive` or
+`requires_approval` (and for non-read native capabilities). Run those through
+the interactive CLI, Telegram, or Web gateway so the exact bound operation is
+presented and its approval is atomically consumed at the shared execution sink.
 
 ## Configure
 
@@ -128,18 +152,19 @@ spend and run only in the sandbox until approved.
 4. Docker + Tailscale up on the host
 5. Run the installer; verify `bash scripts/health-check.sh`
 6. Telegram: "list your skills" → catalog reply
-7. Admin dashboard reachable on :3001, LangFuse on :3000
-8. (Windows Worker) `windows-worker/install.ps1` on the Windows machine, set `WINDOWS_WORKER_URL` + `WINDOWS_WORKER_SECRET`, `bash scripts/verify-windows-worker.sh`
+7. `tailscale serve status` routes HTTPS to loopback :3001; direct tailnet :3001 is closed
+8. Approval test confirms an allowlisted Tailscale identity is recorded as `tailscale:<login>`
+9. Windows Worker build/health is historical scaffold verification only; execution remains disabled by ADR-0001
 
 ## Repo map
 
 ```
 config/            YAML configuration (routing, budgets, boundary, gateways, MCP)
 migrations/        Postgres schema (dymaxion.*)
-dymaxion-runtime/  the agent daemon (Mastra + AI SDK + middleware chain)
+dymaxion-runtime/  the agent daemon (TypeScript + AI SDK + middleware chain)
 dymaxion-admin/    Next.js 15 dashboard + web chat + OAuth callback routes
 docker/whisper/    faster-whisper transcription service
-skills/active/     the 45-skill catalog (proposed/ + archived/ created at runtime)
+skills/active/     the committed 45-skill historical catalog; runtime promotion is disabled
 knowledge-base/    ~115 seed reference docs (stubs in Sprint 1, embedded at load)
 windows-worker/    native Windows service for ArcGIS Pro CLI + arcpy
 scripts/           operational scripts (migrations, registration, health, replay)

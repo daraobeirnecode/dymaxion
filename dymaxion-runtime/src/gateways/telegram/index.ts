@@ -3,8 +3,8 @@
 // /workspace/data/attachments/, inline-keyboard approvals, 20s progress
 // pings during long steps, markdown replies.
 
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { closeSync, constants, mkdirSync, openSync, realpathSync, writeFileSync } from 'node:fs';
+import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import {
   type ApprovalRequest,
@@ -20,6 +20,10 @@ import {
   type StepResult,
 } from '../common.js';
 import { decideApproval, awaitDecision } from '../../security/approval.js';
+import {
+  chunkApprovalReview,
+  formatApprovalReview,
+} from '../../security/approval-review.js';
 import { logger } from '../../observability/logger.js';
 
 interface TgUpdate {
@@ -44,14 +48,80 @@ interface TgMessage {
 }
 
 const ATTACHMENTS_DIR = process.env.ATTACHMENTS_DIR ?? '/workspace/data/attachments';
+const MAX_ATTACHMENT_BYTES = Number(process.env.TELEGRAM_MAX_ATTACHMENT_BYTES ?? 25 * 1024 * 1024);
 const PROGRESS_INTERVAL_MS = 20_000;
+
+export function sanitizeTelegramFilename(name: string): string {
+  const leaf = basename(name.replaceAll('\\', '/'))
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/[^A-Za-z0-9._-]/g, '_')
+    .replace(/^\.+/, '')
+    .slice(0, 120);
+  return leaf || 'attachment';
+}
+
+export function secureAttachmentPath(root: string, hash: string, name: string): string {
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  const canonicalRoot = realpathSync(root);
+  const target = resolve(canonicalRoot, `${hash}-${sanitizeTelegramFilename(name)}`);
+  const rel = relative(canonicalRoot, target);
+  if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+    throw new Error('telegram attachment path escapes configured directory');
+  }
+  return target;
+}
+
+export async function readTelegramFileLimited(response: Response, maxBytes = MAX_ATTACHMENT_BYTES): Promise<Buffer> {
+  const declared = Number(response.headers.get('content-length') ?? 0);
+  if (declared > maxBytes) throw new Error(`telegram attachment exceeds ${maxBytes} byte limit`);
+  if (!response.body) throw new Error('telegram file response had no body');
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error(`telegram attachment exceeds ${maxBytes} byte limit`);
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks, total);
+}
+
+export function writeTelegramAttachment(root: string, hash: string, name: string, data: Buffer): string {
+  const target = secureAttachmentPath(root, hash, name);
+  const fd = openSync(
+    target,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+    0o600,
+  );
+  try {
+    writeFileSync(fd, data);
+  } finally {
+    closeSync(fd);
+  }
+  return target;
+}
+
+export function telegramApproverIdentity(adminChatId: string, fromId: number): string {
+  if (!adminChatId || String(fromId) !== String(adminChatId)) {
+    throw new Error('unauthorized Telegram approval callback');
+  }
+  return `telegram:${fromId}`;
+}
 
 export class TelegramGateway implements Gateway {
   readonly name = 'telegram';
   private handler: IncomingHandler | null = null;
   private running = false;
   private offset = 0;
-  private readonly pendingApprovals = new Map<string, (r: ApprovalResponse) => void>();
+  private readonly pendingApprovals = new Map<
+    string,
+    { request: ApprovalRequest; resolve: (response: ApprovalResponse) => void }
+  >();
 
   constructor(
     private readonly botToken: string,
@@ -162,15 +232,35 @@ export class TelegramGateway implements Gateway {
     // callback data: "approve:<approvalId>" | "reject:<approvalId>"
     const [action, approvalId] = (cb.data ?? '').split(':');
     if ((action === 'approve' || action === 'reject') && approvalId) {
+      let decidedBy: string;
+      try {
+        decidedBy = telegramApproverIdentity(this.adminChatId, cb.from.id);
+      } catch {
+        await this.call('answerCallbackQuery', {
+          callback_query_id: cb.id,
+          text: 'unauthorized',
+        });
+        return;
+      }
       const decision = action === 'approve' ? 'approved' : 'rejected';
-      await decideApproval(approvalId, decision, cb.from.first_name ?? String(cb.from.id));
-      this.pendingApprovals.get(approvalId)?.({
-        approved: decision === 'approved',
-        decision,
-        decided_by: cb.from.first_name ?? String(cb.from.id),
+      const accepted = await decideApproval(approvalId, decision, decidedBy);
+      const pending = this.pendingApprovals.get(approvalId);
+      if (pending) {
+        const response: ApprovalResponse = accepted
+          ? {
+              approval_id: approvalId,
+              approved: decision === 'approved',
+              decision,
+              decided_by: decidedBy,
+            }
+          : await awaitDecision(pending.request);
+        pending.resolve(response);
+        this.pendingApprovals.delete(approvalId);
+      }
+      await this.call('answerCallbackQuery', {
+        callback_query_id: cb.id,
+        text: accepted ? decision : 'already decided or expired',
       });
-      this.pendingApprovals.delete(approvalId);
-      await this.call('answerCallbackQuery', { callback_query_id: cb.id, text: decision });
     }
   }
 
@@ -190,11 +280,9 @@ export class TelegramGateway implements Gateway {
     const url = `https://api.telegram.org/file/bot${this.botToken}/${file.file_path}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`telegram file download failed: HTTP ${res.status}`);
-    const buf = Buffer.from(await res.arrayBuffer());
+    const buf = await readTelegramFileLimited(res);
     const hash = createHash('sha256').update(buf).digest('hex').slice(0, 12);
-    mkdirSync(ATTACHMENTS_DIR, { recursive: true });
-    const path = join(ATTACHMENTS_DIR, `${hash}-${name}`);
-    writeFileSync(path, buf);
+    const path = writeTelegramAttachment(ATTACHMENTS_DIR, hash, name, buf);
     return { path, mime, original_name: name };
   }
 
@@ -231,25 +319,36 @@ export class TelegramGateway implements Gateway {
   }
 
   async requestApproval(target: MessageTarget, req: ApprovalRequest): Promise<ApprovalResponse> {
-    await this.call('sendMessage', {
-      chat_id: target.source_id,
-      text: `*Approval required*\n${req.step_description}\n\nExpires in ${req.timeout_minutes} min.`,
-      parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: 'Approve', callback_data: `approve:${req.id}` },
-            { text: 'Reject', callback_data: `reject:${req.id}` },
-          ],
-        ],
-      },
-    });
+    const chunks = chunkApprovalReview(formatApprovalReview(req));
+    for (const [index, chunk] of chunks.entries()) {
+      const isFinalChunk = index === chunks.length - 1;
+      await this.call('sendMessage', {
+        chat_id: target.source_id,
+        text: chunk,
+        ...(isFinalChunk
+          ? {
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    { text: 'Approve exact payload above', callback_data: `approve:${req.id}` },
+                    { text: 'Reject', callback_data: `reject:${req.id}` },
+                  ],
+                ],
+              },
+            }
+          : {}),
+      });
+    }
 
     // Resolve on button press, or fall through to DB polling (dashboard decision / expiry).
     return new Promise<ApprovalResponse>((resolve) => {
-      this.pendingApprovals.set(req.id, resolve);
-      void awaitDecision(req).then((r) => {
-        if (this.pendingApprovals.delete(req.id)) resolve(r);
+      this.pendingApprovals.set(req.id, { request: req, resolve });
+      void awaitDecision(req).then((response) => {
+        const pending = this.pendingApprovals.get(req.id);
+        if (pending) {
+          this.pendingApprovals.delete(req.id);
+          pending.resolve(response);
+        }
       });
     });
   }

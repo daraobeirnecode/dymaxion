@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0.0",
+  "id": "reject-resource-limit",
+  "capability": "inspect_dataset",
+  "input": { "fixture": "synthetic-points.geojson", "max_bytes": 100 },
+  "expected": { "outcome": "error", "golden_file": "reject-resource-limit.json" },
+  "tolerances": { "numeric_absolute": 0, "normalized_fields": [] },
+  "allowed_operations": ["boundary_preflight", "stat"],
+  "expected_approval": { "required": false, "decision": "not-requested" }
+}

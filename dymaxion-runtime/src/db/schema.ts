@@ -149,11 +149,16 @@ export const approvalRequests = dymaxion.table('approval_requests', {
     .notNull()
     .references(() => agentRuns.id),
   stepDescription: text('step_description').notNull(),
-  stepPayload: jsonb('step_payload').notNull(),
+  stepPayload: jsonb('step_payload').$type<Record<string, unknown>>().notNull(),
+  payloadHash: text('payload_hash').notNull(),
+  target: text('target').notNull(),
+  credentialIdentity: text('credential_identity'),
   requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   respondedAt: timestamp('responded_at', { withTimezone: true }),
   decision: text('decision'),
   decidedBy: text('decided_by'),
+  consumedAt: timestamp('consumed_at', { withTimezone: true }),
 });
 
 export const budgetLedger = dymaxion.table('budget_ledger', {

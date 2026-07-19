@@ -1,0 +1,23 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "asset_id": "A-1", "value": 10 },
+      "geometry": { "type": "Point", "coordinates": [2.35, 48.85] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "asset_id": "A-2", "value": null },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[2.34, 48.84], [2.36, 48.86]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "asset_id": "A-3" },
+      "geometry": null
+    }
+  ]
+}

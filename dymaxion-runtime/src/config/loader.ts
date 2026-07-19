@@ -57,6 +57,7 @@ export interface BoundaryConfig {
     url_pattern?: string;
     connection?: string;
     path_pattern?: string;
+    root_env?: string;
   }>;
   denied_hostnames: string[];
   denied_paths: string[];

@@ -96,10 +96,14 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID}
+      TELEGRAM_MAX_ATTACHMENT_BYTES: ${TELEGRAM_MAX_ATTACHMENT_BYTES:-26214400}
+      RUNTIME_INTERNAL_TOKEN: ${RUNTIME_INTERNAL_TOKEN}
+      DYMAXION_CREDENTIAL_IDENTITIES_JSON: ${DYMAXION_CREDENTIAL_IDENTITIES_JSON}
       ESRI_PORTAL_URL: ${ESRI_PORTAL_URL}
       ESRI_CLIENT_ID: ${ESRI_CLIENT_ID}
       ESRI_CLIENT_SECRET: ${ESRI_CLIENT_SECRET}
       DYMAXION_POSTGIS_URL: postgres://dymaxion:${POSTGRES_PASSWORD}@dymaxion-postgres:5432/dymaxion
+      DYMAXION_WORKSPACE_ROOT: /workspace
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       WINDOWS_WORKER_URL: ${WINDOWS_WORKER_URL}
       WINDOWS_WORKER_SECRET: ${WINDOWS_WORKER_SECRET}
@@ -126,6 +130,8 @@ services:
       DATABASE_URL: postgres://dymaxion:${POSTGRES_PASSWORD}@dymaxion-postgres:5432/dymaxion
       LANGFUSE_URL: http://dymaxion-langfuse:3000
       RUNTIME_URL: http://dymaxion-runtime:8787
+      RUNTIME_INTERNAL_TOKEN: ${RUNTIME_INTERNAL_TOKEN}
+      DYMAXION_ADMIN_IDENTITIES: ${DYMAXION_ADMIN_IDENTITIES}
       OAUTH_TOKEN_ENCRYPTION_KEY: ${OAUTH_TOKEN_ENCRYPTION_KEY}
       OPENAI_OAUTH_CLIENT_ID: ${OPENAI_OAUTH_CLIENT_ID}
       OPENAI_OAUTH_CLIENT_SECRET: ${OPENAI_OAUTH_CLIENT_SECRET}
@@ -138,8 +144,8 @@ services:
       COHERE_OAUTH_CLIENT_SECRET: ${COHERE_OAUTH_CLIENT_SECRET}
       ADMIN_BIND_HOST: ${ADMIN_BIND_HOST:-127.0.0.1}
     ports:
-      # Bind to your Tailscale IP (set ADMIN_BIND_HOST=100.117.65.43 in .env)
-      # so the dashboard is reachable only inside the tailnet.
+      # Keep loopback-only. Expose through Tailscale Serve so authenticated
+      # Tailscale identity headers cannot be spoofed by direct clients.
       - "${ADMIN_BIND_HOST:-127.0.0.1}:3001:3001"
     depends_on:
       dymaxion-postgres:

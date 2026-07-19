@@ -8,7 +8,7 @@ import { join, basename, dirname } from 'node:path';
 import { parse } from 'yaml';
 import { db, schema } from '../db/client.js';
 import { mcpAvailable } from '../mcp/manager.js';
-import { workerConfigured, workerAvailable } from '../worker/client.js';
+import { workerConfigured, workerAvailable, workerExecutionEnabled } from '../worker/client.js';
 import { logger } from '../observability/logger.js';
 
 export interface SkillManifest {
@@ -64,6 +64,9 @@ function toolAvailable(tool: string): { ok: boolean; reason?: string } {
       : { ok: false, reason: `MCP server '${name}' not running` };
   }
   if (tool === 'windows-worker') {
+    if (!workerExecutionEnabled()) {
+      return { ok: false, reason: 'Windows Worker disabled by ADR-0001 pending redesign/security testing' };
+    }
     if (!workerConfigured()) return { ok: false, reason: 'Windows Worker not configured' };
     return workerAvailable() ? { ok: true } : { ok: false, reason: 'Windows Worker unreachable' };
   }
