@@ -53,6 +53,15 @@ jobs:
         run: node dist/main.js smoke-test
       - name: Reject moderate, high, or critical production advisories
         run: npm audit --omit=dev --audit-level=moderate
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build exact final runtime image for every supported architecture
+        run: >-
+          docker buildx build
+          --platform linux/amd64,linux/arm64
+          --target runtime
+          --output type=cacheonly
+          .
       - name: Build exact runtime production dependency stage
         run: docker build --target production-deps -t dymaxion-runtime-production-deps:ci .
       - name: Audit the dependency tree copied into the runtime image

@@ -20,14 +20,16 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-FROM node:22-slim
+FROM node:22-slim AS runtime
 
 # --- OS + geospatial CLI stack -----------------------------------------
+# Fiona currently falls back to a source build on linux/arm64, so both GDAL
+# and Python development headers are runtime-image build prerequisites.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl wget jq ca-certificates \
-    python3 python3-pip python3-venv python3-gdal \
+    python3 python3-dev python3-pip python3-venv python3-gdal \
     postgresql-client \
-    gdal-bin proj-bin \
+    gdal-bin libgdal-dev proj-bin \
     osmium-tool \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
