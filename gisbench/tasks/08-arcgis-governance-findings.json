@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "id": "arcgis-governance-findings",
+  "capability": "inspect_arcgis_org",
+  "input": {
+    "fixture": "arcgis/governance-org",
+    "capability_input": {
+      "portal_url": "https://demo-org.maps.arcgis.com",
+      "org_id": "DEMOORG123",
+      "include": ["items", "services"],
+      "page_size": 10,
+      "max_records": 10,
+      "stale_after_days": 180
+    }
+  },
+  "expected": { "outcome": "success", "golden_file": "arcgis-governance-findings.json" },
+  "tolerances": { "numeric_absolute": 0, "normalized_fields": [] },
+  "allowed_operations": ["boundary_preflight", "arcgis_request", "derive_inventory", "hash_sha256"],
+  "expected_approval": { "required": false, "decision": "not-requested" }
+}

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { BoundaryOptions } from '../security/boundary.js';
 
 const SemverSchema = z.string().regex(/^\d+\.\d+\.\d+$/);
 
@@ -83,4 +84,8 @@ export interface CapabilityExecutionContext {
   signal?: AbortSignal;
   now?: () => Date;
   io?: Record<string, unknown>;
+  /** Boundary enforcement options for capabilities that dispatch outbound
+   * requests; capabilities must pass these to the shared URL checks so
+   * audit/DNS behavior stays consistent with the executor preflight. */
+  boundary?: BoundaryOptions;
 }

@@ -104,6 +104,13 @@ function resolveDependencies(
     capabilityContext: {
       agentRunId,
       ...(supplied.capabilityContext ?? {}),
+      // Outbound-request capabilities must enforce the same boundary policy
+      // (audit sink, DNS resolution) the executor preflight uses.
+      boundary: supplied.capabilityContext?.boundary ?? {
+        agentRunId,
+        audit,
+        ...(supplied.boundaryOptions ?? {}),
+      },
     },
     approvalRequest: supplied.approvalRequest,
   };

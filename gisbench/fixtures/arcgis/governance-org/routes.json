@@ -1,0 +1,13 @@
+{
+  "description": "Synthetic organization exercising deterministic governance normalization: stale/fresh items, service-backed types with and without URLs, unknown sharing values, and an incomplete record. All content is invented; no real organization was queried.",
+  "routes": [
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/portals/DEMOORG123?f=json",
+      "body_file": "portal-self.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/search?f=json&q=orgid%3ADEMOORG123&sortField=created&sortOrder=asc&start=1&num=10",
+      "body_file": "items-page1.json"
+    }
+  ]
+}

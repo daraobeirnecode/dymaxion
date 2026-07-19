@@ -1,0 +1,67 @@
+{
+  "total": 6,
+  "start": 1,
+  "num": 10,
+  "nextStart": -1,
+  "results": [
+    {
+      "id": "dddddddddddddddddddddddddddddd01",
+      "title": "Roads",
+      "owner": "ops.admin",
+      "type": "Feature Service",
+      "access": "public",
+      "created": 1672531200000,
+      "modified": 1783641600000,
+      "size": 8192,
+      "url": "https://services.arcgis.com/DEMOORG123/arcgis/rest/services/Roads/FeatureServer"
+    },
+    {
+      "id": "dddddddddddddddddddddddddddddd02",
+      "title": "Legacy Basemap",
+      "owner": "ops.admin",
+      "type": "Map Service",
+      "access": "org",
+      "created": 1640995200000,
+      "modified": 1748736000000,
+      "size": 16384,
+      "url": "https://demo-org.maps.arcgis.com/server/rest/services/LegacyBasemap/MapServer"
+    },
+    {
+      "id": "dddddddddddddddddddddddddddddd03",
+      "title": "Abandoned Survey Layer",
+      "owner": "legacy.user",
+      "type": "Feature Service",
+      "access": "shared",
+      "created": 1655251200000,
+      "modified": 1706745600000,
+      "size": 2048
+    },
+    {
+      "id": "dddddddddddddddddddddddddddddd04",
+      "title": "Weekly Ops Map",
+      "owner": "ops.admin",
+      "type": "Web Map",
+      "access": "private",
+      "created": 1675209600000,
+      "modified": 1782864000000,
+      "size": 256
+    },
+    {
+      "id": "dddddddddddddddddddddddddddddd05",
+      "title": "Field Notes Upload",
+      "owner": "legacy.user",
+      "type": "CSV",
+      "access": "everyone-maybe",
+      "created": 1677628800000,
+      "size": 64
+    },
+    {
+      "title": "Recordless Fragment",
+      "owner": "legacy.user",
+      "type": "Web Map",
+      "access": "private",
+      "created": 1680307200000,
+      "modified": 1682899200000
+    }
+  ]
+}

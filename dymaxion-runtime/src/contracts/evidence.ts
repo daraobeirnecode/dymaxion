@@ -36,11 +36,25 @@ export const GisMetadataSchema = z
   })
   .strict();
 
+// Optional per-request retrieval evidence for capabilities that assemble one
+// bundle from several bounded remote reads (e.g. paginated ArcGIS REST calls).
+// Additive since evidence schema 1.1.0; single-source capabilities omit it.
+const RetrievalRequestSchema = z
+  .object({
+    name: z.string().min(1),
+    url: z.string().url(),
+    status: z.number().int().nonnegative(),
+    sha256: Sha256Schema,
+    bytes: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const EvidenceBundleSchema = z
   .object({
     schema_version: SemverSchema,
     bundle_id: z.string().min(1),
     generated_at: IsoDateSchema,
+    requests: z.array(RetrievalRequestSchema).optional(),
     source: z
       .object({
         uri: z.string().min(1),

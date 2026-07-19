@@ -8,9 +8,9 @@ Named for Gerardus Dymaxion. Framed as an operator you delegate to, not a chatbo
 
 ## Stack (containers) — UPDATED 2026-07-14
 
-Framework: **Mastra** (TypeScript agent framework) + **Vercel AI SDK** for LLM providers + **openid-client** for OAuth. NOT using LiteLLM in the core runtime. [ADR-0001](docs/adr/0001-phase-0-runtime-and-execution-boundaries.md) is authoritative; conflicting Sprint 1 architecture text is historical.
+Framework: **TypeScript/Node.js runtime** + **Vercel AI SDK** for LLM providers + **openid-client** for OAuth. Mastra is development-only compatibility scaffolding and is absent from the production dependency tree. NOT using LiteLLM in the core runtime. [ADR-0001](docs/adr/0001-phase-0-runtime-and-execution-boundaries.md) is authoritative; conflicting Sprint 1 architecture text is historical.
 
-- **dymaxion-runtime** — TypeScript/Node.js 22+ agent daemon on Mastra
+- **dymaxion-runtime** — TypeScript/Node.js 22+ agent daemon (native middleware; Mastra dev-only scaffolding per ADR-0001)
 - **dymaxion-postgres** — Postgres 18 + pgvector + AGE (memory + audit + OAuth tokens)
 - **dymaxion-langfuse** — LLM observability (self-hosted)
 - **dymaxion-whisper** — voice-memo transcription (faster-whisper)
@@ -100,8 +100,42 @@ Install:
 - `dymaxion.oauth_tokens` — encrypted provider tokens (AES-256-GCM; never logged)
 - `dymaxion.budget_ledger` — monthly per-tier spend; frozen on cap hit
 
+## Implemented native capabilities
+
+Exactly two native capabilities are implemented and tested; everything else in
+the catalog is historical scaffold (see ADR-0001 and the README):
+
+- **`inspect_dataset`** (Phase 0) — deterministic, read-only local GeoJSON
+  inspection producing a dataset passport plus versioned evidence.
+- **`inspect_arcgis_org`** (Phase 1A) — deterministic, read-only ArcGIS
+  Online/Enterprise organization inventory over the Portal REST API
+  (users/groups/items/service-backed items with ownership, sharing, and
+  staleness summaries). Docs: `docs/capabilities/inspect-arcgis-org.md`.
+
+Phase 1A constraints that still hold:
+
+- **Fixture-only testing.** All `inspect_arcgis_org` tests and GISBench tasks
+  run against committed synthetic fixtures through an injectable transport
+  with stubbed DNS. No authenticated or private ArcGIS organization was
+  queried during development, and none may be queried in tests.
+- **No trusted ArcGIS credential provider exists yet.** The capability runs
+  with anonymous/public visibility only, never accepts credential-like input
+  fields, and reports always carry a partial-visibility caveat. Any future
+  authentication must be a trusted server-side provider — credential values
+  never appear in inputs, outputs, evidence, or logs.
+- **Enterprise custom hosts need explicit boundary configuration.** The
+  employer boundary allowlists `*.arcgis.com` / `*.maps.arcgis.com`; a
+  customer ArcGIS Enterprise portal on its own domain must be added by hand
+  to `config/employer-boundary.yaml` before it can be inspected. Deny rules
+  (City of Sacramento hosts) always win.
+- **GISBench has exactly ten golden tasks** — five Phase 0 `inspect_dataset`
+  and five Phase 1A `inspect_arcgis_org` — an evaluation scaffold toward the
+  100-task goal, not a coverage claim.
+
 ## Build + verify
 
+- Runtime checks: `cd dymaxion-runtime && npm run typecheck && npm test` (51 tests)
+- GISBench: `cd dymaxion-runtime && npm run gisbench` (10/10 golden tasks)
 - Runtime: `cd dymaxion-runtime && npm run build` (tsc strict) then `DYMAXION_CONFIG_DIR=../config SKILLS_DIR=../skills node dist/main.js smoke-test`
 - Admin: `cd dymaxion-admin && npm run build`
 - Worker: `cd windows-worker && npm run build`

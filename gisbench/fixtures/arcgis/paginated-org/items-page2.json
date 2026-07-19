@@ -1,0 +1,28 @@
+{
+  "total": 5,
+  "start": 3,
+  "num": 2,
+  "nextStart": 5,
+  "results": [
+    {
+      "id": "cccccccccccccccccccccccccccccc03",
+      "title": "Parcels 2023 Q3",
+      "owner": "greg.gis",
+      "type": "Web Map",
+      "access": "private",
+      "created": 1680307200000,
+      "modified": 1782864000000,
+      "size": 1024
+    },
+    {
+      "id": "cccccccccccccccccccccccccccccc04",
+      "title": "Parcels 2023 Q4",
+      "owner": "greg.gis",
+      "type": "Web Map",
+      "access": "private",
+      "created": 1682899200000,
+      "modified": 1782864000000,
+      "size": 1024
+    }
+  ]
+}

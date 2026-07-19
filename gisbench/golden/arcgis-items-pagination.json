@@ -1,0 +1,230 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "report": {
+      "schema_version": "1.0.0",
+      "portal": {
+        "url": "https://demo-org.maps.arcgis.com",
+        "org_id": "DEMOORG123",
+        "name": "Demo Synthetic Org",
+        "url_key": "demo-org",
+        "access": "public",
+        "created_at": "2020-01-01T00:00:00.000Z",
+        "modified_at": "2026-06-01T00:00:00.000Z"
+      },
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "parameters": {
+        "include": [
+          "items"
+        ],
+        "stale_after_days": 365,
+        "page_size": 2,
+        "max_records": 10,
+        "item_owner": null
+      },
+      "caveats": [
+        "Inventory covers only content visible to the configured identity at the approved portal; it is not proof of a complete organization inventory."
+      ],
+      "users": null,
+      "groups": null,
+      "items": {
+        "total_reported": 5,
+        "retrieved_count": 5,
+        "truncated": false,
+        "records": [
+          {
+            "id": "cccccccccccccccccccccccccccccc01",
+            "title": "Parcels 2023 Q1",
+            "owner": "ada.analyst",
+            "type": "Web Map",
+            "access": "org",
+            "created_at": "2023-02-01T00:00:00.000Z",
+            "modified_at": "2026-07-01T00:00:00.000Z",
+            "size_bytes": 1024,
+            "service_backed": false,
+            "service_url": null,
+            "stale": false,
+            "days_since_modified": 17
+          },
+          {
+            "id": "cccccccccccccccccccccccccccccc02",
+            "title": "Parcels 2023 Q2",
+            "owner": "ada.analyst",
+            "type": "Web Map",
+            "access": "org",
+            "created_at": "2023-03-01T00:00:00.000Z",
+            "modified_at": "2026-07-01T00:00:00.000Z",
+            "size_bytes": 1024,
+            "service_backed": false,
+            "service_url": null,
+            "stale": false,
+            "days_since_modified": 17
+          },
+          {
+            "id": "cccccccccccccccccccccccccccccc03",
+            "title": "Parcels 2023 Q3",
+            "owner": "greg.gis",
+            "type": "Web Map",
+            "access": "private",
+            "created_at": "2023-04-01T00:00:00.000Z",
+            "modified_at": "2026-07-01T00:00:00.000Z",
+            "size_bytes": 1024,
+            "service_backed": false,
+            "service_url": null,
+            "stale": false,
+            "days_since_modified": 17
+          },
+          {
+            "id": "cccccccccccccccccccccccccccccc04",
+            "title": "Parcels 2023 Q4",
+            "owner": "greg.gis",
+            "type": "Web Map",
+            "access": "private",
+            "created_at": "2023-05-01T00:00:00.000Z",
+            "modified_at": "2026-07-01T00:00:00.000Z",
+            "size_bytes": 1024,
+            "service_backed": false,
+            "service_url": null,
+            "stale": false,
+            "days_since_modified": 17
+          },
+          {
+            "id": "cccccccccccccccccccccccccccccc05",
+            "title": "Parcels Archive Index",
+            "owner": "ada.analyst",
+            "type": "Feature Service",
+            "access": "public",
+            "created_at": "2023-06-01T00:00:00.000Z",
+            "modified_at": "2026-07-01T00:00:00.000Z",
+            "size_bytes": 4096,
+            "service_backed": true,
+            "service_url": "https://services.arcgis.com/DEMOORG123/arcgis/rest/services/ParcelsArchive/FeatureServer",
+            "stale": false,
+            "days_since_modified": 17
+          }
+        ]
+      },
+      "services": null,
+      "ownership_summary": [
+        {
+          "owner": "ada.analyst",
+          "item_count": 3
+        },
+        {
+          "owner": "greg.gis",
+          "item_count": 2
+        }
+      ],
+      "sharing_summary": {
+        "public": 1,
+        "org": 2,
+        "shared": 0,
+        "private": 2,
+        "unknown": 0
+      },
+      "staleness": {
+        "threshold_days": 365,
+        "evaluated_at": "2026-07-18T12:00:00.000Z",
+        "stale_item_count": 0,
+        "unknown_modified_count": 0,
+        "findings": []
+      },
+      "warnings": [],
+      "truncation": {
+        "truncated": false,
+        "reasons": []
+      }
+    },
+    "evidence": {
+      "schema_version": "1.1.0",
+      "bundle_id": "inspect_arcgis_org:96fd0d0c521413b1",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "requests": [
+        {
+          "name": "portal_self",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/portals/DEMOORG123?f=json",
+          "status": 200,
+          "sha256": "96fd0d0c521413b14f243356c8ece86f9d3d6aa6446e136afbb54c0a6bc1e6a3",
+          "bytes": 160
+        },
+        {
+          "name": "items:page1",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/search?f=json&q=orgid%3ADEMOORG123&sortField=created&sortOrder=asc&start=1&num=2",
+          "status": 200,
+          "sha256": "c9139f64b187bc9aca03e1cb71ef60514ebbf41cd74ef97483a442472ae0af2d",
+          "bytes": 594
+        },
+        {
+          "name": "items:page2",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/search?f=json&q=orgid%3ADEMOORG123&sortField=created&sortOrder=asc&start=3&num=2",
+          "status": 200,
+          "sha256": "0c85ae89a4e4e97fd89937b6f45b8ad73000dc2c1708a2bc2ec3ab8b06378341",
+          "bytes": 596
+        },
+        {
+          "name": "items:page3",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/search?f=json&q=orgid%3ADEMOORG123&sortField=created&sortOrder=asc&start=5&num=2",
+          "status": 200,
+          "sha256": "76706f5540ef4543d03a6d32a4108b895fe816d4c718c249b9408c8058229b88",
+          "bytes": 460
+        }
+      ],
+      "source": {
+        "uri": "https://demo-org.maps.arcgis.com/sharing/rest/portals/DEMOORG123?f=json",
+        "identity": {
+          "kind": "arcgis_org",
+          "value": "DEMOORG123"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "96fd0d0c521413b14f243356c8ece86f9d3d6aa6446e136afbb54c0a6bc1e6a3"
+      },
+      "gis_metadata": {
+        "format": "ArcGIS Portal REST JSON",
+        "crs": null,
+        "axis_order": null,
+        "units": null,
+        "extent": null,
+        "schema": [],
+        "row_count": 5,
+        "geometry_types": [],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "{\"include\":[\"items\"],\"item_owner\":null,\"max_records\":10,\"org_id\":\"DEMOORG123\",\"page_size\":2,\"portal_url\":\"https://demo-org.maps.arcgis.com\",\"stale_after_days\":365}",
+        "sha256": "168ad3b303f58da40708daa0633d429c39a53d5fcee184a381fae3c77e419714"
+      },
+      "execution": {
+        "capability": "inspect_arcgis_org",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "arcgis_org_inventory",
+          "sha256": "e04b93c606b7820c2ad9a2e377091c04b43be27e35c1429bf5203969ce6bcf69",
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "boundary_preflight",
+              "arcgis_envelope",
+              "pagination",
+              "output_schema"
+            ],
+            "warnings": []
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

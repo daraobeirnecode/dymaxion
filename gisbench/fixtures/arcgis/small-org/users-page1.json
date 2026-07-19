@@ -1,0 +1,24 @@
+{
+  "total": 2,
+  "start": 1,
+  "num": 10,
+  "nextStart": -1,
+  "users": [
+    {
+      "username": "ada.analyst",
+      "fullName": "Ada Analyst",
+      "role": "org_admin",
+      "created": 1614556800000,
+      "modified": 1777593600000,
+      "lastLogin": 1782892800000
+    },
+    {
+      "username": "greg.gis",
+      "fullName": "Greg GIS",
+      "role": "org_publisher",
+      "created": 1655251200000,
+      "modified": 1704067200000,
+      "lastLogin": -1
+    }
+  ]
+}

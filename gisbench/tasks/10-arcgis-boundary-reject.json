@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0.0",
+  "id": "arcgis-boundary-reject",
+  "capability": "inspect_arcgis_org",
+  "input": {
+    "fixture": "arcgis/denied-org",
+    "capability_input": {
+      "portal_url": "https://city-of-sacramento.maps.arcgis.com",
+      "org_id": "DEMOORG123",
+      "page_size": 10,
+      "max_records": 10,
+      "stale_after_days": 365
+    }
+  },
+  "expected": { "outcome": "error", "golden_file": "arcgis-boundary-reject.json" },
+  "tolerances": { "numeric_absolute": 0, "normalized_fields": [] },
+  "allowed_operations": ["boundary_preflight"],
+  "expected_approval": { "required": false, "decision": "not-requested" }
+}

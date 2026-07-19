@@ -1,0 +1,16 @@
+{
+  "total": 1,
+  "start": 1,
+  "num": 10,
+  "nextStart": -1,
+  "results": [
+    {
+      "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa01",
+      "title": "Operations",
+      "owner": "ada.analyst",
+      "access": "org",
+      "created": 1617235200000,
+      "modified": 1767225600000
+    }
+  ]
+}

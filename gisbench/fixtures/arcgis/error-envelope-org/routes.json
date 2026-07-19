@@ -1,0 +1,9 @@
+{
+  "description": "Synthetic portal whose portals endpoint returns an ArcGIS REST error envelope with HTTP 200 and a fake token value in the message, proving envelope rejection and secret redaction. No real organization was queried.",
+  "routes": [
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/portals/DEMOORG123?f=json",
+      "body_file": "portal-self-error.json"
+    }
+  ]
+}

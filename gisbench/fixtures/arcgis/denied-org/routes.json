@@ -1,0 +1,4 @@
+{
+  "description": "Deliberately empty route set: the task targets a denied City of Sacramento hostname, so the employer boundary must reject the run before any request is attempted. Any transport call against this fixture fails the task.",
+  "routes": []
+}
