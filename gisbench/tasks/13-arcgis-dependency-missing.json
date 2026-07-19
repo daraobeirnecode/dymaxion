@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "id": "arcgis-dependency-missing",
+  "capability": "trace_arcgis_dependencies",
+  "input": {
+    "fixture": "arcgis/dependency-missing",
+    "capability_input": {
+      "portal_url": "https://demo-org.maps.arcgis.com",
+      "root_item_ids": ["3333cccc3333cccc3333cccc3333cc01"]
+    }
+  },
+  "expected": { "outcome": "success", "golden_file": "arcgis-dependency-missing.json" },
+  "tolerances": { "numeric_absolute": 0, "normalized_fields": [] },
+  "allowed_operations": ["boundary_preflight", "arcgis_request", "derive_graph", "hash_sha256"],
+  "expected_approval": { "required": false, "decision": "not-requested" }
+}

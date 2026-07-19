@@ -1,0 +1,180 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "report": {
+      "schema_version": "1.0.0",
+      "portal": {
+        "url": "https://demo-org.maps.arcgis.com"
+      },
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "parameters": {
+        "root_item_ids": [
+          "5555eeee5555eeee5555eeee5555ee01"
+        ],
+        "max_depth": 4,
+        "max_nodes": 2,
+        "max_edges": 400,
+        "max_requests": 200,
+        "max_response_bytes": 2097152,
+        "max_total_response_bytes": 8388608,
+        "max_duration_ms": 30000
+      },
+      "roots": [
+        "item:5555eeee5555eeee5555eeee5555ee01"
+      ],
+      "nodes": [
+        {
+          "id": "item:5555eeee5555eeee5555eeee5555ee01",
+          "kind": "item",
+          "item_id": "5555eeee5555eeee5555eeee5555ee01",
+          "service_url": null,
+          "type": "Web Map",
+          "title": "Wide Reference Map",
+          "owner": "ada.analyst",
+          "access": "org",
+          "support": "expandable",
+          "expanded": true,
+          "depth": 0,
+          "is_root": true,
+          "impact": {
+            "upstream_count": 0,
+            "downstream_count": 1
+          }
+        },
+        {
+          "id": "item:6666ffff6666ffff6666ffff6666ff02",
+          "kind": "item",
+          "item_id": "6666ffff6666ffff6666ffff6666ff02",
+          "service_url": null,
+          "type": "Feature Service",
+          "title": "First Layer",
+          "owner": "ada.analyst",
+          "access": "public",
+          "support": "terminal",
+          "expanded": false,
+          "depth": 1,
+          "is_root": false,
+          "impact": {
+            "upstream_count": 1,
+            "downstream_count": 0
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "item:5555eeee5555eeee5555eeee5555ee01",
+          "to": "item:6666ffff6666ffff6666ffff6666ff02",
+          "relationship": "operational_layer",
+          "locator": "operationalLayers[].itemId"
+        }
+      ],
+      "cycles": [],
+      "unresolved_references": [],
+      "totals": {
+        "node_count": 2,
+        "edge_count": 1,
+        "item_node_count": 2,
+        "service_node_count": 0,
+        "request_count": 3
+      },
+      "truncation": {
+        "truncated": true,
+        "reasons": [
+          "node ceiling: stopped adding nodes at the 2-node ceiling"
+        ]
+      },
+      "caveats": [
+        "The graph covers only content visible to the configured identity at the approved portal; it is not proof of a complete dependency inventory.",
+        "Only explicitly supported Web Mapping Application and Web Map JSON paths are traversed; references outside those paths are not discovered.",
+        "Service URLs are sanitized terminal references; the services themselves were never contacted or verified.",
+        "One or more traversal ceilings were reached; the graph reflects the retrieved subset only."
+      ],
+      "warnings": []
+    },
+    "evidence": {
+      "schema_version": "1.1.0",
+      "bundle_id": "trace_arcgis_dependencies:b2f1d185e8c4bd43",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "requests": [
+        {
+          "name": "item_meta:5555eeee5555eeee5555eeee5555ee01",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/5555eeee5555eeee5555eeee5555ee01?f=json",
+          "status": 200,
+          "sha256": "b2f1d185e8c4bd43c9288f60a8d2dac9fa6c5bfb5cfd17f1607cf6edd9781557",
+          "bytes": 146
+        },
+        {
+          "name": "item_data:5555eeee5555eeee5555eeee5555ee01",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/5555eeee5555eeee5555eeee5555ee01/data?f=json",
+          "status": 200,
+          "sha256": "de923468fa25f1b09e87569047a6d06a68eed802d42c5b557eecb314f0cb9565",
+          "bytes": 194
+        },
+        {
+          "name": "item_meta:6666ffff6666ffff6666ffff6666ff02",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/6666ffff6666ffff6666ffff6666ff02?f=json",
+          "status": 200,
+          "sha256": "3a83a6b3838c3c5b37cf7b18baeca6315ea3e0cf3eb436c22b092d77ae1745e7",
+          "bytes": 150
+        }
+      ],
+      "source": {
+        "uri": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/5555eeee5555eeee5555eeee5555ee01?f=json",
+        "identity": {
+          "kind": "arcgis_dependency_roots",
+          "value": "5555eeee5555eeee5555eeee5555ee01"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "b2f1d185e8c4bd43c9288f60a8d2dac9fa6c5bfb5cfd17f1607cf6edd9781557"
+      },
+      "gis_metadata": {
+        "format": "ArcGIS Portal REST JSON",
+        "crs": null,
+        "axis_order": null,
+        "units": null,
+        "extent": null,
+        "schema": [],
+        "row_count": 2,
+        "geometry_types": [],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "{\"max_depth\":4,\"max_duration_ms\":30000,\"max_edges\":400,\"max_nodes\":2,\"max_requests\":200,\"max_response_bytes\":2097152,\"max_total_response_bytes\":8388608,\"portal_url\":\"https://demo-org.maps.arcgis.com\",\"root_item_ids\":[\"5555eeee5555eeee5555eeee5555ee01\"]}",
+        "sha256": "f344672f3d26c878ac4a3145fca59f4ea7b1f632fb65f2d5caec1a7ab1026e8c"
+      },
+      "execution": {
+        "capability": "trace_arcgis_dependencies",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "arcgis_dependency_graph",
+          "sha256": "7c90487bb883f3b2cc7a55d1653e9f78792eb743af3c3b94fd29d2894cb48b92",
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "boundary_preflight",
+              "arcgis_envelope",
+              "graph_ceilings",
+              "canonical_ordering",
+              "output_schema"
+            ],
+            "warnings": []
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

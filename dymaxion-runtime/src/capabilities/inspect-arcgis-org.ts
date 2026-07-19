@@ -18,8 +18,10 @@ import type { BoundaryOptions } from '../security/boundary.js';
 import {
   fetchArcGisTransport,
   paginateArcGis,
+  portalRoot,
   redactSecrets,
   requestArcGisJson,
+  validatePortalUrl,
   type ArcGisRequestEvidence,
   type ArcGisRestTransport,
 } from './arcgis-rest.js';
@@ -114,33 +116,6 @@ export const InspectArcgisOrgInputSchema = z
       }
     }
   });
-
-function validatePortalUrl(raw: string): string | null {
-  // Inspect the raw string before WHATWG URL normalization can silently
-  // rewrite traversal segments, backslashes, or encoded characters.
-  if (/\.\.|%|\\/.test(raw)) {
-    return 'portal_url must not contain traversal, encoded, or backslash segments';
-  }
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return 'portal_url must be an absolute URL';
-  }
-  if (url.protocol !== 'https:') return 'portal_url must use https';
-  if (url.username || url.password) return 'portal_url must not embed credentials';
-  if (url.search || url.hash) return 'portal_url must not contain a query string or fragment';
-  if (!url.hostname) return 'portal_url must include a hostname';
-  if (url.pathname.includes('//')) return 'portal_url path must not contain empty segments';
-  return null;
-}
-
-/** Approved portal root: origin plus normalized path, no trailing slash. */
-function portalRoot(rawUrl: string): string {
-  const url = new URL(rawUrl);
-  const path = url.pathname.replace(/\/+$/, '');
-  return `${url.origin}${path}`;
-}
 
 const IsoDate = z.string().datetime({ offset: true });
 const SharingSchema = z.enum(['public', 'org', 'shared', 'private', 'unknown']);

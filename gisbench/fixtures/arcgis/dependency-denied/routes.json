@@ -1,0 +1,4 @@
+{
+  "description": "Intentionally empty route set for the denied-hostname dependency boundary task; the employer boundary must reject the portal before any request, so any request against this fixture fails the task.",
+  "routes": []
+}

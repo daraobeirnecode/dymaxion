@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "id": "arcgis-dependency-ceiling",
+  "capability": "trace_arcgis_dependencies",
+  "input": {
+    "fixture": "arcgis/dependency-ceiling",
+    "capability_input": {
+      "portal_url": "https://demo-org.maps.arcgis.com",
+      "root_item_ids": ["5555eeee5555eeee5555eeee5555ee01"],
+      "max_nodes": 2
+    }
+  },
+  "expected": { "outcome": "success", "golden_file": "arcgis-dependency-ceiling.json" },
+  "tolerances": { "numeric_absolute": 0, "normalized_fields": [] },
+  "allowed_operations": ["boundary_preflight", "arcgis_request", "derive_graph", "hash_sha256"],
+  "expected_approval": { "required": false, "decision": "not-requested" }
+}

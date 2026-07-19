@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic Web Map whose references cover missing-item, malformed-id, credential-bearing-URL, unsupported-scheme, and query-stripping paths. The embedded token=SYNTHETICFAKEVALUE111 string is a fake redaction canary, not a real credential.",
+  "routes": [
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/3333cccc3333cccc3333cccc3333cc01?f=json",
+      "body_file": "map-meta.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/3333cccc3333cccc3333cccc3333cc01/data?f=json",
+      "body_file": "map-data.json"
+    },
+    {
+      "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/4444dddd4444dddd4444dddd4444dd02?f=json",
+      "body_file": "missing-item-error.json"
+    }
+  ]
+}

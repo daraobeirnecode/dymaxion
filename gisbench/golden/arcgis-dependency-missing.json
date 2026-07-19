@@ -1,0 +1,233 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "report": {
+      "schema_version": "1.0.0",
+      "portal": {
+        "url": "https://demo-org.maps.arcgis.com"
+      },
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "parameters": {
+        "root_item_ids": [
+          "3333cccc3333cccc3333cccc3333cc01"
+        ],
+        "max_depth": 4,
+        "max_nodes": 200,
+        "max_edges": 400,
+        "max_requests": 200,
+        "max_response_bytes": 2097152,
+        "max_total_response_bytes": 8388608,
+        "max_duration_ms": 30000
+      },
+      "roots": [
+        "item:3333cccc3333cccc3333cccc3333cc01"
+      ],
+      "nodes": [
+        {
+          "id": "item:3333cccc3333cccc3333cccc3333cc01",
+          "kind": "item",
+          "item_id": "3333cccc3333cccc3333cccc3333cc01",
+          "service_url": null,
+          "type": "Web Map",
+          "title": "Partially Broken Map",
+          "owner": "ada.analyst",
+          "access": "org",
+          "support": "expandable",
+          "expanded": true,
+          "depth": 0,
+          "is_root": true,
+          "impact": {
+            "upstream_count": 0,
+            "downstream_count": 2
+          }
+        },
+        {
+          "id": "item:4444dddd4444dddd4444dddd4444dd02",
+          "kind": "item",
+          "item_id": "4444dddd4444dddd4444dddd4444dd02",
+          "service_url": null,
+          "type": null,
+          "title": null,
+          "owner": null,
+          "access": "unknown",
+          "support": "missing",
+          "expanded": false,
+          "depth": 1,
+          "is_root": false,
+          "impact": {
+            "upstream_count": 1,
+            "downstream_count": 0
+          }
+        },
+        {
+          "id": "service:99236235b360a049123f95c0081e29d4f1bc459fe16ec6bc60147ac74632409d",
+          "kind": "service",
+          "item_id": null,
+          "service_url": "https://services.arcgis.com/synthetic/arcgis/rest/services/Roads/FeatureServer",
+          "type": null,
+          "title": null,
+          "owner": null,
+          "access": "unknown",
+          "support": "service_reference",
+          "expanded": false,
+          "depth": 1,
+          "is_root": false,
+          "impact": {
+            "upstream_count": 1,
+            "downstream_count": 0
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "item:3333cccc3333cccc3333cccc3333cc01",
+          "to": "item:4444dddd4444dddd4444dddd4444dd02",
+          "relationship": "operational_layer",
+          "locator": "operationalLayers[].itemId"
+        },
+        {
+          "from": "item:3333cccc3333cccc3333cccc3333cc01",
+          "to": "service:99236235b360a049123f95c0081e29d4f1bc459fe16ec6bc60147ac74632409d",
+          "relationship": "operational_layer",
+          "locator": "operationalLayers[].url"
+        }
+      ],
+      "cycles": [],
+      "unresolved_references": [
+        {
+          "from": "item:3333cccc3333cccc3333cccc3333cc01",
+          "locator": "operationalLayers[].itemId",
+          "kind": "item_id",
+          "reason": "malformed_item_id"
+        },
+        {
+          "from": "item:3333cccc3333cccc3333cccc3333cc01",
+          "locator": "operationalLayers[].url",
+          "kind": "service_url",
+          "reason": "credential_bearing_url"
+        },
+        {
+          "from": "item:3333cccc3333cccc3333cccc3333cc01",
+          "locator": "operationalLayers[].url",
+          "kind": "service_url",
+          "reason": "unsupported_url_scheme"
+        }
+      ],
+      "totals": {
+        "node_count": 3,
+        "edge_count": 2,
+        "item_node_count": 2,
+        "service_node_count": 1,
+        "request_count": 3
+      },
+      "truncation": {
+        "truncated": false,
+        "reasons": []
+      },
+      "caveats": [
+        "The graph covers only content visible to the configured identity at the approved portal; it is not proof of a complete dependency inventory.",
+        "Only explicitly supported Web Mapping Application and Web Map JSON paths are traversed; references outside those paths are not discovered.",
+        "Service URLs are sanitized terminal references; the services themselves were never contacted or verified.",
+        "Missing or unresolved references mean downstream impact counts may understate real dependencies."
+      ],
+      "warnings": [
+        "item '3333cccc3333cccc3333cccc3333cc01': credential-bearing service URL at operationalLayers[].url was removed",
+        "item '3333cccc3333cccc3333cccc3333cc01': malformed item id reference at operationalLayers[].itemId was ignored",
+        "item '3333cccc3333cccc3333cccc3333cc01': non-HTTP service URL at operationalLayers[].url was ignored",
+        "item '3333cccc3333cccc3333cccc3333cc01': service URL query/fragment at operationalLayers[].url was removed",
+        "item '4444dddd4444dddd4444dddd4444dd02': item metadata was unavailable; node marked missing"
+      ]
+    },
+    "evidence": {
+      "schema_version": "1.1.0",
+      "bundle_id": "trace_arcgis_dependencies:686094ae69a66985",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "requests": [
+        {
+          "name": "item_meta:3333cccc3333cccc3333cccc3333cc01",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/3333cccc3333cccc3333cccc3333cc01?f=json",
+          "status": 200,
+          "sha256": "686094ae69a669858f1b52b9223e39cb9dc1c7ca8b105ab40872521208a8e7ac",
+          "bytes": 148
+        },
+        {
+          "name": "item_data:3333cccc3333cccc3333cccc3333cc01",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/3333cccc3333cccc3333cccc3333cc01/data?f=json",
+          "status": 200,
+          "sha256": "1925cd042a9c2560f620fddd4410ca7f48c1e924d13d9f650d3626591c4fb3cc",
+          "bytes": 442
+        },
+        {
+          "name": "item_meta:4444dddd4444dddd4444dddd4444dd02",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/4444dddd4444dddd4444dddd4444dd02?f=json",
+          "status": 200,
+          "sha256": "9370e0b86a9c703791cadb78328981efb060f48d1c049cbc545871b6219c2887",
+          "bytes": 142
+        }
+      ],
+      "source": {
+        "uri": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/3333cccc3333cccc3333cccc3333cc01?f=json",
+        "identity": {
+          "kind": "arcgis_dependency_roots",
+          "value": "3333cccc3333cccc3333cccc3333cc01"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "686094ae69a669858f1b52b9223e39cb9dc1c7ca8b105ab40872521208a8e7ac"
+      },
+      "gis_metadata": {
+        "format": "ArcGIS Portal REST JSON",
+        "crs": null,
+        "axis_order": null,
+        "units": null,
+        "extent": null,
+        "schema": [],
+        "row_count": 3,
+        "geometry_types": [],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "{\"max_depth\":4,\"max_duration_ms\":30000,\"max_edges\":400,\"max_nodes\":200,\"max_requests\":200,\"max_response_bytes\":2097152,\"max_total_response_bytes\":8388608,\"portal_url\":\"https://demo-org.maps.arcgis.com\",\"root_item_ids\":[\"3333cccc3333cccc3333cccc3333cc01\"]}",
+        "sha256": "efddf3bd39b87c16eca299184664f8f740e91d2bf9c0db8bf05a0e9f24f853fb"
+      },
+      "execution": {
+        "capability": "trace_arcgis_dependencies",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "arcgis_dependency_graph",
+          "sha256": "ca4bcfb6c0b7644724fc440964e4a727f2c8c68fa0c7ec8c43b6c20a81c57e26",
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "boundary_preflight",
+              "arcgis_envelope",
+              "graph_ceilings",
+              "canonical_ordering",
+              "output_schema"
+            ],
+            "warnings": [
+              "item '3333cccc3333cccc3333cccc3333cc01': credential-bearing service URL at operationalLayers[].url was removed",
+              "item '3333cccc3333cccc3333cccc3333cc01': malformed item id reference at operationalLayers[].itemId was ignored",
+              "item '3333cccc3333cccc3333cccc3333cc01': non-HTTP service URL at operationalLayers[].url was ignored",
+              "item '3333cccc3333cccc3333cccc3333cc01': service URL query/fragment at operationalLayers[].url was removed",
+              "item '4444dddd4444dddd4444dddd4444dd02': item metadata was unavailable; node marked missing"
+            ]
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

@@ -1,0 +1,195 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "report": {
+      "schema_version": "1.0.0",
+      "portal": {
+        "url": "https://demo-org.maps.arcgis.com"
+      },
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "parameters": {
+        "root_item_ids": [
+          "1111aaaa1111aaaa1111aaaa1111aa01"
+        ],
+        "max_depth": 4,
+        "max_nodes": 200,
+        "max_edges": 400,
+        "max_requests": 200,
+        "max_response_bytes": 2097152,
+        "max_total_response_bytes": 8388608,
+        "max_duration_ms": 30000
+      },
+      "roots": [
+        "item:1111aaaa1111aaaa1111aaaa1111aa01"
+      ],
+      "nodes": [
+        {
+          "id": "item:1111aaaa1111aaaa1111aaaa1111aa01",
+          "kind": "item",
+          "item_id": "1111aaaa1111aaaa1111aaaa1111aa01",
+          "service_url": null,
+          "type": "Web Map",
+          "title": "Reference Map A",
+          "owner": "ada.analyst",
+          "access": "org",
+          "support": "expandable",
+          "expanded": true,
+          "depth": 0,
+          "is_root": true,
+          "impact": {
+            "upstream_count": 1,
+            "downstream_count": 1
+          }
+        },
+        {
+          "id": "item:2222bbbb2222bbbb2222bbbb2222bb02",
+          "kind": "item",
+          "item_id": "2222bbbb2222bbbb2222bbbb2222bb02",
+          "service_url": null,
+          "type": "Web Map",
+          "title": "Reference Map B",
+          "owner": "greg.gis",
+          "access": "org",
+          "support": "expandable",
+          "expanded": true,
+          "depth": 1,
+          "is_root": false,
+          "impact": {
+            "upstream_count": 1,
+            "downstream_count": 1
+          }
+        }
+      ],
+      "edges": [
+        {
+          "from": "item:1111aaaa1111aaaa1111aaaa1111aa01",
+          "to": "item:2222bbbb2222bbbb2222bbbb2222bb02",
+          "relationship": "operational_layer",
+          "locator": "operationalLayers[].itemId"
+        },
+        {
+          "from": "item:2222bbbb2222bbbb2222bbbb2222bb02",
+          "to": "item:1111aaaa1111aaaa1111aaaa1111aa01",
+          "relationship": "operational_layer",
+          "locator": "operationalLayers[].itemId"
+        }
+      ],
+      "cycles": [
+        [
+          "item:1111aaaa1111aaaa1111aaaa1111aa01",
+          "item:2222bbbb2222bbbb2222bbbb2222bb02"
+        ]
+      ],
+      "unresolved_references": [],
+      "totals": {
+        "node_count": 2,
+        "edge_count": 2,
+        "item_node_count": 2,
+        "service_node_count": 0,
+        "request_count": 4
+      },
+      "truncation": {
+        "truncated": false,
+        "reasons": []
+      },
+      "caveats": [
+        "The graph covers only content visible to the configured identity at the approved portal; it is not proof of a complete dependency inventory.",
+        "Only explicitly supported Web Mapping Application and Web Map JSON paths are traversed; references outside those paths are not discovered.",
+        "Service URLs are sanitized terminal references; the services themselves were never contacted or verified."
+      ],
+      "warnings": []
+    },
+    "evidence": {
+      "schema_version": "1.1.0",
+      "bundle_id": "trace_arcgis_dependencies:cea5154aab2943d1",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "requests": [
+        {
+          "name": "item_meta:1111aaaa1111aaaa1111aaaa1111aa01",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/1111aaaa1111aaaa1111aaaa1111aa01?f=json",
+          "status": 200,
+          "sha256": "cea5154aab2943d1c2814a5f9c65e2790ce8d84462f8a18365b553848ddf6a1f",
+          "bytes": 143
+        },
+        {
+          "name": "item_data:1111aaaa1111aaaa1111aaaa1111aa01",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/1111aaaa1111aaaa1111aaaa1111aa01/data?f=json",
+          "status": 200,
+          "sha256": "1369937f7a956f3f94425532661fc2f29e0d798b6c3495af89d0fd252a51e2d2",
+          "bytes": 140
+        },
+        {
+          "name": "item_meta:2222bbbb2222bbbb2222bbbb2222bb02",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/2222bbbb2222bbbb2222bbbb2222bb02?f=json",
+          "status": 200,
+          "sha256": "2ce346a9aa513b456ede5f242d3a11aed571725cbf26791327adcad13b10b6dc",
+          "bytes": 140
+        },
+        {
+          "name": "item_data:2222bbbb2222bbbb2222bbbb2222bb02",
+          "url": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/2222bbbb2222bbbb2222bbbb2222bb02/data?f=json",
+          "status": 200,
+          "sha256": "0a08f6d40a911cf0d33219a1bd2021c316ea70d8b87901c56969217e214fb697",
+          "bytes": 78
+        }
+      ],
+      "source": {
+        "uri": "https://demo-org.maps.arcgis.com/sharing/rest/content/items/1111aaaa1111aaaa1111aaaa1111aa01?f=json",
+        "identity": {
+          "kind": "arcgis_dependency_roots",
+          "value": "1111aaaa1111aaaa1111aaaa1111aa01"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "cea5154aab2943d1c2814a5f9c65e2790ce8d84462f8a18365b553848ddf6a1f"
+      },
+      "gis_metadata": {
+        "format": "ArcGIS Portal REST JSON",
+        "crs": null,
+        "axis_order": null,
+        "units": null,
+        "extent": null,
+        "schema": [],
+        "row_count": 2,
+        "geometry_types": [],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "{\"max_depth\":4,\"max_duration_ms\":30000,\"max_edges\":400,\"max_nodes\":200,\"max_requests\":200,\"max_response_bytes\":2097152,\"max_total_response_bytes\":8388608,\"portal_url\":\"https://demo-org.maps.arcgis.com\",\"root_item_ids\":[\"1111aaaa1111aaaa1111aaaa1111aa01\"]}",
+        "sha256": "fc6b36ec13bc74884db8fdf00faf5f7472a3117dc87f192ae6a36801fb780ca6"
+      },
+      "execution": {
+        "capability": "trace_arcgis_dependencies",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "arcgis_dependency_graph",
+          "sha256": "1ee219dc74f34336961d983931a01e63853a9e69cdfc6acad67ffa6599b062f3",
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "boundary_preflight",
+              "arcgis_envelope",
+              "graph_ceilings",
+              "canonical_ordering",
+              "output_schema"
+            ],
+            "warnings": []
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

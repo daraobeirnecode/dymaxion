@@ -102,8 +102,8 @@ Install:
 
 ## Implemented native capabilities
 
-Exactly two native capabilities are implemented and tested; everything else in
-the catalog is historical scaffold (see ADR-0001 and the README):
+Exactly three native capabilities are implemented and tested; everything else
+in the catalog is historical scaffold (see ADR-0001 and the README):
 
 - **`inspect_dataset`** (Phase 0) — deterministic, read-only local GeoJSON
   inspection producing a dataset passport plus versioned evidence.
@@ -111,13 +111,20 @@ the catalog is historical scaffold (see ADR-0001 and the README):
   Online/Enterprise organization inventory over the Portal REST API
   (users/groups/items/service-backed items with ownership, sharing, and
   staleness summaries). Docs: `docs/capabilities/inspect-arcgis-org.md`.
+- **`trace_arcgis_dependencies`** (Phase 1B) — deterministic, read-only
+  downstream dependency graph from approved portal items (Web Mapping
+  Application → Web Map → item/service references over explicitly supported
+  JSON paths only), with cycles, unresolved references, impact summaries,
+  sanitized never-dispatched service leaves, and honest truncation.
+  Docs: `docs/capabilities/trace-arcgis-dependencies.md`.
 
-Phase 1A constraints that still hold:
+Phase 1A/1B constraints that still hold:
 
-- **Fixture-only testing.** All `inspect_arcgis_org` tests and GISBench tasks
-  run against committed synthetic fixtures through an injectable transport
-  with stubbed DNS. No authenticated or private ArcGIS organization was
-  queried during development, and none may be queried in tests.
+- **Fixture-only testing.** All `inspect_arcgis_org` and
+  `trace_arcgis_dependencies` tests and GISBench tasks run against committed
+  synthetic fixtures through an injectable transport with stubbed DNS. No
+  authenticated or private ArcGIS organization was queried during
+  development, and none may be queried in tests.
 - **No trusted ArcGIS credential provider exists yet.** The capability runs
   with anonymous/public visibility only, never accepts credential-like input
   fields, and reports always carry a partial-visibility caveat. Any future
@@ -128,15 +135,37 @@ Phase 1A constraints that still hold:
   customer ArcGIS Enterprise portal on its own domain must be added by hand
   to `config/employer-boundary.yaml` before it can be inspected. Deny rules
   (City of Sacramento hosts) always win.
-- **GISBench has exactly ten golden tasks** — five Phase 0 `inspect_dataset`
-  and five Phase 1A `inspect_arcgis_org` — an evaluation scaffold toward the
-  100-task goal, not a coverage claim.
+- **Dependency tracing never dispatches item-provided URLs.** Outbound
+  `trace_arcgis_dependencies` requests are constructed only from the
+  validated portal root plus validated 32-hex item IDs; service URLs found in
+  item data are sanitized terminal graph references only.
+- **GISBench has exactly fifteen golden tasks** — five Phase 0
+  `inspect_dataset`, five Phase 1A `inspect_arcgis_org`, and five Phase 1B
+  `trace_arcgis_dependencies` — an evaluation scaffold toward the 100-task
+  goal, not a coverage claim.
 
 ## Build + verify
 
-- Runtime checks: `cd dymaxion-runtime && npm run typecheck && npm test` (51 tests)
-- GISBench: `cd dymaxion-runtime && npm run gisbench` (10/10 golden tasks)
+- Runtime checks: `cd dymaxion-runtime && npm run typecheck && npm test`
+- GISBench: `cd dymaxion-runtime && npm run gisbench`
 - Runtime: `cd dymaxion-runtime && npm run build` (tsc strict) then `DYMAXION_CONFIG_DIR=../config SKILLS_DIR=../skills node dist/main.js smoke-test`
 - Admin: `cd dymaxion-admin && npm run build`
 - Worker: `cd windows-worker && npm run build`
 - Stack: `docker compose config -q`; migrations are idempotent (`scripts/apply-migrations.sh`)
+
+## Current task: Phase 1B ArcGIS dependency graph
+
+Implement the plan at `docs/plans/2026-07-19-phase-1b-arcgis-dependency-graph.md` as a single bounded vertical slice.
+
+- New native capability: `trace_arcgis_dependencies`.
+- MVP graph: `Web Mapping Application → Web Map → item/service references` using only explicit supported JSON paths.
+- Reuse the Phase 1A ArcGIS REST transport and evidence contracts.
+- Construct item metadata/data request URLs only from the validated portal root and validated item IDs.
+- Never dispatch an item-provided service URL; service URLs are sanitized terminal references only.
+- Enforce graph depth/node/edge/request/byte/duration/cancellation ceilings.
+- Canonicalize nodes, edges, cycles, unresolved references and warnings before hashing.
+- Keep request evidence in actual dispatch order.
+- Add at least five synthetic fixture-backed GISBench tasks and focused adversarial tests.
+- Preserve every Phase 0 approval, identity, boundary and Worker invariant.
+- Do not query live ArcGIS systems, add credentials, implement writes, build a graph UI/database, deploy, push, open a PR or merge.
+- Fable 5 should edit the implementation and run local checks; Mercator will independently verify and Tyr will review the exact commit before merge.

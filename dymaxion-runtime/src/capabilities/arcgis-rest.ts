@@ -34,6 +34,33 @@ export interface ArcGisRequestEvidence {
   bytes: number;
 }
 
+/**
+ * Typed failure for a dispatched ArcGIS request whose HTTP response WAS
+ * received: it carries sanitized request evidence (constructed URL, status,
+ * body hash, byte count — never body content) so callers that tolerate
+ * per-item failures can still count the received bytes against their total
+ * ceiling and record truthful dispatch-order evidence. Requests that never
+ * produced a response (boundary blocks, transport failures, aborts) throw
+ * plain errors without evidence and must stay fail-closed.
+ */
+export class ArcGisRequestFailure extends Error {
+  constructor(
+    message: string,
+    public readonly kind:
+      | 'redirect'
+      | 'http_error'
+      | 'byte_limit'
+      | 'content_type'
+      | 'invalid_json'
+      | 'error_envelope',
+    public readonly status: number,
+    public readonly evidence: ArcGisRequestEvidence,
+  ) {
+    super(message);
+    this.name = 'ArcGisRequestFailure';
+  }
+}
+
 // Any key=value or "key":"value" pair; the key is tested against
 // isCredentialKey so compound conventional names (client_secret, oauth_token,
 // private_key, …) are caught without redacting ordinary prose.
@@ -92,11 +119,40 @@ function isCredentialKey(name: string): boolean {
 const MAX_ERROR_DETAIL_CHARS = 240;
 
 const URL_USERINFO = /(https?:\/\/)[^/\s@"']+@/gi;
+// RFC 6750 b64token / RFC 7617 token68 character run. Single shared source
+// for BOTH the global redaction replacement and the non-global path detector
+// so the two grammars cannot drift. ANY non-empty value after a Bearer/Basic
+// scheme marker counts — no minimum length, short tokens are still secrets.
+// A bare 'bearer'/'basic' word with no following token68 value (segment end,
+// '/', non-token characters) never matches, so ordinary names containing
+// those words are unaffected.
+const TOKEN68_RUN = String.raw`[A-Za-z0-9+/=._~-]+`;
 // Header-style credentials: "Authorization: Bearer <v>", "Authorization: Basic <v>",
 // bare "Bearer/Basic <v>" scheme values, and "X-Api-Key: <v>" style headers.
 const AUTH_HEADER = /\b((?:proxy-)?authorization\s*:\s*)(?:(bearer|basic)\s+)?[^\s"',;}]+/gi;
-const AUTH_SCHEME = /\b(bearer|basic)\s+[A-Za-z0-9+/=._~-]{8,}/gi;
+// Global: used only with String.replace (never .test, which would be
+// stateful on a /g regex).
+const AUTH_SCHEME = new RegExp(String.raw`\b(bearer|basic)\s+${TOKEN68_RUN}`, 'gi');
 const API_KEY_HEADER = /\b((?:x-)?api[-_]?key\s*:\s*)[^\s"',;}]+/gi;
+
+// Assignment pairs inside URL path text: unlike KEY_VALUE_PAIR above, the key
+// may directly follow a '/' segment boundary ('/token=abc/FeatureServer').
+const PATH_ASSIGNMENT = /([A-Za-z0-9_.-]+)\s*[=:]\s*[^\s/]+/g;
+// Non-global: safe for .test() detection; same shared token68 grammar.
+const AUTH_MATERIAL = new RegExp(String.raw`\b(?:bearer|basic)\s+${TOKEN68_RUN}`, 'i');
+
+/** True when decoded URL path (or similar) text carries credential-shaped
+ * key/value assignments (`token=…`, `api_key:…`) or authorization material
+ * (Bearer/Basic tokens). Used to reject service references whose PATH
+ * smuggles secrets past query stripping. Plain names without an assignment
+ * ('/Hydrants', '/token/', '/FeatureServer') never match, so ordinary
+ * service names are unaffected. */
+export function containsCredentialMaterial(text: string): boolean {
+  for (const match of text.matchAll(PATH_ASSIGNMENT)) {
+    if (isCredentialKey(match[1])) return true;
+  }
+  return AUTH_MATERIAL.test(text);
+}
 
 /** Redact token-like values, URL userinfo, and header-style credentials so
  * secrets never reach errors, logs, or evidence. */
@@ -109,6 +165,35 @@ export function redactSecrets(text: string): string {
     .replace(API_KEY_HEADER, '$1<redacted>')
     .replace(KEY_VALUE_PAIR, (match, prefix: string, name: string, separator: string) =>
       isCredentialKey(name) ? `${prefix}${name}${separator}<redacted>` : match);
+}
+
+/** Validate a portal root URL string; returns a problem description or null.
+ * Shared by every ArcGIS capability so portal inputs are rejected identically. */
+export function validatePortalUrl(raw: string): string | null {
+  // Inspect the raw string before WHATWG URL normalization can silently
+  // rewrite traversal segments, backslashes, or encoded characters.
+  if (/\.\.|%|\\/.test(raw)) {
+    return 'portal_url must not contain traversal, encoded, or backslash segments';
+  }
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return 'portal_url must be an absolute URL';
+  }
+  if (url.protocol !== 'https:') return 'portal_url must use https';
+  if (url.username || url.password) return 'portal_url must not embed credentials';
+  if (url.search || url.hash) return 'portal_url must not contain a query string or fragment';
+  if (!url.hostname) return 'portal_url must include a hostname';
+  if (url.pathname.includes('//')) return 'portal_url path must not contain empty segments';
+  return null;
+}
+
+/** Approved portal root: origin plus normalized path, no trailing slash. */
+export function portalRoot(rawUrl: string): string {
+  const url = new URL(rawUrl);
+  const path = url.pathname.replace(/\/+$/, '');
+  return `${url.origin}${path}`;
 }
 
 function sanitizeErrorDetail(text: string): string {
@@ -181,6 +266,11 @@ export async function requestArcGisJson(options: ArcGisJsonRequestOptions): Prom
   }
   // Boundary check immediately before dispatch — every URL, every page.
   await assertUrlAllowed(options.url.href, options.boundary);
+  // The boundary check awaits DNS resolution and audit sinks; a cancellation
+  // that lands during that window must still prevent the dispatch.
+  if (options.signal?.aborted) {
+    throw new Error(`inspect cancelled before request '${options.name}'`);
+  }
   const response = await options.transport.get({
     url: options.url,
     timeoutMs: options.timeoutMs,
@@ -188,20 +278,36 @@ export async function requestArcGisJson(options: ArcGisJsonRequestOptions): Prom
     signal: options.signal,
   });
   const target = `${options.url.host}${options.url.pathname}`;
+  // A response was received: every failure below carries sanitized request
+  // evidence so callers can account the received bytes and record the request.
+  const bytes = Buffer.byteLength(response.bodyText, 'utf8');
+  const evidence: ArcGisRequestEvidence = {
+    name: options.name,
+    url: options.url.href,
+    status: response.status,
+    sha256: sha256Text(response.bodyText),
+    bytes,
+  };
+  const fail = (kind: ArcGisRequestFailure['kind'], message: string): never => {
+    throw new ArcGisRequestFailure(message, kind, response.status, evidence);
+  };
+  // Byte ceiling first, before any status classification: an oversized
+  // response must fail closed as 'byte_limit' even when its status (e.g. a
+  // tolerated 4xx) would otherwise be treated as a per-item failure.
+  if (bytes > options.maxBytes) {
+    fail('byte_limit', `arcgis response exceeded ${options.maxBytes} byte limit for ${target}`);
+  }
   if (response.status >= 300 && response.status < 400) {
-    throw new Error(`arcgis request '${options.name}' returned redirect ${response.status} for ${target}; redirects are not followed`);
+    fail('redirect', `arcgis request '${options.name}' returned redirect ${response.status} for ${target}; redirects are not followed`);
   }
   if (response.status !== 200) {
-    throw new Error(`arcgis request '${options.name}' failed with HTTP ${response.status} for ${target}`);
-  }
-  const bytes = Buffer.byteLength(response.bodyText, 'utf8');
-  if (bytes > options.maxBytes) {
-    throw new Error(`arcgis response exceeded ${options.maxBytes} byte limit for ${target}`);
+    fail('http_error', `arcgis request '${options.name}' failed with HTTP ${response.status} for ${target}`);
   }
   const contentType = (response.contentType ?? '').toLowerCase();
   // ArcGIS REST serves f=json as application/json or (older releases) text/plain.
   if (!contentType.includes('application/json') && !contentType.startsWith('text/plain')) {
-    throw new Error(
+    fail(
+      'content_type',
       `arcgis request '${options.name}' returned unexpected content type '${sanitizeErrorDetail(contentType || '(none)')}' for ${target}`,
     );
   }
@@ -209,29 +315,25 @@ export async function requestArcGisJson(options: ArcGisJsonRequestOptions): Prom
   try {
     parsed = JSON.parse(response.bodyText);
   } catch {
-    throw new Error(`arcgis request '${options.name}' returned invalid JSON for ${target}`);
+    parsed = undefined;
+  }
+  if (parsed === undefined) {
+    fail('invalid_json', `arcgis request '${options.name}' returned invalid JSON for ${target}`);
   }
   if (!isPlainObject(parsed)) {
-    throw new Error(`arcgis request '${options.name}' returned a non-object JSON body for ${target}`);
+    fail('invalid_json', `arcgis request '${options.name}' returned a non-object JSON body for ${target}`);
   }
-  if ('error' in parsed) {
-    const envelope = isPlainObject(parsed.error) ? parsed.error : {};
+  const json = parsed as Record<string, unknown>;
+  if ('error' in json) {
+    const envelope = isPlainObject(json.error) ? json.error : {};
     const code = typeof envelope.code === 'number' ? envelope.code : 'unknown';
     const message = typeof envelope.message === 'string' ? envelope.message : 'no message';
-    throw new Error(
+    fail(
+      'error_envelope',
       `arcgis request '${options.name}' returned error envelope (code ${code}): ${sanitizeErrorDetail(message)}`,
     );
   }
-  return {
-    json: parsed,
-    evidence: {
-      name: options.name,
-      url: options.url.href,
-      status: response.status,
-      sha256: sha256Text(response.bodyText),
-      bytes,
-    },
-  };
+  return { json, evidence };
 }
 
 export interface ArcGisPageEnvelope {

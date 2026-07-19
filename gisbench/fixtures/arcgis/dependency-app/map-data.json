@@ -1,0 +1,14 @@
+{
+  "operationalLayers": [
+    {
+      "itemId": "cccc0000cccc0000cccc0000cccc0003",
+      "url": "https://services.arcgis.com/synthetic/arcgis/rest/services/Hydrants/FeatureServer/0"
+    }
+  ],
+  "tables": [{ "itemId": "dddd0000dddd0000dddd0000dddd0004" }],
+  "baseMap": {
+    "baseMapLayers": [
+      { "url": "https://tiles.arcgis.com/synthetic/arcgis/rest/services/Topo/MapServer" }
+    ]
+  }
+}
