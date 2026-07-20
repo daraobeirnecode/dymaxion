@@ -18,7 +18,7 @@ jobs:
     env:
       BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1 (Node 24)
         with:
           fetch-depth: 0
       - name: Validate patch integrity
@@ -35,8 +35,8 @@ jobs:
       run:
         working-directory: dymaxion-runtime
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1 (Node 24)
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0 (Node 24)
         with:
           node-version: 22
           cache: npm
@@ -53,8 +53,8 @@ jobs:
         run: node dist/main.js smoke-test
       - name: Reject moderate, high, or critical production advisories
         run: npm audit --omit=dev --audit-level=moderate
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0 (Node 24)
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0 (Node 24)
       - name: Build exact final runtime image for every supported architecture
         run: >-
           docker buildx build
@@ -78,8 +78,8 @@ jobs:
       run:
         working-directory: dymaxion-admin
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1 (Node 24)
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0 (Node 24)
         with:
           node-version: 22
           cache: npm
@@ -96,8 +96,8 @@ jobs:
       run:
         working-directory: windows-worker
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1 (Node 24)
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0 (Node 24)
         with:
           node-version: 22
           cache: npm
@@ -111,7 +111,7 @@ jobs:
   compose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1 (Node 24)
       - name: Validate standalone Compose configuration
         run: |
           cp .env.example .env
