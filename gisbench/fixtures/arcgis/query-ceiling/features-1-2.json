@@ -1,0 +1,16 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "STATUS": "ok"
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "STATUS": "open"
+      }
+    }
+  ]
+}

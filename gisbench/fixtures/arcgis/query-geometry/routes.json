@@ -1,0 +1,32 @@
+{
+  "description": "Synthetic public Feature Layer for the optional-geometry task: two hydrants returned with Esri JSON point geometry in the requested output WKID 3857. All coordinates and values are invented; no real ArcGIS service was queried.",
+  "routes": [
+    {
+      "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0?f=json",
+      "body_file": "layer-meta.json"
+    },
+    {
+      "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+      "method": "POST",
+      "form": {
+        "f": "json",
+        "where": "1=1",
+        "returnIdsOnly": "true",
+        "returnGeometry": "false"
+      },
+      "body_file": "ids.json"
+    },
+    {
+      "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+      "method": "POST",
+      "form": {
+        "f": "json",
+        "objectIds": "10,11",
+        "outFields": "OBJECTID,STATUS",
+        "returnGeometry": "true",
+        "outSR": "3857"
+      },
+      "body_file": "features-10-11.json"
+    }
+  ]
+}

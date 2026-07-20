@@ -1,0 +1,31 @@
+{
+  "id": 0,
+  "name": "Hydrants",
+  "type": "Feature Layer",
+  "geometryType": "esriGeometryPoint",
+  "objectIdField": "OBJECTID",
+  "capabilities": "Query,Extract",
+  "maxRecordCount": 10,
+  "extent": {
+    "spatialReference": {
+      "wkid": 4326
+    }
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "nullable": false
+    },
+    {
+      "name": "STATUS",
+      "type": "esriFieldTypeString",
+      "nullable": true
+    },
+    {
+      "name": "FLOW_GPM",
+      "type": "esriFieldTypeDouble",
+      "nullable": true
+    }
+  ]
+}

@@ -1,0 +1,215 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "report": {
+      "schema_version": "1.0.0",
+      "service": {
+        "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0",
+        "layer_id": 0,
+        "name": "Hydrants",
+        "type": "Feature Layer",
+        "geometry_type": "esriGeometryPoint",
+        "object_id_field": "OBJECTID",
+        "source_spatial_reference": 4326,
+        "output_spatial_reference": null,
+        "max_record_count": 4,
+        "requested_fields": [
+          "STATUS"
+        ],
+        "effective_fields": [
+          "OBJECTID",
+          "STATUS"
+        ]
+      },
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "parameters": {
+        "where": "1=1",
+        "return_geometry": false,
+        "out_sr": null,
+        "page_size": 4,
+        "max_records": 1000,
+        "max_requests": 100,
+        "max_response_bytes": 2097152,
+        "max_total_response_bytes": 16777216,
+        "max_duration_ms": 30000
+      },
+      "features": [
+        {
+          "object_id": 1,
+          "attributes": {
+            "OBJECTID": 1,
+            "STATUS": "ok"
+          },
+          "geometry": null
+        },
+        {
+          "object_id": 2,
+          "attributes": {
+            "OBJECTID": 2,
+            "STATUS": "open"
+          },
+          "geometry": null
+        },
+        {
+          "object_id": 3,
+          "attributes": {
+            "OBJECTID": 3,
+            "STATUS": "shut"
+          },
+          "geometry": null
+        },
+        {
+          "object_id": 4,
+          "attributes": {
+            "OBJECTID": 4,
+            "STATUS": "dry"
+          },
+          "geometry": null
+        }
+      ],
+      "totals": {
+        "matched_object_ids": 4,
+        "selected_object_ids": 4,
+        "returned_records": 4,
+        "request_count": 5,
+        "response_bytes": 1120
+      },
+      "truncation": {
+        "truncated": false,
+        "reasons": []
+      },
+      "caveats": [
+        "The query ran with anonymous/public visibility only; records not visible to that identity are absent, and this is not proof of a complete result set.",
+        "Only explicit attribute queries with optional geometry are supported in this slice; statistics, group-by, order-by, geometry filters, datum transformations, attachments, and related records are rejected by the input schema."
+      ],
+      "warnings": [
+        "a feature page reported exceededTransferLimit and was split into deterministic halves"
+      ]
+    },
+    "evidence": {
+      "schema_version": "1.2.0",
+      "bundle_id": "query_feature_service:0bd03222c301bc1c",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "requests": [
+        {
+          "name": "layer_metadata",
+          "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0?f=json",
+          "status": 200,
+          "sha256": "0bd03222c301bc1ca6fe4fd04f7077dc1bfdd6b82109628db22121b17c20d917",
+          "bytes": 572
+        },
+        {
+          "name": "query_ids",
+          "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+          "status": 200,
+          "sha256": "2ca6dc3d5775f0ebaa997fb834aff69fb9960220b5a4097e855ce075f614f2d9",
+          "bytes": 87,
+          "method": "POST",
+          "request_sha256": "c0c362608acb2b21aac5413630fe1d653cf378a490c6153a0eedf910443c64f6"
+        },
+        {
+          "name": "query_features:1",
+          "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+          "status": 200,
+          "sha256": "a9d2e6cd1b0dcb2a4bac8433ee3e2ead961be25b086d0fe5d80c091fbeb4f628",
+          "bytes": 54,
+          "method": "POST",
+          "request_sha256": "beba56f7cb19ddd2e95369e8de46d595b1219adabaa1ab45e4e817fdb29a3e51"
+        },
+        {
+          "name": "query_features:2",
+          "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+          "status": 200,
+          "sha256": "06a0ea1011fc644e2f5b68230e275a2b2933976417bada5d47e89d9954868017",
+          "bytes": 203,
+          "method": "POST",
+          "request_sha256": "e8a45da2920bfd6ba18d905e5dd5e60d3d2e07676d6c3eb13a789064e8d1b08c"
+        },
+        {
+          "name": "query_features:3",
+          "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+          "status": 200,
+          "sha256": "2b6ca6123be95fcca1461c3ea319fce7c7955ca3c4850853764b2143304bc0d9",
+          "bytes": 204,
+          "method": "POST",
+          "request_sha256": "4997b203f3e1f315c89fab9e94699f5f7b8babddd3c496c1e87afac39ee2e4e9"
+        }
+      ],
+      "source": {
+        "uri": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0?f=json",
+        "identity": {
+          "kind": "arcgis_feature_layer",
+          "value": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "0bd03222c301bc1ca6fe4fd04f7077dc1bfdd6b82109628db22121b17c20d917"
+      },
+      "gis_metadata": {
+        "format": "ArcGIS FeatureServer REST JSON",
+        "crs": null,
+        "axis_order": null,
+        "units": null,
+        "extent": null,
+        "schema": [
+          {
+            "name": "OBJECTID",
+            "types": [
+              "esriFieldTypeOID"
+            ],
+            "nullable": false
+          },
+          {
+            "name": "STATUS",
+            "types": [
+              "esriFieldTypeString"
+            ],
+            "nullable": true
+          }
+        ],
+        "row_count": 4,
+        "geometry_types": [],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "{\"layer_url\":\"https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0\",\"max_duration_ms\":30000,\"max_records\":1000,\"max_requests\":100,\"max_response_bytes\":2097152,\"max_total_response_bytes\":16777216,\"out_fields\":[\"STATUS\"],\"out_sr\":null,\"page_size\":4,\"return_geometry\":false,\"where\":\"1=1\"}",
+        "sha256": "968a03b288f4eca2251831fb86c0b7041c3f255bfd4f40b4cccb30eeee10fd96"
+      },
+      "execution": {
+        "capability": "query_feature_service",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "arcgis_feature_query",
+          "sha256": "af7caac78241b7aaab61acd5c8ba202bf6edfbc031c11f57ee0f1bdf68d27d18",
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "boundary_preflight",
+              "layer_metadata_validation",
+              "canonical_object_id_paging",
+              "response_identity_checks",
+              "query_ceilings",
+              "output_schema"
+            ],
+            "warnings": [
+              "a feature page reported exceededTransferLimit and was split into deterministic halves"
+            ]
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

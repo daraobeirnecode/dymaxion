@@ -1,0 +1,42 @@
+{
+  "description": "Synthetic public Feature Layer for the record-ceiling task: six matched object IDs with max_records 3 selecting the lowest three, retrieved in canonical batches. All values are invented; no real ArcGIS service was queried.",
+  "routes": [
+    {
+      "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0?f=json",
+      "body_file": "layer-meta.json"
+    },
+    {
+      "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+      "method": "POST",
+      "form": {
+        "f": "json",
+        "where": "1=1",
+        "returnIdsOnly": "true",
+        "returnGeometry": "false"
+      },
+      "body_file": "ids.json"
+    },
+    {
+      "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+      "method": "POST",
+      "form": {
+        "f": "json",
+        "objectIds": "1,2",
+        "outFields": "OBJECTID,STATUS",
+        "returnGeometry": "false"
+      },
+      "body_file": "features-1-2.json"
+    },
+    {
+      "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+      "method": "POST",
+      "form": {
+        "f": "json",
+        "objectIds": "3",
+        "outFields": "OBJECTID,STATUS",
+        "returnGeometry": "false"
+      },
+      "body_file": "features-3.json"
+    }
+  ]
+}

@@ -102,7 +102,7 @@ Install:
 
 ## Implemented native capabilities
 
-Exactly three native capabilities are implemented and tested; everything else
+Exactly four native capabilities are implemented and tested; everything else
 in the catalog is historical scaffold (see ADR-0001 and the README):
 
 - **`inspect_dataset`** (Phase 0) — deterministic, read-only local GeoJSON
@@ -117,12 +117,24 @@ in the catalog is historical scaffold (see ADR-0001 and the README):
   JSON paths only), with cycles, unresolved references, impact summaries,
   sanitized never-dispatched service leaves, and honest truncation.
   Docs: `docs/capabilities/trace-arcgis-dependencies.md`.
+- **`query_feature_service`** (Phase 1C) — deterministic, read-only
+  attribute (and optional geometry) query against one approved
+  anonymous/public HTTPS `FeatureServer/<layer-id>` URL: metadata and
+  query-capability validation first, explicit metadata-validated fields with
+  automatic object-ID inclusion, canonical object-ID discovery and batch
+  paging over POST forms, bounded deterministic `exceededTransferLimit`
+  splitting, strict response identity/completeness checks, honest
+  truncation, and evidence with canonical request-body hashes (no query
+  values in URLs). Statistics, ordering, geometry filters, transformations,
+  attachments, and related records are rejected in this slice.
+  Docs: `docs/capabilities/query-feature-service.md`.
 
-Phase 1A/1B constraints that still hold:
+Phase 1A/1B/1C constraints that still hold:
 
-- **Fixture-only testing.** All `inspect_arcgis_org` and
-  `trace_arcgis_dependencies` tests and GISBench tasks run against committed
-  synthetic fixtures through an injectable transport with stubbed DNS. No
+- **Fixture-only testing.** All `inspect_arcgis_org`,
+  `trace_arcgis_dependencies`, and `query_feature_service` tests and
+  GISBench tasks run against committed synthetic fixtures through an
+  injectable transport with stubbed DNS. No
   authenticated or private ArcGIS organization was queried during
   development, and none may be queried in tests.
 - **No trusted ArcGIS credential provider exists yet.** The capability runs
@@ -139,10 +151,15 @@ Phase 1A/1B constraints that still hold:
   `trace_arcgis_dependencies` requests are constructed only from the
   validated portal root plus validated 32-hex item IDs; service URLs found in
   item data are sanitized terminal graph references only.
-- **GISBench has exactly fifteen golden tasks** — five Phase 0
-  `inspect_dataset`, five Phase 1A `inspect_arcgis_org`, and five Phase 1B
-  `trace_arcgis_dependencies` — an evaluation scaffold toward the 100-task
-  goal, not a coverage claim.
+- **Feature queries never dispatch remote-returned URLs or leak query
+  values.** `query_feature_service` requests only the validated layer URL
+  and `<layer_url>/query`; query predicates, object IDs, and field lists
+  travel in POST form bodies that are hashed into evidence but never
+  serialized, and evidence URLs for query dispatches carry no query string.
+- **GISBench has exactly twenty golden tasks** — five Phase 0
+  `inspect_dataset`, five Phase 1A `inspect_arcgis_org`, five Phase 1B
+  `trace_arcgis_dependencies`, and five Phase 1C `query_feature_service` —
+  an evaluation scaffold toward the 100-task goal, not a coverage claim.
 
 ## Build + verify
 
@@ -153,19 +170,19 @@ Phase 1A/1B constraints that still hold:
 - Worker: `cd windows-worker && npm run build`
 - Stack: `docker compose config -q`; migrations are idempotent (`scripts/apply-migrations.sh`)
 
-## Current task: Phase 1B ArcGIS dependency graph
+## Current task: Phase 1C safe Feature Service query
 
-Implement the plan at `docs/plans/2026-07-19-phase-1b-arcgis-dependency-graph.md` as a single bounded vertical slice.
+Implement the plan at `docs/plans/2026-07-20-phase-1c-query-feature-service.md` as one bounded vertical slice.
 
-- New native capability: `trace_arcgis_dependencies`.
-- MVP graph: `Web Mapping Application → Web Map → item/service references` using only explicit supported JSON paths.
-- Reuse the Phase 1A ArcGIS REST transport and evidence contracts.
-- Construct item metadata/data request URLs only from the validated portal root and validated item IDs.
-- Never dispatch an item-provided service URL; service URLs are sanitized terminal references only.
-- Enforce graph depth/node/edge/request/byte/duration/cancellation ceilings.
-- Canonicalize nodes, edges, cycles, unresolved references and warnings before hashing.
-- Keep request evidence in actual dispatch order.
-- Add at least five synthetic fixture-backed GISBench tasks and focused adversarial tests.
-- Preserve every Phase 0 approval, identity, boundary and Worker invariant.
-- Do not query live ArcGIS systems, add credentials, implement writes, build a graph UI/database, deploy, push, open a PR or merge.
-- Fable 5 should edit the implementation and run local checks; Mercator will independently verify and Tyr will review the exact commit before merge.
+- New native capability: `query_feature_service`.
+- MVP target: one approved anonymous/public HTTPS `FeatureServer/<layer-id>` URL.
+- Inspect metadata and query capabilities first; require explicit fields.
+- Discover object IDs, canonicalize them before ceilings, then POST deterministic object-ID batches.
+- Handle `exceededTransferLimit` with bounded deterministic batch splitting.
+- Add optional geometry and `outSR`; reject statistics, geometry filters, transformations, attachments and related-record modes in this slice.
+- Extend the shared ArcGIS transport non-breakingly with bounded POST-form support; evidence URLs must not expose form values.
+- Enforce record/request/response-byte/total-byte/duration/cancellation ceilings and per-dispatch boundary checks.
+- Add five synthetic fixture-backed GISBench tasks and focused adversarial tests.
+- Preserve every Phase 0/1A/1B approval, identity, boundary, determinism, redaction and Worker invariant.
+- Do not query live ArcGIS systems, add credentials, implement writes, deploy, push, open a PR or merge.
+- Fable 5 edits and verifies locally; Mercator independently verifies and Tyr reviews an exact local commit before any publication decision.

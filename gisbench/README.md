@@ -1,6 +1,6 @@
 # GISBench
 
-GISBench contains exactly fifteen reproducible golden tasks across the three
+GISBench contains exactly twenty reproducible golden tasks across the four
 implemented native capabilities.
 
 Phase 0 — deterministic `inspect_dataset` (local GeoJSON):
@@ -33,11 +33,30 @@ Phase 1B — deterministic read-only `trace_arcgis_dependencies`
 15. employer-boundary rejection of a denied portal hostname before any
     request.
 
+Phase 1C — deterministic read-only `query_feature_service` (fixture-backed
+ArcGIS FeatureServer REST layer metadata and POST-form `/query`, no network
+access):
+
+16. basic attribute query with canonical object-ID discovery and batch
+    paging (unsorted server IDs and shuffled page order normalize to one
+    canonical report);
+17. optional geometry with an explicit output WKID (`outSR` in the POST
+    form, sanitized Esri JSON geometry in the report);
+18. `exceededTransferLimit` handling: the full batch fails honestly and the
+    deterministic halves succeed, with every attempt request- and
+    byte-accounted;
+19. `max_records` ceiling truncation selecting the lowest canonical object
+    IDs with explicit truncation reasons;
+20. employer-boundary rejection of a denied FeatureServer hostname before
+    any request.
+
 Each versioned task declares its golden output/error, numeric tolerance,
 explicitly normalized environment-dependent fields, permitted operations, and
 expected approval behavior. ArcGIS tasks resolve requests through an
-exact-URL fixture transport (`fixtures/arcgis/*/routes.json`) with stubbed
-DNS, so no live DNS lookup or HTTP request ever occurs. All fixtures are
+exact-match fixture transport (`fixtures/arcgis/*/routes.json`, matching
+method, URL, and canonicalized POST form entries) with stubbed DNS, so no
+live DNS lookup or HTTP request ever occurs, and any unexpected request
+fails the task closed. All fixtures are
 synthetic CC0 test data described in `fixtures/PROVENANCE.md`; none use City
 of Sacramento, client, employer, authenticated ArcGIS, or production data.
 
@@ -52,6 +71,8 @@ normalizes only checkout-dependent source paths, filesystem modification
 time, and hashes/canonical parameter fields that incorporate those paths;
 ArcGIS tasks are fully deterministic and normalize nothing. Evidence hashes
 (source, canonical parameters, output artifacts, per-request bodies) are
-validated before comparison. GISBench remains an evaluation scaffold —
-fifteen tasks toward the 100-task roadmap goal, not a claim of broad GIS
+validated before comparison; Phase 1C query evidence additionally validates
+the POST method, canonical request-body hashes, and the absence of query
+strings from query evidence URLs. GISBench remains an evaluation scaffold —
+twenty tasks toward the 100-task roadmap goal, not a claim of broad GIS
 coverage.
