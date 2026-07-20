@@ -1,7 +1,7 @@
 # GISBench fixtures
 
 All files in this directory are small synthetic datasets created for Dymaxion
-Phase 0/1A tests. They contain no City of Sacramento, client, employer,
+Phase 0/1A/1B/1C tests. They contain no City of Sacramento, client, employer,
 private ArcGIS, or production-system data, no real usernames or PII, and no
 real tokens or credentials.
 
@@ -43,6 +43,26 @@ fixtures.
 - `arcgis/dependency-missing/`: a Web Map with a missing-item reference (HTTP 200 error envelope), a malformed item id, a credential-bearing URL, an `ftp://` URL, and a query-bearing URL. The embedded `SYNTHETICFAKEVALUE111`/`222`/`333` strings are fake redaction canaries, not real credentials.
 - `arcgis/dependency-ceiling/`: a Web Map with three item references traversed under a two-node ceiling to prove honest truncation.
 - `arcgis/dependency-denied/`: intentionally empty route set for the denied-portal boundary task; any request against it fails the task.
+
+## Phase 1C ArcGIS Feature Service fixtures (`arcgis/query-*`)
+
+Each subdirectory serves synthetic FeatureServer layer metadata and
+POST-form `/query` responses for the `query_feature_service` capability via
+the exact-match fixture transport (`routes.json` entries carry `method` and
+canonical `form` fields for POST routes; GET metadata remains exact-URL).
+The synthetic organization `synthorg` at `services.arcgis.com`, the
+`Hydrants` layer, and every object ID, attribute value, and coordinate are
+invented. The response shapes follow the public ArcGIS Feature Service REST
+API documentation (`FeatureServer/<layer-id>` metadata with `f=json`, and
+`/query` with `returnIdsOnly`/`objectIds`/`outFields`/`returnGeometry`/
+`outSR`, including the `exceededTransferLimit` flag). No request was made to
+any real ArcGIS endpoint to author them; CC0 test fixtures.
+
+- `arcgis/query-basic/`: three hydrants retrieved with canonical object-ID paging under `maxRecordCount` 2; the server returns unsorted IDs and shuffled page order to prove canonical normalization.
+- `arcgis/query-geometry/`: two hydrants with Esri JSON point geometry in the requested output WKID 3857.
+- `arcgis/query-split/`: a four-ID batch that reports `exceededTransferLimit`, retrieved by deterministic halves with shuffled response order.
+- `arcgis/query-ceiling/`: six matched object IDs with `max_records` 3 selecting the lowest three.
+- `arcgis/query-denied/`: intentionally empty route set for the denied-hostname feature query boundary task; any request against it fails the task.
 
 The coordinates, attributes, identifiers, and timestamps are invented. They
 are not suitable for operational decisions.

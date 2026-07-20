@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "id": "arcgis-query-geometry-outsr",
+  "capability": "query_feature_service",
+  "input": {
+    "fixture": "arcgis/query-geometry",
+    "capability_input": {
+      "layer_url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0",
+      "out_fields": [
+        "STATUS"
+      ],
+      "return_geometry": true,
+      "out_sr": 3857
+    }
+  },
+  "expected": {
+    "outcome": "success",
+    "golden_file": "arcgis-query-geometry-outsr.json"
+  },
+  "tolerances": {
+    "numeric_absolute": 0,
+    "normalized_fields": []
+  },
+  "allowed_operations": [
+    "boundary_preflight",
+    "arcgis_request",
+    "query_post",
+    "derive_features",
+    "hash_sha256"
+  ],
+  "expected_approval": {
+    "required": false,
+    "decision": "not-requested"
+  }
+}

@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import type { CapabilityDefinition, CapabilityExecutionContext } from '../contracts/capability.js';
 import { inspectArcgisOrgCapability } from './inspect-arcgis-org.js';
 import { inspectDatasetCapability } from './inspect-dataset.js';
+import { queryFeatureServiceCapability } from './query-feature-service.js';
 import { traceArcgisDependenciesCapability } from './trace-arcgis-dependencies.js';
 
 const capabilities = new Map<string, CapabilityDefinition<unknown, unknown>>([
@@ -13,6 +14,10 @@ const capabilities = new Map<string, CapabilityDefinition<unknown, unknown>>([
   [
     traceArcgisDependenciesCapability.manifest.slug,
     traceArcgisDependenciesCapability as CapabilityDefinition<unknown, unknown>,
+  ],
+  [
+    queryFeatureServiceCapability.manifest.slug,
+    queryFeatureServiceCapability as CapabilityDefinition<unknown, unknown>,
   ],
 ]);
 

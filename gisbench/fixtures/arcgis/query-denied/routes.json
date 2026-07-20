@@ -1,0 +1,4 @@
+{
+  "description": "Intentionally empty route set for the denied-hostname feature query boundary task; the employer boundary must reject the layer URL before any request, so any request against this fixture fails the task.",
+  "routes": []
+}

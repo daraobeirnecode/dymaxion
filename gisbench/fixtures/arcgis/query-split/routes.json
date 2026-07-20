@@ -1,0 +1,53 @@
+{
+  "description": "Synthetic public Feature Layer for the transfer-limit task: the full four-ID batch reports exceededTransferLimit and the deterministic halves succeed with shuffled response order. All values are invented; no real ArcGIS service was queried.",
+  "routes": [
+    {
+      "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0?f=json",
+      "body_file": "layer-meta.json"
+    },
+    {
+      "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+      "method": "POST",
+      "form": {
+        "f": "json",
+        "where": "1=1",
+        "returnIdsOnly": "true",
+        "returnGeometry": "false"
+      },
+      "body_file": "ids.json"
+    },
+    {
+      "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+      "method": "POST",
+      "form": {
+        "f": "json",
+        "objectIds": "1,2,3,4",
+        "outFields": "OBJECTID,STATUS",
+        "returnGeometry": "false"
+      },
+      "body_file": "features-exceeded.json"
+    },
+    {
+      "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+      "method": "POST",
+      "form": {
+        "f": "json",
+        "objectIds": "1,2",
+        "outFields": "OBJECTID,STATUS",
+        "returnGeometry": "false"
+      },
+      "body_file": "features-1-2.json"
+    },
+    {
+      "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+      "method": "POST",
+      "form": {
+        "f": "json",
+        "objectIds": "3,4",
+        "outFields": "OBJECTID,STATUS",
+        "returnGeometry": "false"
+      },
+      "body_file": "features-3-4.json"
+    }
+  ]
+}

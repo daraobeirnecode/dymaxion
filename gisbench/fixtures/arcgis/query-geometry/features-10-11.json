@@ -1,0 +1,33 @@
+{
+  "spatialReference": {
+    "wkid": 3857
+  },
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 11,
+        "STATUS": "open"
+      },
+      "geometry": {
+        "x": -11693242.5,
+        "y": 4867210.25,
+        "spatialReference": {
+          "wkid": 3857
+        }
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 10,
+        "STATUS": "ok"
+      },
+      "geometry": {
+        "x": -11693250.0,
+        "y": 4867200.5,
+        "spatialReference": {
+          "wkid": 3857
+        }
+      }
+    }
+  ]
+}

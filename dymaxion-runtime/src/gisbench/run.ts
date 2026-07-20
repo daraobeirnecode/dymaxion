@@ -3,13 +3,13 @@ import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import type { ArcGisRestTransport } from '../capabilities/arcgis-rest.js';
+import { canonicalFormBody, type ArcGisRestTransport } from '../capabilities/arcgis-rest.js';
 import { runSkill, type RunSkillDependencies } from '../skills/executor.js';
 import { sha256Canonical, sha256Text } from '../contracts/canonical.js';
 
 // 5 Phase 0 inspect_dataset + 5 Phase 1A inspect_arcgis_org
-// + 5 Phase 1B trace_arcgis_dependencies
-const TASK_COUNT = 15;
+// + 5 Phase 1B trace_arcgis_dependencies + 5 Phase 1C query_feature_service
+const TASK_COUNT = 20;
 
 const ExpectationSchema = z
   .object({
@@ -96,10 +96,31 @@ const TraceTaskSchema = z
   })
   .strict();
 
+const QueryTaskSchema = z
+  .object({
+    schema_version: z.literal('1.0.0'),
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    capability: z.literal('query_feature_service'),
+    input: z
+      .object({
+        fixture: z.string().regex(/^arcgis\/[a-z0-9-]+$/),
+        capability_input: z.record(z.unknown()),
+      })
+      .strict(),
+    expected: ExpectationSchema,
+    tolerances: ToleranceSchema,
+    allowed_operations: z.array(
+      z.enum(['boundary_preflight', 'arcgis_request', 'query_post', 'derive_features', 'hash_sha256']),
+    ),
+    expected_approval: ApprovalExpectationSchema,
+  })
+  .strict();
+
 const TaskSchema = z.discriminatedUnion('capability', [
   DatasetTaskSchema,
   ArcgisTaskSchema,
   TraceTaskSchema,
+  QueryTaskSchema,
 ]);
 
 type TaskDefinition = z.infer<typeof TaskSchema>;
@@ -230,13 +251,44 @@ function validateTraceEvidenceHashes(output: Record<string, unknown>): void {
   assert.equal(outputs[0]?.sha256, sha256Canonical(report), 'evidence output hash must validate');
 }
 
+function validateQueryEvidenceHashes(output: Record<string, unknown>): void {
+  const report = output.report as Record<string, unknown>;
+  const evidence = output.evidence as Record<string, unknown>;
+  assert.ok(report && evidence, 'successful result requires report and evidence');
+  const source = evidence.source as Record<string, unknown>;
+  const parameters = evidence.parameters as Record<string, unknown>;
+  const outputs = evidence.outputs as Array<Record<string, unknown>>;
+  const requests = evidence.requests as Array<Record<string, unknown>>;
+  assert.ok(Array.isArray(requests) && requests.length >= 2, 'retrieval evidence requires request records');
+  assert.equal(requests[0]?.name, 'layer_metadata');
+  assert.equal(
+    source.sha256,
+    requests[0]?.sha256,
+    'evidence source hash must match the layer metadata request hash',
+  );
+  for (const request of requests.slice(1)) {
+    assert.equal(request.method, 'POST', 'query dispatches must be POST-form requests');
+    assert.match(String(request.request_sha256), /^[a-f0-9]{64}$/);
+    assert.ok(!String(request.url).includes('?'), 'query evidence URLs must carry no query string');
+  }
+  assert.equal(
+    parameters.sha256,
+    sha256Text(String(parameters.canonical_json)),
+    'evidence parameter hash must validate',
+  );
+  assert.ok(Array.isArray(outputs) && outputs.length === 1, 'exactly one output artifact is required');
+  assert.equal(outputs[0]?.name, 'arcgis_feature_query');
+  assert.equal(outputs[0]?.sha256, sha256Canonical(report), 'evidence output hash must validate');
+}
+
 function validateEvidenceHashes(normalized: Record<string, unknown>, capability: TaskDefinition['capability']): void {
   if (normalized.ok !== true) return;
   assert.ok(normalized.output && typeof normalized.output === 'object', 'successful result requires output');
   const output = normalized.output as Record<string, unknown>;
   if (capability === 'inspect_dataset') validateDatasetEvidenceHashes(output);
   else if (capability === 'inspect_arcgis_org') validateArcgisEvidenceHashes(output);
-  else validateTraceEvidenceHashes(output);
+  else if (capability === 'trace_arcgis_dependencies') validateTraceEvidenceHashes(output);
+  else validateQueryEvidenceHashes(output);
 }
 
 export function normalizeResult(
@@ -295,6 +347,11 @@ const RouteManifestSchema = z
       z
         .object({
           url: z.string().url(),
+          // POST routes exact-match the canonicalized form entries; a request
+          // whose method, URL, or form differs in any way finds no route and
+          // fails the task closed.
+          method: z.enum(['GET', 'POST']).optional(),
+          form: z.record(z.string()).optional(),
           status: z.number().int().optional(),
           content_type: z.string().min(1).optional(),
           body_file: z.string().regex(/^[a-z0-9.-]+\.json$/),
@@ -304,7 +361,8 @@ const RouteManifestSchema = z
   })
   .strict();
 
-/** Fixture-backed transport: exact-URL matching, no network, fail closed. */
+/** Fixture-backed transport: exact method+URL+canonical-form matching, no
+ * network, fail closed on any unexpected request. */
 async function loadFixtureTransport(
   fixtureDir: string,
   operations: Set<string>,
@@ -314,20 +372,35 @@ async function loadFixtureTransport(
   );
   const routes = new Map<string, { status: number; contentType: string; bodyText: string }>();
   for (const route of manifest.routes) {
-    routes.set(route.url, {
+    const method = route.method ?? 'GET';
+    assert.equal(
+      method === 'POST',
+      route.form !== undefined,
+      `fixture route ${route.url}: form fixtures are exactly the POST routes`,
+    );
+    const key = method === 'POST' ? `POST ${route.url} ${canonicalFormBody(route.form!)}` : `GET ${route.url}`;
+    routes.set(key, {
       status: route.status ?? 200,
       contentType: route.content_type ?? 'application/json; charset=utf-8',
       bodyText: await readFile(join(fixtureDir, route.body_file), 'utf8'),
     });
   }
+  const respond = (key: string) => {
+    const route = routes.get(key);
+    if (!route) throw new Error(`fixture transport has no route for ${key}`);
+    return { status: route.status, contentType: route.contentType, bodyText: route.bodyText };
+  };
   return {
     async get(request) {
       operations.add('arcgis_request');
       const start = Number(request.url.searchParams.get('start') ?? '1');
       if (Number.isFinite(start) && start > 1) operations.add('paginate');
-      const route = routes.get(request.url.href);
-      if (!route) throw new Error(`fixture transport has no route for ${request.url.href}`);
-      return { status: route.status, contentType: route.contentType, bodyText: route.bodyText };
+      return respond(`GET ${request.url.href}`);
+    },
+    async postForm(request) {
+      operations.add('arcgis_request');
+      operations.add('query_post');
+      return respond(`POST ${request.url.href} ${request.body}`);
     },
   };
 }
@@ -386,7 +459,10 @@ async function executeDatasetTask(
 }
 
 async function executeArcgisTask(
-  task: z.infer<typeof ArcgisTaskSchema> | z.infer<typeof TraceTaskSchema>,
+  task:
+    | z.infer<typeof ArcgisTaskSchema>
+    | z.infer<typeof TraceTaskSchema>
+    | z.infer<typeof QueryTaskSchema>,
   roots: TaskRoots,
 ): Promise<{ normalized: unknown; operations: string[] }> {
   const operations = new Set<string>(['boundary_preflight']);
@@ -415,7 +491,13 @@ async function executeArcgisTask(
     dependencies,
   );
   if (result.ok) {
-    operations.add(task.capability === 'inspect_arcgis_org' ? 'derive_inventory' : 'derive_graph');
+    operations.add(
+      task.capability === 'inspect_arcgis_org'
+        ? 'derive_inventory'
+        : task.capability === 'trace_arcgis_dependencies'
+          ? 'derive_graph'
+          : 'derive_features',
+    );
     operations.add('hash_sha256');
   }
   assertTaskExpectations(task, result.ok, operations);
@@ -461,7 +543,7 @@ export async function runGisBench(updateGoldens = false): Promise<GisBenchResult
   assert.equal(
     taskFiles.length,
     TASK_COUNT,
-    `GISBench must contain exactly ${TASK_COUNT} tasks (5 Phase 0 + 5 Phase 1A + 5 Phase 1B)`,
+    `GISBench must contain exactly ${TASK_COUNT} tasks (5 Phase 0 + 5 Phase 1A + 5 Phase 1B + 5 Phase 1C)`,
   );
   if (updateGoldens) await mkdir(join(benchmark, 'golden'), { recursive: true });
 

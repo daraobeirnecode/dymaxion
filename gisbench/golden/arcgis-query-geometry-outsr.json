@@ -1,0 +1,191 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "report": {
+      "schema_version": "1.0.0",
+      "service": {
+        "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0",
+        "layer_id": 0,
+        "name": "Hydrants",
+        "type": "Feature Layer",
+        "geometry_type": "esriGeometryPoint",
+        "object_id_field": "OBJECTID",
+        "source_spatial_reference": 4326,
+        "output_spatial_reference": 3857,
+        "max_record_count": 10,
+        "requested_fields": [
+          "STATUS"
+        ],
+        "effective_fields": [
+          "OBJECTID",
+          "STATUS"
+        ]
+      },
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "parameters": {
+        "where": "1=1",
+        "return_geometry": true,
+        "out_sr": 3857,
+        "page_size": 10,
+        "max_records": 1000,
+        "max_requests": 100,
+        "max_response_bytes": 2097152,
+        "max_total_response_bytes": 16777216,
+        "max_duration_ms": 30000
+      },
+      "features": [
+        {
+          "object_id": 10,
+          "attributes": {
+            "OBJECTID": 10,
+            "STATUS": "ok"
+          },
+          "geometry": {
+            "spatialReference": {
+              "wkid": 3857
+            },
+            "x": -11693250,
+            "y": 4867200.5
+          }
+        },
+        {
+          "object_id": 11,
+          "attributes": {
+            "OBJECTID": 11,
+            "STATUS": "open"
+          },
+          "geometry": {
+            "spatialReference": {
+              "wkid": 3857
+            },
+            "x": -11693242.5,
+            "y": 4867210.25
+          }
+        }
+      ],
+      "totals": {
+        "matched_object_ids": 2,
+        "selected_object_ids": 2,
+        "returned_records": 2,
+        "request_count": 3,
+        "response_bytes": 1184
+      },
+      "truncation": {
+        "truncated": false,
+        "reasons": []
+      },
+      "caveats": [
+        "The query ran with anonymous/public visibility only; records not visible to that identity are absent, and this is not proof of a complete result set.",
+        "Only explicit attribute queries with optional geometry are supported in this slice; statistics, group-by, order-by, geometry filters, datum transformations, attachments, and related records are rejected by the input schema."
+      ],
+      "warnings": []
+    },
+    "evidence": {
+      "schema_version": "1.2.0",
+      "bundle_id": "query_feature_service:65c6008fc040f8a2",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "requests": [
+        {
+          "name": "layer_metadata",
+          "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0?f=json",
+          "status": 200,
+          "sha256": "65c6008fc040f8a252734fa677c7c69cbde50a9a245588b0f77e7266ee816226",
+          "bytes": 573
+        },
+        {
+          "name": "query_ids",
+          "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+          "status": 200,
+          "sha256": "b8ba55a74fc7be03756499dc7583d57e89effd3bc04f758e87f94687ecbb9d53",
+          "bytes": 75,
+          "method": "POST",
+          "request_sha256": "c0c362608acb2b21aac5413630fe1d653cf378a490c6153a0eedf910443c64f6"
+        },
+        {
+          "name": "query_features:1",
+          "url": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0/query",
+          "status": 200,
+          "sha256": "a6ba9b6dfeac18f9137043ba0e28b22557a336307c4ca70e16fb852b5df713b4",
+          "bytes": 536,
+          "method": "POST",
+          "request_sha256": "17b8cd13992eebf5b8d11ce36597f066e291e4e9493ed78fe9ab41c34c1d9f24"
+        }
+      ],
+      "source": {
+        "uri": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0?f=json",
+        "identity": {
+          "kind": "arcgis_feature_layer",
+          "value": "https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "65c6008fc040f8a252734fa677c7c69cbde50a9a245588b0f77e7266ee816226"
+      },
+      "gis_metadata": {
+        "format": "ArcGIS FeatureServer REST JSON",
+        "crs": "WKID:3857",
+        "axis_order": null,
+        "units": null,
+        "extent": null,
+        "schema": [
+          {
+            "name": "OBJECTID",
+            "types": [
+              "esriFieldTypeOID"
+            ],
+            "nullable": false
+          },
+          {
+            "name": "STATUS",
+            "types": [
+              "esriFieldTypeString"
+            ],
+            "nullable": true
+          }
+        ],
+        "row_count": 2,
+        "geometry_types": [
+          "esriGeometryPoint"
+        ],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "{\"layer_url\":\"https://services.arcgis.com/synthorg/arcgis/rest/services/Hydrants/FeatureServer/0\",\"max_duration_ms\":30000,\"max_records\":1000,\"max_requests\":100,\"max_response_bytes\":2097152,\"max_total_response_bytes\":16777216,\"out_fields\":[\"STATUS\"],\"out_sr\":3857,\"page_size\":10,\"return_geometry\":true,\"where\":\"1=1\"}",
+        "sha256": "aa8d3294c460cbddb1c005e74ad2b9acfb8ca250e36a7f3f60d85e8e6266600f"
+      },
+      "execution": {
+        "capability": "query_feature_service",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "arcgis_feature_query",
+          "sha256": "fdce90a46f16791f1d3494761ad79e2ae936eaae5a05c8d8ea7dbfed7fc94cc6",
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "boundary_preflight",
+              "layer_metadata_validation",
+              "canonical_object_id_paging",
+              "response_identity_checks",
+              "query_ceilings",
+              "output_schema"
+            ],
+            "warnings": []
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

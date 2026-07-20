@@ -6,6 +6,7 @@
 // not a generic HTTP escape hatch — callers build URLs from validated parts
 // and this module never serializes credentials.
 
+import { createHash } from 'node:crypto';
 import { sha256Text } from '../contracts/canonical.js';
 import { assertUrlAllowed, type BoundaryOptions } from '../security/boundary.js';
 
@@ -16,14 +17,39 @@ export interface ArcGisTransportRequest {
   signal?: AbortSignal;
 }
 
+export interface ArcGisTransportPostRequest extends ArcGisTransportRequest {
+  /** Canonical application/x-www-form-urlencoded body. It may carry query
+   * predicates and object IDs; it is dispatched, hashed, and then never
+   * serialized into evidence, logs, or errors. */
+  body: string;
+}
+
 export interface ArcGisTransportResponse {
   status: number;
   contentType: string | null;
   bodyText: string;
 }
 
+/** A production streamed response crossed its byte ceiling after an HTTP
+ * response had already been received. Keep only the bounded partial body in
+ * memory so requestArcGisJson can emit typed, hash-only request evidence and
+ * callers can account the actual bytes read exactly once. */
+class ArcGisTransportByteLimitFailure extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly sha256: string,
+    public readonly bytes: number,
+  ) {
+    super('ArcGIS streamed response exceeded its byte limit');
+    this.name = 'ArcGisTransportByteLimitFailure';
+  }
+}
+
 export interface ArcGisRestTransport {
   get(request: ArcGisTransportRequest): Promise<ArcGisTransportResponse>;
+  /** Optional bounded POST-form support (additive since Phase 1C). A
+   * transport without it fails closed when a POST is requested. */
+  postForm?(request: ArcGisTransportPostRequest): Promise<ArcGisTransportResponse>;
 }
 
 export interface ArcGisRequestEvidence {
@@ -32,6 +58,22 @@ export interface ArcGisRequestEvidence {
   status: number;
   sha256: string;
   bytes: number;
+  /** Present for POST-form requests (additive since evidence 1.2.0). */
+  method?: 'GET' | 'POST';
+  /** SHA-256 of the canonical form body; the body itself is never recorded. */
+  request_sha256?: string;
+}
+
+/** Canonical application/x-www-form-urlencoded body: entries sorted by key
+ * (then value), so logically identical forms hash identically. */
+export function canonicalFormBody(form: Readonly<Record<string, string>>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(form).sort(([a, av], [b, bv]) =>
+    a < b ? -1 : a > b ? 1 : av < bv ? -1 : av > bv ? 1 : 0,
+  )) {
+    params.append(key, value);
+  }
+  return params.toString();
 }
 
 /**
@@ -84,7 +126,10 @@ const EXACT_CREDENTIAL_KEYS = new Set([
 // Compound names: any separator-delimited suffix of a credential word, e.g.
 // client_secret, oauth_token, refresh_token, id_token, private_key, api_key,
 // access_key, db_password, x-api-key, session.token.
-const CREDENTIAL_SUFFIX = /(?:^|[_.-])(?:token|secret|key|password|passwd|credential|credentials|apikey)$/;
+const CREDENTIAL_SUFFIX = /(?:^|[_.-])(?:token|secret|key|password|passwd|credential|credentials|apikey|auth|authorization|signature|sig)$/;
+// `code` is too broad as a generic suffix (`postal_code`, `status_code`).
+// Restrict OAuth-style authorization codes to conventional credential names.
+const TARGETED_CODE_KEY = /^(?:oauth|auth|authorization|client|verification)[_.-]?code$/;
 // Reviewed allowlist of conventional collapsed/camelCase compound credential
 // names that survive lowercasing without a separator (kept narrow on purpose:
 // no broad endsWith matching that would redact ordinary keys like 'monkey').
@@ -101,6 +146,7 @@ const COLLAPSED_CREDENTIAL_KEYS = new Set([
   'apitoken',
   'appsecret',
   'secretkey',
+  'xsignature',
 ]);
 
 function isCredentialKey(name: string): boolean {
@@ -108,6 +154,7 @@ function isCredentialKey(name: string): boolean {
   if (EXACT_CREDENTIAL_KEYS.has(normalized) || COLLAPSED_CREDENTIAL_KEYS.has(normalized)) {
     return true;
   }
+  if (TARGETED_CODE_KEY.test(normalized)) return true;
   if (CREDENTIAL_SUFFIX.test(normalized)) return true;
   // camelCase compounds: split case boundaries, then re-test the suffix rule
   // (clientSecret → client_secret). Names without case boundaries ('monkey')
@@ -148,6 +195,12 @@ const AUTH_MATERIAL = new RegExp(String.raw`\b(?:bearer|basic)\s+${TOKEN68_RUN}`
  * ('/Hydrants', '/token/', '/FeatureServer') never match, so ordinary
  * service names are unaffected. */
 export function containsCredentialMaterial(text: string): boolean {
+  // Scan every assignment key independently. A zero-width lookahead avoids an
+  // outer SQL assignment consuming a nested literal such as
+  // `STATUS = 'token=secret'` before the credential key can be inspected.
+  for (const match of text.matchAll(/(?=(?<![A-Za-z0-9_.-])([A-Za-z0-9_.-]+)["']?\s*[=:])/g)) {
+    if (isCredentialKey(match[1])) return true;
+  }
   for (const match of text.matchAll(PATH_ASSIGNMENT)) {
     if (isCredentialKey(match[1])) return true;
   }
@@ -203,40 +256,69 @@ function sanitizeErrorDetail(text: string): string {
     : redacted;
 }
 
+/** Streamed bounded read shared by the GET and POST production paths. */
+async function readBoundedResponse(
+  response: Response,
+  request: ArcGisTransportRequest,
+): Promise<ArcGisTransportResponse> {
+  if (!response.body) {
+    return { status: response.status, contentType: response.headers.get('content-type'), bodyText: '' };
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  const responseHash = createHash('sha256');
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    responseHash.update(value);
+    if (received > request.maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      throw new ArcGisTransportByteLimitFailure(
+        response.status,
+        responseHash.digest('hex'),
+        received,
+      );
+    }
+    chunks.push(value);
+  }
+  return {
+    status: response.status,
+    contentType: response.headers.get('content-type'),
+    bodyText: Buffer.concat(chunks).toString('utf8'),
+  };
+}
+
+function combinedSignal(request: ArcGisTransportRequest): AbortSignal {
+  const signals = [AbortSignal.timeout(request.timeoutMs)];
+  if (request.signal) signals.push(request.signal);
+  return AbortSignal.any(signals);
+}
+
 /** Production transport: Node fetch, no redirect following, streamed byte cap. */
 export const fetchArcGisTransport: ArcGisRestTransport = {
   async get(request: ArcGisTransportRequest): Promise<ArcGisTransportResponse> {
-    const signals = [AbortSignal.timeout(request.timeoutMs)];
-    if (request.signal) signals.push(request.signal);
     const response = await fetch(request.url, {
       method: 'GET',
       redirect: 'manual',
-      signal: AbortSignal.any(signals),
+      signal: combinedSignal(request),
       headers: { accept: 'application/json' },
     });
-    if (!response.body) {
-      return { status: response.status, contentType: response.headers.get('content-type'), bodyText: '' };
-    }
-    const reader = response.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let received = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      received += value.byteLength;
-      if (received > request.maxBytes) {
-        await reader.cancel().catch(() => undefined);
-        throw new Error(
-          `arcgis response exceeded ${request.maxBytes} byte limit for ${request.url.host}${request.url.pathname}`,
-        );
-      }
-      chunks.push(value);
-    }
-    return {
-      status: response.status,
-      contentType: response.headers.get('content-type'),
-      bodyText: Buffer.concat(chunks).toString('utf8'),
-    };
+    return readBoundedResponse(response, request);
+  },
+  async postForm(request: ArcGisTransportPostRequest): Promise<ArcGisTransportResponse> {
+    const response = await fetch(request.url, {
+      method: 'POST',
+      redirect: 'manual',
+      signal: combinedSignal(request),
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      body: request.body,
+    });
+    return readBoundedResponse(response, request);
   },
 };
 
@@ -248,6 +330,10 @@ export interface ArcGisJsonRequestOptions {
   timeoutMs: number;
   maxBytes: number;
   signal?: AbortSignal;
+  /** Presence selects a POST-form dispatch. Entries are canonicalized before
+   * hashing and dispatch; the target URL must carry no query string so no
+   * form value can appear in evidence URLs or error text. */
+  form?: Readonly<Record<string, string>>;
 }
 
 export interface ArcGisJsonResult {
@@ -259,10 +345,23 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-/** One bounded, boundary-preflighted ArcGIS REST JSON request. */
+/** One bounded, boundary-preflighted ArcGIS REST JSON request (GET, or
+ * POST form when `form` is provided). */
 export async function requestArcGisJson(options: ArcGisJsonRequestOptions): Promise<ArcGisJsonResult> {
   if (options.signal?.aborted) {
     throw new Error(`inspect cancelled before request '${options.name}'`);
+  }
+  let body: string | null = null;
+  if (options.form !== undefined) {
+    if (options.url.search || options.url.hash) {
+      throw new Error(
+        `arcgis POST request '${options.name}' must not carry a query string or fragment in its URL`,
+      );
+    }
+    if (typeof options.transport.postForm !== 'function') {
+      throw new Error(`arcgis transport does not support POST for request '${options.name}'`);
+    }
+    body = canonicalFormBody(options.form);
   }
   // Boundary check immediately before dispatch — every URL, every page.
   await assertUrlAllowed(options.url.href, options.boundary);
@@ -271,13 +370,38 @@ export async function requestArcGisJson(options: ArcGisJsonRequestOptions): Prom
   if (options.signal?.aborted) {
     throw new Error(`inspect cancelled before request '${options.name}'`);
   }
-  const response = await options.transport.get({
+  const transportRequest = {
     url: options.url,
     timeoutMs: options.timeoutMs,
     maxBytes: options.maxBytes,
     signal: options.signal,
-  });
+  };
   const target = `${options.url.host}${options.url.pathname}`;
+  let response: ArcGisTransportResponse;
+  try {
+    response =
+      body === null
+        ? await options.transport.get(transportRequest)
+        : await options.transport.postForm!({ ...transportRequest, body });
+  } catch (error) {
+    if (error instanceof ArcGisTransportByteLimitFailure) {
+      const evidence: ArcGisRequestEvidence = {
+        name: options.name,
+        url: options.url.href,
+        status: error.status,
+        sha256: error.sha256,
+        bytes: error.bytes,
+        ...(body === null ? {} : { method: 'POST' as const, request_sha256: sha256Text(body) }),
+      };
+      throw new ArcGisRequestFailure(
+        `arcgis response exceeded ${options.maxBytes} byte limit for ${target}`,
+        'byte_limit',
+        error.status,
+        evidence,
+      );
+    }
+    throw error;
+  }
   // A response was received: every failure below carries sanitized request
   // evidence so callers can account the received bytes and record the request.
   const bytes = Buffer.byteLength(response.bodyText, 'utf8');
@@ -287,6 +411,7 @@ export async function requestArcGisJson(options: ArcGisJsonRequestOptions): Prom
     status: response.status,
     sha256: sha256Text(response.bodyText),
     bytes,
+    ...(body === null ? {} : { method: 'POST' as const, request_sha256: sha256Text(body) }),
   };
   const fail = (kind: ArcGisRequestFailure['kind'], message: string): never => {
     throw new ArcGisRequestFailure(message, kind, response.status, evidence);

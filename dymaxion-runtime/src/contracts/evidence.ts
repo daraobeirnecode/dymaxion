@@ -46,8 +46,29 @@ const RetrievalRequestSchema = z
     status: z.number().int().nonnegative(),
     sha256: Sha256Schema,
     bytes: z.number().int().nonnegative(),
+    // Additive since evidence schema 1.2.0: POST-form dispatches record the
+    // HTTP method and the canonical form-body hash. Bodies, query predicates,
+    // and object-ID lists are never serialized into evidence.
+    method: z.enum(['GET', 'POST']).optional(),
+    request_sha256: Sha256Schema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((request, context) => {
+    if (request.method === 'POST' && request.request_sha256 === undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['request_sha256'],
+        message: 'POST request evidence requires request_sha256',
+      });
+    }
+    if (request.request_sha256 !== undefined && request.method !== 'POST') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['method'],
+        message: 'request_sha256 is only valid for POST request evidence',
+      });
+    }
+  });
 
 export const EvidenceBundleSchema = z
   .object({
