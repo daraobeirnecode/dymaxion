@@ -18,7 +18,7 @@ jobs:
     env:
       BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1 (Node 24)
         with:
           fetch-depth: 0
       - name: Validate patch integrity
@@ -35,8 +35,8 @@ jobs:
       run:
         working-directory: dymaxion-runtime
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1 (Node 24)
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0 (Node 24)
         with:
           node-version: 22
           cache: npm
@@ -78,8 +78,8 @@ jobs:
       run:
         working-directory: dymaxion-admin
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1 (Node 24)
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0 (Node 24)
         with:
           node-version: 22
           cache: npm
@@ -96,8 +96,8 @@ jobs:
       run:
         working-directory: windows-worker
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1 (Node 24)
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0 (Node 24)
         with:
           node-version: 22
           cache: npm
@@ -111,7 +111,7 @@ jobs:
   compose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1 (Node 24)
       - name: Validate standalone Compose configuration
         run: |
           cp .env.example .env
