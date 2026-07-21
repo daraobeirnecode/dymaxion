@@ -112,6 +112,22 @@ function parsedArtifact(output: RunVectorAnalysisOutput): any {
   return JSON.parse(output.artifact.content);
 }
 
+function rebindArtifactFields(output: any, content: string): { bytes: number; hash: string } {
+  const bytes = Buffer.byteLength(content, 'utf8');
+  const hash = sha256Text(content);
+  output.artifact.content = content;
+  output.artifact.bytes = bytes;
+  output.artifact.sha256 = hash;
+  output.report.output.bytes = bytes;
+  output.report.output.sha256 = hash;
+  const artifactOutput = output.evidence.outputs.find((candidate: any) => candidate.name === 'nearest_point_geojson');
+  assert.ok(artifactOutput, 'nearest_point_geojson evidence output missing');
+  artifactOutput.bytes = bytes;
+  artifactOutput.sha256 = hash;
+  output.evidence.bundle_id = `run_vector_analysis:${hash.slice(0, 16)}`;
+  return { bytes, hash };
+}
+
 test('run_vector_analysis manifest, schemas and registry are strict and trace Phase 1F ceilings', () => {
   const manifest = runVectorAnalysisCapability.manifest;
   assert.equal(manifest.slug, 'run_vector_analysis');
@@ -222,6 +238,10 @@ test('nearest_point succeeds with known distances, exact artifact/evidence hashe
     assert.equal(first.output.report.output.bytes, first.output.artifact.bytes);
     assert.equal(first.output.evidence.outputs[0].sha256, first.output.artifact.sha256);
     assert.equal(first.output.evidence.outputs[0].bytes, first.output.artifact.bytes);
+    assert.equal(first.output.report.source.bytes, (await stat(source)).size);
+    assert.equal(first.output.report.candidate.bytes, (await stat(candidate)).size);
+    assert.equal(first.output.evidence.source.bytes, first.output.report.source.bytes);
+    assert.equal(first.output.evidence.related_sources?.[0].bytes, first.output.report.candidate.bytes);
     assert.equal(first.output.evidence.parameters.sha256, sha256Text(first.output.evidence.parameters.canonical_json));
     assert.equal(first.output.evidence.source.sha256, sha256Text(await readFile(source)));
     assert.equal(first.output.evidence.related_sources?.[0].sha256, sha256Text(await readFile(candidate)));
@@ -302,6 +322,39 @@ test('output schema rejects forged artifact, report and evidence integrity bindi
     const base = result.output;
     assert.doesNotThrow(() => RunVectorAnalysisOutputSchema.parse(base));
 
+    const multibyteOverLimit = structuredClone(base) as any;
+    const oversizedWithPadding = (padding: string) => canonicalJson({
+      features: parsedArtifact(base).features,
+      padding,
+      type: 'FeatureCollection',
+    });
+    const emptyPaddingContent = oversizedWithPadding('');
+    const paddingCharacters = MAX_OUTPUT_BYTES - emptyPaddingContent.length;
+    assert.ok(paddingCharacters > 0);
+    const oversizedContent = oversizedWithPadding('é'.repeat(paddingCharacters));
+    assert.ok(oversizedContent.length <= MAX_OUTPUT_BYTES);
+    assert.ok(Buffer.byteLength(oversizedContent, 'utf8') > MAX_OUTPUT_BYTES);
+    const { bytes: oversizedBytes, hash: oversizedHash } = rebindArtifactFields(multibyteOverLimit, oversizedContent);
+    assert.equal(multibyteOverLimit.artifact.bytes, oversizedBytes);
+    assert.equal(multibyteOverLimit.artifact.sha256, oversizedHash);
+    assert.equal(multibyteOverLimit.report.output.bytes, oversizedBytes);
+    assert.equal(multibyteOverLimit.report.output.sha256, oversizedHash);
+    assert.equal(multibyteOverLimit.evidence.outputs[0].bytes, oversizedBytes);
+    assert.equal(multibyteOverLimit.evidence.outputs[0].sha256, oversizedHash);
+    assert.equal(multibyteOverLimit.evidence.bundle_id, `run_vector_analysis:${oversizedHash.slice(0, 16)}`);
+    const oversizedParsed = RunVectorAnalysisOutputSchema.safeParse(multibyteOverLimit);
+    assert.equal(oversizedParsed.success, false);
+    if (!oversizedParsed.success) {
+      assert.deepEqual(
+        oversizedParsed.error.issues.map((issue) => ({ path: issue.path, message: issue.message })),
+        [{ path: ['artifact', 'content'], message: 'artifact content exceeds maximum UTF-8 output byte limit' }],
+      );
+      const issueJson = JSON.stringify(oversizedParsed.error.issues);
+      assert.equal(issueJson.includes(oversizedContent), false);
+      assert.equal(issueJson.includes('éééé'), false);
+      assert.equal(issueJson.includes(oversizedHash), false);
+    }
+
     const semanticallyForgedParameters = structuredClone(base) as any;
     const differentCanonicalParameters = canonicalJson({
       ...JSON.parse(semanticallyForgedParameters.evidence.parameters.canonical_json),
@@ -343,10 +396,33 @@ test('output schema rejects forged artifact, report and evidence integrity bindi
       ['evidence execution capability version', (forged) => { forged.evidence.execution.capability_version = '9.9.9'; }, ['evidence', 'execution', 'capability_version']],
       ['primary source uri', (forged) => { forged.report.source.source_uri = 'file:///forged.geojson'; }, ['report', 'source', 'source_uri']],
       ['primary source hash', (forged) => { forged.report.source.sha256 = invalidHash; }, ['report', 'source', 'sha256']],
+      ['primary source bytes', (forged) => { forged.report.source.bytes += 1; }, ['report', 'source', 'bytes']],
+      ['primary evidence source bytes', (forged) => { forged.evidence.source.bytes += 1; }, ['report', 'source', 'bytes']],
+      ['primary report row count', (forged) => { forged.report.source.row_count += 1; }, ['report', 'source', 'row_count']],
+      ['primary evidence metadata row count', (forged) => { forged.evidence.gis_metadata.row_count += 1; }, ['evidence', 'gis_metadata', 'row_count']],
       ['missing candidate source', (forged) => { delete forged.evidence.related_sources; }, ['evidence', 'related_sources']],
       ['duplicate candidate source', (forged) => { forged.evidence.related_sources.push({ ...forged.evidence.related_sources[0], uri: 'file:///other.geojson' }); }, ['evidence', 'related_sources', 1, 'role']],
       ['candidate source uri', (forged) => { forged.report.candidate.source_uri = 'file:///forged-candidate.geojson'; }, ['report', 'candidate', 'source_uri']],
       ['candidate source hash', (forged) => { forged.report.candidate.sha256 = invalidHash; }, ['report', 'candidate', 'sha256']],
+      ['candidate source bytes', (forged) => { forged.report.candidate.bytes += 1; }, ['report', 'candidate', 'bytes']],
+      ['candidate evidence source bytes', (forged) => { forged.evidence.related_sources[0].bytes += 1; }, ['report', 'candidate', 'bytes']],
+      ['candidate report row count', (forged) => { forged.report.candidate.row_count += 1; }, ['report', 'candidate', 'row_count']],
+      ['candidate evidence metadata row count', (forged) => { forged.evidence.related_sources[0].gis_metadata.row_count += 1; }, ['evidence', 'related_sources', 0, 'gis_metadata', 'row_count']],
+      ['output features count', (forged) => { forged.report.counts.output_features += 1; }, ['report', 'counts', 'output_features']],
+      ['matched plus unmatched count', (forged) => { forged.report.counts.matched += 1; }, ['report', 'counts', 'matched']],
+      ['artifact feature count', (forged) => {
+        const content = canonicalJson(fc([]));
+        const bytes = Buffer.byteLength(content, 'utf8');
+        const hash = sha256Text(content);
+        forged.artifact.content = content;
+        forged.artifact.bytes = bytes;
+        forged.artifact.sha256 = hash;
+        forged.report.output.bytes = bytes;
+        forged.report.output.sha256 = hash;
+        forged.evidence.outputs[0].bytes = bytes;
+        forged.evidence.outputs[0].sha256 = hash;
+        forged.evidence.bundle_id = `run_vector_analysis:${hash.slice(0, 16)}`;
+      }, ['artifact', 'content']],
       ['bundle id hash fragment', (forged) => { forged.evidence.bundle_id = 'run_vector_analysis:0000000000000000'; }, ['evidence', 'bundle_id']],
     ];
 

@@ -16,8 +16,8 @@
 - Operation: exactly `nearest_point`; no buffer, clip, intersect, dissolve, point-in-polygon, spatial join, routing, nearest line/polygon or aggregation.
 - Inputs: `source_uri`, `candidate_source_uri`, optional `max_distance_meters`; unknown fields reject.
 - Paths: raw local `.geojson` only. Reject schemes, query/fragment delimiters, controls, any percent escape and credential-shaped material before boundary audit, recorder or I/O.
-- Data: RFC 7946 FeatureCollection roots only; every feature must have Point geometry, object/null properties and finite positions with valid longitude/latitude. Empty primary succeeds with empty output; empty candidates reject when primary is non-empty.
-- Output: canonical `application/geo+json` FeatureCollection. Preserve each primary feature and properties, but reject a pre-existing reserved `_dymaxion` property. Add `_dymaxion.nearest_point` with candidate source index, optional candidate GeoJSON ID, rounded distance in metres and match status. Candidates' properties are never copied.
+- Data: RFC 7946 FeatureCollection roots only; every feature must have Point geometry, object/null properties and finite positions with valid longitude/latitude. Empty primary succeeds with empty output; empty candidates are valid and produce unmatched primary outputs.
+- Output: canonical `application/geo+json` FeatureCollection. Preserve each primary feature and properties, but reject a pre-existing reserved `_dymaxion` property. Add direct `properties._dymaxion` with candidate source index, optional candidate GeoJSON ID, rounded distance in metres and match status. Candidates' properties are never copied.
 - Distance: spherical great-circle/Haversine with fixed authalic radius `6_371_008.8 m`; output rounded to millimetres. It is not an ellipsoidal/geodesic-engine or projected-distance claim.
 - Tie-break: rounded distance ascending, then candidate source index ascending. Input ordering is preserved in output.
 - Bounds: 1 MiB per source, 2 MiB combined bytes, 1,000 primary features, 1,000 candidates, 250,000 pair evaluations, 2 MiB output, five seconds, cancellation/deadline checkpoints during both file pipelines, every ordinate and every pair loop.
@@ -27,7 +27,7 @@
 
 1. Sacramento-scale synthetic useful nearest matches with exact rounded distances and deterministic tie-breaks.
 2. Antimeridian, identical-coordinate zero distance, near-polar and max-distance unmatched behavior.
-3. Empty primary success; empty candidate/non-empty primary failure.
+3. Empty primary success; empty candidate/non-empty primary success with unmatched outputs.
 4. Reject non-Point/null geometry, legacy `crs`, malformed UTF-8/JSON, invalid envelopes, invalid positions/extra ordinates and reserved property collision.
 5. Prove raw/encoded/credential/remote/boundary-denied paths reach no recorder/I/O/output leak; benign raw spaces, Unicode and credential-ish words remain valid.
 6. Enforce per-file/combined bytes, feature counts, pair evaluations, output bytes, duration and cancellation with exploit-shaped tests.
@@ -72,7 +72,7 @@
 3. Implement two independent fail-closed local-file read pipelines with schema preflight, canonical boundary paths, boundary reassertion before every sink, fatal UTF-8, exact byte hashes and non-echoing I/O errors.
 4. Implement Point-only RFC 7946 validation with per-ordinate paced checkpoints and no recursion.
 5. Implement Haversine distance, millimetre rounding, max-distance filtering and deterministic candidate-index tie-break.
-6. Construct canonical output GeoJSON with a reserved `_dymaxion.nearest_point` object; enforce output incrementally and at final bytes.
+6. Construct canonical output GeoJSON with a reserved direct `properties._dymaxion` object; enforce output incrementally and at final bytes.
 7. Build a strict report and evidence bundle binding both source hashes, canonical parsed parameters and exact output bytes/hash.
 8. Add RED/GREEN tests for every acceptance-matrix case, including fake recorder/audit/I/O sink assertions.
 

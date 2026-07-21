@@ -139,6 +139,22 @@ test('resource limit contract accepts optional vector-analysis ceilings and rema
 test('evidence bundles cover provenance and reject unknown fields recursively', () => {
   assert.equal(EvidenceBundleSchema.parse(evidence).execution.mode, 'deterministic');
   assert.deepEqual(EvidenceBundleSchema.parse(evidence), evidence);
+  const withSourceBytes = {
+    ...evidence,
+    source: { ...evidence.source, bytes: 0 },
+  };
+  assert.equal(EvidenceBundleSchema.parse(withSourceBytes).source.bytes, 0);
+  assert.equal(EvidenceBundleSchema.parse({ ...evidence, source: { ...evidence.source, bytes: 123 } }).source.bytes, 123);
+  for (const bytes of [-1, 1.5]) {
+    assert.throws(
+      () => EvidenceBundleSchema.parse({ ...evidence, source: { ...evidence.source, bytes } }),
+      /integer|greater than or equal|too small/i,
+    );
+  }
+  assert.throws(
+    () => EvidenceBundleSchema.parse({ ...evidence, source: { ...evidence.source, bytes: 'unknown' } }),
+    /number|invalid/i,
+  );
   const withBytes = {
     ...evidence,
     outputs: [{ ...evidence.outputs[0], bytes: 123 }],
@@ -166,6 +182,7 @@ test('evidence bundles accept strict non-empty related sources with unique bound
     version: { modified_at: '2026-07-18T11:30:00.000Z' },
     retrieved_at: '2026-07-18T12:00:00.000Z',
     sha256: 'd'.repeat(64),
+    bytes: 0,
     gis_metadata: {
       ...evidence.gis_metadata,
       row_count: 5,
@@ -174,6 +191,20 @@ test('evidence bundles accept strict non-empty related sources with unique bound
 
   const withRelatedSources = { ...evidence, related_sources: [relatedSource] };
   assert.deepEqual(EvidenceBundleSchema.parse(withRelatedSources).related_sources, [relatedSource]);
+  assert.equal(
+    EvidenceBundleSchema.parse({ ...evidence, related_sources: [{ ...relatedSource, bytes: 321 }] }).related_sources?.[0]?.bytes,
+    321,
+  );
+  for (const bytes of [-1, 1.5]) {
+    assert.throws(
+      () => EvidenceBundleSchema.parse({ ...evidence, related_sources: [{ ...relatedSource, bytes }] }),
+      /integer|greater than or equal|too small/i,
+    );
+  }
+  assert.throws(
+    () => EvidenceBundleSchema.parse({ ...evidence, related_sources: [{ ...relatedSource, bytes: 'unknown' }] }),
+    /number|invalid/i,
+  );
 
   assert.throws(() => EvidenceBundleSchema.parse({ ...evidence, related_sources: [] }), /at least 1|too_small/i);
   assert.throws(

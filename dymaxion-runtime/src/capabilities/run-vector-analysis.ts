@@ -274,6 +274,30 @@ function addOutputIntegrityIssue(context: z.RefinementCtx, path: Array<string | 
   context.addIssue({ code: z.ZodIssueCode.custom, path, message });
 }
 
+function artifactFeatureCountFromContent(content: string, context: z.RefinementCtx): number | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    addOutputIntegrityIssue(context, ['artifact', 'content'], 'artifact content must be valid GeoJSON FeatureCollection JSON');
+    return undefined;
+  }
+  if (!isObject(parsed)) {
+    addOutputIntegrityIssue(context, ['artifact', 'content'], 'artifact content must be a GeoJSON FeatureCollection object');
+    return undefined;
+  }
+  const keys = Object.keys(parsed).sort();
+  if (keys.length !== 2 || keys[0] !== 'features' || keys[1] !== 'type') {
+    addOutputIntegrityIssue(context, ['artifact', 'content'], 'artifact FeatureCollection root must contain only type and features');
+    return undefined;
+  }
+  if (parsed.type !== 'FeatureCollection' || !Array.isArray(parsed.features)) {
+    addOutputIntegrityIssue(context, ['artifact', 'content'], 'artifact content must be a GeoJSON FeatureCollection with a features array');
+    return undefined;
+  }
+  return parsed.features.length;
+}
+
 export const RunVectorAnalysisOutputSchema = z
   .object({
     schema_version: z.literal('1.0.0'),
@@ -292,6 +316,17 @@ export const RunVectorAnalysisOutputSchema = z
   .strict()
   .superRefine((output, context) => {
     const artifactBytes = Buffer.byteLength(output.artifact.content, 'utf8');
+    const artifactWithinByteLimit = artifactBytes <= MAX_OUTPUT_BYTES;
+    const artifactFeatureCount = artifactWithinByteLimit
+      ? artifactFeatureCountFromContent(output.artifact.content, context)
+      : undefined;
+    if (!artifactWithinByteLimit) {
+      addOutputIntegrityIssue(
+        context,
+        ['artifact', 'content'],
+        'artifact content exceeds maximum UTF-8 output byte limit',
+      );
+    }
     const artifactHash = sha256Text(output.artifact.content);
     if (output.artifact.bytes !== artifactBytes) {
       addOutputIntegrityIssue(context, ['artifact', 'bytes'], 'artifact byte count must match UTF-8 content');
@@ -354,6 +389,17 @@ export const RunVectorAnalysisOutputSchema = z
     if (output.report.source.sha256 !== output.evidence.source.sha256) {
       addOutputIntegrityIssue(context, ['report', 'source', 'sha256'], 'primary report source hash must match evidence source');
     }
+    if (output.evidence.source.bytes === undefined) {
+      addOutputIntegrityIssue(context, ['evidence', 'source', 'bytes'], 'primary evidence source bytes are required');
+    } else if (output.report.source.bytes !== output.evidence.source.bytes) {
+      addOutputIntegrityIssue(context, ['report', 'source', 'bytes'], 'primary report source bytes must match evidence source bytes');
+    }
+    if (output.report.source.row_count !== output.report.counts.input_features) {
+      addOutputIntegrityIssue(context, ['report', 'source', 'row_count'], 'primary report source row_count must match input feature count');
+    }
+    if (output.evidence.gis_metadata.row_count !== output.report.counts.input_features) {
+      addOutputIntegrityIssue(context, ['evidence', 'gis_metadata', 'row_count'], 'primary evidence row_count must match input feature count');
+    }
     const candidateSources = output.evidence.related_sources?.filter((source) => source.role === 'candidate_features') ?? [];
     let candidateSourceForParameters: (typeof candidateSources)[number] | undefined;
     if (candidateSources.length !== 1) {
@@ -368,9 +414,35 @@ export const RunVectorAnalysisOutputSchema = z
       if (output.report.candidate.sha256 !== candidateSource.sha256) {
         addOutputIntegrityIssue(context, ['report', 'candidate', 'sha256'], 'candidate report source hash must match evidence related source');
       }
+      if (candidateSource.bytes === undefined) {
+        addOutputIntegrityIssue(context, ['evidence', 'related_sources', candidateIndex, 'bytes'], 'candidate evidence source bytes are required');
+      } else if (output.report.candidate.bytes !== candidateSource.bytes) {
+        addOutputIntegrityIssue(context, ['report', 'candidate', 'bytes'], 'candidate report source bytes must match evidence related source bytes');
+      }
+      if (candidateSource.gis_metadata === undefined) {
+        addOutputIntegrityIssue(context, ['evidence', 'related_sources', candidateIndex, 'gis_metadata'], 'candidate related source gis_metadata is required');
+      } else if (candidateSource.gis_metadata.row_count !== output.report.counts.candidate_features) {
+        addOutputIntegrityIssue(
+          context,
+          ['evidence', 'related_sources', candidateIndex, 'gis_metadata', 'row_count'],
+          'candidate evidence row_count must match candidate feature count',
+        );
+      }
       if (candidateIndex < 0) {
         addOutputIntegrityIssue(context, ['evidence', 'related_sources'], 'evidence must contain candidate_features related source');
       }
+    }
+    if (output.report.candidate.row_count !== output.report.counts.candidate_features) {
+      addOutputIntegrityIssue(context, ['report', 'candidate', 'row_count'], 'candidate report row_count must match candidate feature count');
+    }
+    if (output.report.counts.output_features !== output.report.counts.input_features) {
+      addOutputIntegrityIssue(context, ['report', 'counts', 'output_features'], 'output feature count must match input feature count');
+    }
+    if (output.report.counts.matched + output.report.counts.unmatched !== output.report.counts.output_features) {
+      addOutputIntegrityIssue(context, ['report', 'counts', 'matched'], 'matched and unmatched counts must sum to output feature count');
+    }
+    if (artifactFeatureCount !== undefined && artifactFeatureCount !== output.report.counts.output_features) {
+      addOutputIntegrityIssue(context, ['artifact', 'content'], 'artifact feature count must match report output feature count');
     }
     if (output.evidence.bundle_id !== `run_vector_analysis:${output.artifact.sha256.slice(0, 16)}`) {
       addOutputIntegrityIssue(context, ['evidence', 'bundle_id'], 'evidence bundle id must match artifact hash fragment');
@@ -983,6 +1055,7 @@ async function executeRunVectorAnalysis(
       version: {},
       retrieved_at: timestamp,
       sha256: primary.sha256,
+      bytes: primary.byteLength,
     },
     related_sources: [
       {
@@ -992,6 +1065,7 @@ async function executeRunVectorAnalysis(
         version: {},
         retrieved_at: timestamp,
         sha256: candidate.sha256,
+        bytes: candidate.byteLength,
         gis_metadata: candidateMetadata,
       },
     ],

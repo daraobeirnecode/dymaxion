@@ -64,10 +64,19 @@ Hard limits:
 - `max_distance_meters`: `> 0` and `<= 20,015,114.442035925`
 - cost: `$0`
 
-Safety and limitations:
+Safety, integrity, and limitations:
 
 - No network, DNS, portal, database, filesystem write, durable artifact write,
   or approval path is used.
+- Output validation cross-binds the inline artifact's UTF-8 byte count and
+  SHA-256 hash through `artifact`, `report.output`, and the evidence output
+  entry. The source SHA-256 values commit to the exact original source bytes,
+  and reported source byte counts must match the evidence byte counts, but an
+  unsigned output bundle cannot independently derive or authenticate original
+  source byte length from a SHA-256 hash alone. Consumers requiring source-byte
+  authenticity must verify the source files against both reported SHA-256 values
+  and byte counts, or rely on an external trusted signature/attestation over the
+  bundle and source observations.
 - Raw local paths reject URL/URI syntax, authority forms, query/fragment
   delimiters, percent escapes, control characters, non-`.geojson` extensions,
   credential-shaped text, same-source aliases, and paths outside the configured

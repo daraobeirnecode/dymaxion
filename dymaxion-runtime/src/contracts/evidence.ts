@@ -52,6 +52,7 @@ export const EvidenceSourceSchema = z
       .strict(),
     retrieved_at: IsoDateSchema,
     sha256: Sha256Schema,
+    bytes: z.number().int().nonnegative().optional(),
   })
   .strict();
 

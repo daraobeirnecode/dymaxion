@@ -106,7 +106,8 @@
         },
         "version": {},
         "retrieved_at": "2026-07-21T12:00:00.000Z",
-        "sha256": "7e349841f829c7f0794b32c4bb9f61609ed7e1f3d194206ecf5e3abfaa374061"
+        "sha256": "7e349841f829c7f0794b32c4bb9f61609ed7e1f3d194206ecf5e3abfaa374061",
+        "bytes": 301
       },
       "related_sources": [
         {
@@ -118,6 +119,7 @@
           "version": {},
           "retrieved_at": "2026-07-21T12:00:00.000Z",
           "sha256": "6d18edfe75b3149104038dcbca4d0096bbcb923f0f9fa4b49f4815344e75bb90",
+          "bytes": 43,
           "role": "candidate_features",
           "gis_metadata": {
             "format": "GeoJSON",
