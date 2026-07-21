@@ -262,12 +262,57 @@ test('antimeridian and empty/point degenerate extents are deliberate and determi
 
     const pointPath = await writeGeojson(dir, 'point.geojson', {
       type: 'FeatureCollection',
-      features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [12, 34] } }],
+      features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [12.0004, 34.0004] } }],
     });
     const point = await generate({ source_uri: pointPath });
     assert.equal(point.ok, true, point.error);
-    assert.deepEqual(point.output.report.extent.source, [12, 34, 12, 34]);
-    assert.deepEqual(point.output.report.extent.viewport, [11.5, 33.5, 12.5, 34.5]);
+    assert.deepEqual(point.output.report.extent.source, [12.0004, 34.0004, 12.0004, 34.0004]);
+    assert.deepEqual(point.output.report.extent.viewport, [11.5004, 33.5004, 12.5004, 34.5004]);
+
+    const negativeExtentPath = await writeGeojson(dir, 'negative-extent.geojson', {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'MultiPoint', coordinates: [[-105.4, 39.5], [-104.8, 39.9]] },
+        },
+      ],
+    });
+    const negativeExtent = await generate({ source_uri: negativeExtentPath });
+    assert.equal(negativeExtent.ok, true, negativeExtent.error);
+    assert.deepEqual(negativeExtent.output.report.extent.source, [-105.4, 39.5, -104.8, 39.9]);
+
+    const datelinePointPath = await writeGeojson(dir, 'dateline-point.geojson', {
+      type: 'FeatureCollection',
+      features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [179.8, 0] } }],
+    });
+    const datelinePoint = await generate({ source_uri: datelinePointPath });
+    assert.equal(datelinePoint.ok, true, datelinePoint.error);
+    assert.deepEqual(datelinePoint.output.report.extent.source, [179.8, 0, 179.8, 0]);
+    assert.deepEqual(datelinePoint.output.report.extent.viewport, [179.3, -0.5, 180.3, 0.5]);
+    assert.equal(datelinePoint.output.report.extent.antimeridian_crosses, true);
+    assert.ok(datelinePoint.output.report.qa.warnings.some((warning) => warning.includes('Antimeridian-aware')));
+    assert.match(datelinePoint.output.artifact.content, />Antimeridian-aware extent<\/text>/);
+    assert.doesNotMatch(datelinePoint.output.artifact.content, />CRS84 extent<\/text>/);
+
+    const roundedBoundaryPath = await writeGeojson(dir, 'rounded-boundary.geojson', {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'Point', coordinates: [179.50000000000003, 0] },
+        },
+      ],
+    });
+    const roundedBoundary = await generate({ source_uri: roundedBoundaryPath });
+    assert.equal(roundedBoundary.ok, true, roundedBoundary.error);
+    assert.deepEqual(roundedBoundary.output.report.extent.viewport, [179, -0.5, 180, 0.5]);
+    assert.equal(roundedBoundary.output.report.extent.antimeridian_crosses, false);
+    assert.equal(roundedBoundary.output.report.qa.warnings.some((warning) => warning.includes('Antimeridian-aware')), false);
+    assert.match(roundedBoundary.output.artifact.content, />CRS84 extent<\/text>/);
+    assert.doesNotMatch(roundedBoundary.output.artifact.content, />Antimeridian-aware extent<\/text>/);
   });
 });
 
@@ -311,6 +356,27 @@ test('malformed, out-of-range, unsupported, depth, feature, coordinate, SVG-outp
     assert.equal(oversized.ok, false);
     assert.match(oversized.error ?? '', /resource limit/);
     assert.equal(oversized.counts.readFile, 0);
+
+    const invalidUtf8Path = await writeGeojson(dir, 'invalid-utf8.geojson', { type: 'FeatureCollection', features: [] });
+    const invalidUtf8Bytes = Buffer.concat([
+      Buffer.from('{"type":"FeatureCollection","foreign":"', 'utf8'),
+      Buffer.from([0xff]),
+      Buffer.from('","features":[]}\n', 'utf8'),
+    ]);
+    const invalidUtf8 = await generate(
+      { source_uri: invalidUtf8Path },
+      {
+        capabilityContext: {
+          now: () => FIXED_NOW,
+          io: {
+            stat: async () => ({ size: invalidUtf8Bytes.byteLength }),
+            readFile: async () => invalidUtf8Bytes,
+          },
+        },
+      },
+    );
+    assert.equal(invalidUtf8.ok, false);
+    assert.match(invalidUtf8.error ?? '', /not valid UTF-8/);
 
     let geometry: unknown = { type: 'Point', coordinates: [0, 0] };
     for (let i = 0; i < MAX_GEOMETRY_COLLECTION_DEPTH + 1; i += 1) geometry = { type: 'GeometryCollection', geometries: [geometry] };
@@ -396,6 +462,32 @@ test('malformed, out-of-range, unsupported, depth, feature, coordinate, SVG-outp
     assert.equal(cancelledDuringCoordinates.ok, false);
     assert.match(cancelledDuringCoordinates.error ?? '', /cancelled during coordinate (?:parsing|traversal)/i);
     assert.ok(parseSignalChecks >= 8);
+
+    let ordinateSignalChecks = 0;
+    const ordinateSignal = {
+      get aborted(): boolean {
+        ordinateSignalChecks += 1;
+        return ordinateSignalChecks >= 6;
+      },
+    } as AbortSignal;
+    const cancelledInsidePosition = await generate(
+      {
+        source_uri: await writeGeojson(dir, 'cancel-inside-position.geojson', {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: { type: 'Point', coordinates: [0, 0, ...Array.from({ length: 100_000 }, () => 0)] },
+            },
+          ],
+        }),
+      },
+      { capabilityContext: { now: () => FIXED_NOW, signal: ordinateSignal, io: { stat, readFile } } },
+    );
+    assert.equal(cancelledInsidePosition.ok, false);
+    assert.match(cancelledInsidePosition.error ?? '', /cancelled during coordinate parsing/i);
+    assert.ok(ordinateSignalChecks >= 6);
 
     let tick = 0;
     const duration = await generate(

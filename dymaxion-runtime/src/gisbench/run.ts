@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { canonicalFormBody, type ArcGisRestTransport } from '../capabilities/arcgis-rest.js';
+import { GenerateMapArtifactInputSchema } from '../capabilities/generate-map-artifact.js';
 import { runSkill, type RunSkillDependencies } from '../skills/executor.js';
-import { sha256Canonical, sha256Text } from '../contracts/canonical.js';
+import { canonicalJson, sha256Canonical, sha256Text } from '../contracts/canonical.js';
 
 // 5 Phase 0 inspect_dataset + 5 Phase 1A inspect_arcgis_org
 // + 5 Phase 1B trace_arcgis_dependencies + 5 Phase 1C query_feature_service
@@ -395,7 +396,10 @@ function validateValidationEvidenceHashes(output: Record<string, unknown>): void
   );
 }
 
-function validateMapArtifactEvidenceHashes(output: Record<string, unknown>): void {
+function validateMapArtifactEvidenceHashes(
+  output: Record<string, unknown>,
+  capabilityInput: Record<string, unknown> | undefined,
+): void {
   const artifact = output.artifact as Record<string, unknown>;
   const report = output.report as Record<string, unknown>;
   const evidence = output.evidence as Record<string, unknown>;
@@ -410,10 +414,29 @@ function validateMapArtifactEvidenceHashes(output: Record<string, unknown>): voi
   assert.equal(artifact.sha256, exactHash, 'inline SVG hash must match exact UTF-8 bytes');
   assert.equal(reportArtifact?.bytes, exactBytes, 'report SVG byte count must match exact UTF-8 bytes');
   assert.equal(reportArtifact?.sha256, exactHash, 'report SVG hash must match exact UTF-8 bytes');
+  assert.ok(capabilityInput, 'successful map result requires the exact capability input');
+  const parsedInput = GenerateMapArtifactInputSchema.parse(capabilityInput);
+  const expectedParameters = {
+    audience: parsedInput.audience,
+    height: parsedInput.height,
+    point_symbol: parsedInput.point_symbol,
+    purpose: parsedInput.purpose,
+    source_uri: pathToFileURL(parsedInput.source_uri).href,
+    style: parsedInput.style,
+    target_format: parsedInput.target_format,
+    title: parsedInput.title,
+    width: parsedInput.width,
+  };
+  const expectedCanonicalParameters = canonicalJson(expectedParameters);
+  assert.equal(
+    parameters.canonical_json,
+    expectedCanonicalParameters,
+    'evidence canonical parameters must match the exact task input before normalization',
+  );
   assert.equal(
     parameters.sha256,
-    sha256Text(String(parameters.canonical_json)),
-    'evidence parameter hash must validate before normalization',
+    sha256Text(expectedCanonicalParameters),
+    'evidence parameter hash must match the exact task input before normalization',
   );
   assert.ok(Array.isArray(outputs) && outputs.length === 1, 'exactly one output artifact is required');
   assert.equal(outputs[0]?.name, 'map_svg');
@@ -421,7 +444,11 @@ function validateMapArtifactEvidenceHashes(output: Record<string, unknown>): voi
   assert.equal(outputs[0]?.sha256, exactHash, 'evidence SVG hash must match exact UTF-8 bytes');
 }
 
-function validateEvidenceHashes(normalized: Record<string, unknown>, capability: TaskDefinition['capability']): void {
+function validateEvidenceHashes(
+  normalized: Record<string, unknown>,
+  capability: TaskDefinition['capability'],
+  capabilityInput?: Record<string, unknown>,
+): void {
   if (normalized.ok !== true) return;
   assert.ok(normalized.output && typeof normalized.output === 'object', 'successful result requires output');
   const output = normalized.output as Record<string, unknown>;
@@ -430,7 +457,7 @@ function validateEvidenceHashes(normalized: Record<string, unknown>, capability:
   else if (capability === 'trace_arcgis_dependencies') validateTraceEvidenceHashes(output);
   else if (capability === 'query_feature_service') validateQueryEvidenceHashes(output);
   else if (capability === 'validate_spatial_data') validateValidationEvidenceHashes(output);
-  else validateMapArtifactEvidenceHashes(output);
+  else validateMapArtifactEvidenceHashes(output, capabilityInput);
 }
 
 export function normalizeResult(
@@ -439,6 +466,7 @@ export function normalizeResult(
   workspaceRoot: string,
   fixtureRoot: string,
   capability: TaskDefinition['capability'] = 'inspect_dataset',
+  capabilityInput?: Record<string, unknown>,
 ): unknown {
   const normalized = JSON.parse(
     JSON.stringify({
@@ -448,7 +476,7 @@ export function normalizeResult(
       cost_usd: result.costUsd,
     }),
   ) as Record<string, unknown>;
-  validateEvidenceHashes(normalized, capability);
+  validateEvidenceHashes(normalized, capability, capabilityInput);
   const context = { workspaceRoot, fixtureRoot };
   for (const field of normalizedFields) setNormalizedField(normalized, field, context);
   return normalized;
@@ -708,6 +736,7 @@ async function executeMapArtifactTask(
       roots.workspace,
       roots.fixtures,
       task.capability,
+      input,
     ),
     operations: [...operations],
   };

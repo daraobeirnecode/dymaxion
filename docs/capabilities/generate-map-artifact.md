@@ -45,10 +45,11 @@ ambiguity. Fixed errors do not echo the supplied path or credential canary.
 
 ## GeoJSON and geometry contract
 
-The root must be a FeatureCollection with a `features` array and must not
-contain the removed legacy `crs` member. Every member must be a Feature with a
-`geometry` member and object-or-null `properties`; missing or array-valued
-properties reject. Supported geometry families:
+Source bytes must be valid UTF-8; malformed byte sequences reject before JSON
+parsing. The root must be a FeatureCollection with a `features` array and must
+not contain the removed legacy `crs` member. Every member must be a Feature
+with a `geometry` member and object-or-null `properties`; missing or
+array-valued properties reject. Supported geometry families:
 
 - Point and MultiPoint;
 - LineString and MultiLineString;

@@ -4,6 +4,7 @@
 
 import { extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { TextDecoder } from 'node:util';
 import { z } from 'zod';
 import { containsCredentialMaterial } from './arcgis-rest.js';
 import { canonicalJson, sha256Canonical, sha256Text } from '../contracts/canonical.js';
@@ -275,6 +276,10 @@ function fmt(value: number): string {
   return normalized.toFixed(3).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
 }
 
+function reportNumber(value: number): number {
+  return Number(value.toPrecision(15));
+}
+
 function normalizeLon360(lon: number): number {
   const value = ((lon % 360) + 360) % 360;
   return value === 360 ? 0 : value;
@@ -285,23 +290,39 @@ function wrapLon180(lon: number): number {
   return Object.is(value, -180) ? 180 : value;
 }
 
-function computeLongitudeInterval(
-  lons: number[],
-  checkpoint: (stage: string) => void,
-): { minX: number; maxX: number; crosses: boolean } {
-  if (lons.length === 0) return { minX: -180, maxX: 180, crosses: false };
+type LongitudeInterval = {
+  minX: number;
+  maxX: number;
+  sourceMinX: number;
+  sourceMaxX: number;
+  crosses: boolean;
+};
+
+function computeLongitudeInterval(lons: number[], checkpoint: (stage: string) => void): LongitudeInterval {
+  if (lons.length === 0) {
+    return { minX: -180, maxX: 180, sourceMinX: -180, sourceMaxX: 180, crosses: false };
+  }
   if (lons.length === 1) {
-    const lon = normalizeLon360(lons[0]);
-    return { minX: lon, maxX: lon, crosses: false };
+    const sourceLon = lons[0];
+    const lon = normalizeLon360(sourceLon);
+    return { minX: lon, maxX: lon, sourceMinX: sourceLon, sourceMaxX: sourceLon, crosses: false };
   }
-  const normalized = new Set<number>();
-  for (const lon of lons) {
+  const sourceByNormalized = new Map<number, number>();
+  for (const sourceLon of lons) {
     checkpoint('longitude interval collection');
-    normalized.add(normalizeLon360(lon));
+    const normalizedLon = normalizeLon360(sourceLon);
+    const current = sourceByNormalized.get(normalizedLon);
+    if (current === undefined || sourceLon === wrapLon180(normalizedLon)) {
+      sourceByNormalized.set(normalizedLon, sourceLon);
+    }
   }
-  const sorted = [...normalized].sort((a, b) => a - b);
+  const sorted = [...sourceByNormalized.keys()].sort((a, b) => a - b);
   checkpoint('longitude interval sort');
-  if (sorted.length === 1) return { minX: sorted[0], maxX: sorted[0], crosses: false };
+  if (sorted.length === 1) {
+    const lon = sorted[0];
+    const sourceLon = sourceByNormalized.get(lon) ?? wrapLon180(lon);
+    return { minX: lon, maxX: lon, sourceMinX: sourceLon, sourceMaxX: sourceLon, crosses: false };
+  }
   let largestGap = -1;
   let gapIndex = 0;
   for (let i = 0; i < sorted.length; i += 1) {
@@ -317,9 +338,15 @@ function computeLongitudeInterval(
   const start = sorted[(gapIndex + 1) % sorted.length];
   const endRaw = sorted[gapIndex];
   const end = endRaw < start ? endRaw + 360 : endRaw;
-  const width = end - start;
-  const crosses = wrapLon180(start) > wrapLon180(start + width);
-  return { minX: start, maxX: start + width, crosses };
+  const sourceMinX = sourceByNormalized.get(start) ?? wrapLon180(start);
+  const sourceMaxX = sourceByNormalized.get(endRaw) ?? wrapLon180(endRaw);
+  return {
+    minX: start,
+    maxX: end,
+    sourceMinX,
+    sourceMaxX,
+    crosses: sourceMinX > sourceMaxX,
+  };
 }
 
 function unwrapLon(lon: number, minX: number): number {
@@ -344,10 +371,13 @@ function cloneCounts(features: number): GeometryCounts {
   };
 }
 
-function parsePosition(value: unknown, path: string): Coord {
+function parsePosition(value: unknown, path: string, checkpoint: (stage: string) => void): Coord {
   if (!Array.isArray(value) || value.length < 2) throw new Error(`malformed GeoJSON: ${path} must be a position`);
-  if (value.some((ordinate) => typeof ordinate !== 'number' || !Number.isFinite(ordinate))) {
-    throw new Error(`malformed GeoJSON: ${path} ordinates must all be finite numbers`);
+  for (const ordinate of value) {
+    checkpoint('coordinate parsing');
+    if (typeof ordinate !== 'number' || !Number.isFinite(ordinate)) {
+      throw new Error(`malformed GeoJSON: ${path} ordinates must all be finite numbers`);
+    }
   }
   const lon = value[0] as number;
   const lat = value[1] as number;
@@ -404,7 +434,7 @@ function collectGeometry(
     const line: Coord[] = [];
     for (let index = 0; index < value.length; index += 1) {
       checkpoint('coordinate parsing');
-      const point = parsePosition(value[index], `${path}[${index}]`);
+      const point = parsePosition(value[index], `${path}[${index}]`, checkpoint);
       addPoint(point);
       line.push(point);
     }
@@ -423,7 +453,7 @@ function collectGeometry(
   };
 
   if (type === 'Point') {
-    const point = parsePosition(geometry.coordinates, 'coordinates');
+    const point = parsePosition(geometry.coordinates, 'coordinates', checkpoint);
     addPoint(point);
     primitives.push({ kind: 'point', featureIndex, point });
     return;
@@ -432,7 +462,7 @@ function collectGeometry(
     if (!Array.isArray(geometry.coordinates)) throw new Error('malformed GeoJSON: MultiPoint coordinates must be an array');
     for (let index = 0; index < geometry.coordinates.length; index += 1) {
       checkpoint('coordinate parsing');
-      const point = parsePosition(geometry.coordinates[index], `coordinates[${index}]`);
+      const point = parsePosition(geometry.coordinates[index], `coordinates[${index}]`, checkpoint);
       addPoint(point);
       primitives.push({ kind: 'point', featureIndex, point });
     }
@@ -480,6 +510,7 @@ function renderSvg(
   input: GenerateMapArtifactInput,
   primitives: Primitive[],
   extent: { minX: number; maxX: number; minY: number; maxY: number; crosses: boolean; empty: boolean },
+  antimeridianCrosses: boolean,
   counts: GeometryCounts,
   warnings: string[],
   sourceAttribution: string,
@@ -584,7 +615,7 @@ function renderSvg(
   pushLine(`<text x="${fmt(width - 232)}" y="38" fill="${style.text}" font-family="system-ui, sans-serif" font-size="12">GeoJSON geometry counts</text>`);
   pushLine(`<text x="${fmt(width - 232)}" y="58" fill="${style.text}" font-family="system-ui, sans-serif" font-size="11">Features ${counts.features}; Positions ${counts.coordinate_positions}</text>`);
   pushLine(`<text x="${fmt(width - 232)}" y="76" fill="${style.text}" font-family="system-ui, sans-serif" font-size="11">Pt ${counts.Point + counts.MultiPoint}; Line ${counts.LineString + counts.MultiLineString}; Poly ${counts.Polygon + counts.MultiPolygon}</text>`);
-  pushLine(`<text x="${fmt(width - 232)}" y="94" fill="${style.text}" font-family="system-ui, sans-serif" font-size="11">${xmlEscape(extent.crosses ? 'Antimeridian-aware extent' : 'CRS84 extent')}</text>`);
+  pushLine(`<text x="${fmt(width - 232)}" y="94" fill="${style.text}" font-family="system-ui, sans-serif" font-size="11">${xmlEscape(antimeridianCrosses ? 'Antimeridian-aware extent' : 'CRS84 extent')}</text>`);
   pushLine('</g>');
   pushLine(
     `<text x="16" y="${height - 16}" fill="${style.text}" font-family="system-ui, sans-serif" font-size="10">Source: ${xmlEscape(sourceAttribution)}. ${warnings.length} warning(s). No scale or basemap.</text>`,
@@ -659,9 +690,15 @@ async function executeGenerateMapArtifact(
     );
   }
 
+  let sourceText: string;
+  try {
+    sourceText = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error('malformed GeoJSON: source is not valid UTF-8');
+  }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(Buffer.from(bytes).toString('utf8'));
+    parsed = JSON.parse(sourceText);
   } catch {
     throw new Error('malformed GeoJSON: invalid JSON syntax');
   }
@@ -729,12 +766,25 @@ async function executeGenerateMapArtifact(
     crosses: sourceLonInterval.crosses,
     empty: counts.coordinate_positions === 0,
   };
-  if (extent.crosses) warnings.push('Antimeridian-aware minimal longitude interval used for viewport fitting.');
+  const wrappedViewportMinX = wrapLon180(extent.minX);
+  const wrappedViewportMaxX = wrapLon180(extent.maxX);
+  const rawPaddedViewportCrosses = extent.crosses || wrappedViewportMinX > wrappedViewportMaxX;
+  const viewportExtent: [number, number, number, number] = extent.empty
+    ? [-180, -90, 180, 90]
+    : [
+        reportNumber(rawPaddedViewportCrosses ? extent.minX : wrappedViewportMinX),
+        reportNumber(extent.minY),
+        reportNumber(rawPaddedViewportCrosses ? extent.maxX : wrappedViewportMaxX),
+        reportNumber(extent.maxY),
+      ];
+  const antimeridianCrosses =
+    extent.crosses || viewportExtent[0] < -180 || viewportExtent[2] > 180 || viewportExtent[0] > viewportExtent[2];
+  if (antimeridianCrosses) warnings.push('Antimeridian-aware minimal longitude interval used for viewport fitting.');
 
   const sourceHash = sha256Text(bytes);
   const sourceAttribution = `local GeoJSON source; sha256 ${sourceHash.slice(0, 12)}`;
   const sourceUri = pathToFileURL(path).href;
-  const svg = renderSvg(input, primitives, extent, counts, warnings, sourceAttribution, pacedCheckpoint);
+  const svg = renderSvg(input, primitives, extent, antimeridianCrosses, counts, warnings, sourceAttribution, pacedCheckpoint);
   checkpoint('SVG rendering');
   assertSafeSvg(svg);
   const svgBytes = Buffer.byteLength(svg, 'utf8');
@@ -742,24 +792,8 @@ async function executeGenerateMapArtifact(
     throw new Error(`generate_map_artifact resource limit exceeded: SVG output ${svgBytes} bytes > ${MAX_SVG_BYTES} bytes`);
   }
   const svgHash = sha256Text(svg);
-  const wrappedViewportMinX = Number(fmt(wrapLon180(extent.minX)));
-  const wrappedViewportMaxX = Number(fmt(wrapLon180(extent.maxX)));
-  const reportUnwrappedViewport = extent.crosses || wrappedViewportMinX > wrappedViewportMaxX;
-  const viewportExtent: [number, number, number, number] = extent.empty
-    ? [-180, -90, 180, 90]
-    : [
-        reportUnwrappedViewport ? Number(fmt(extent.minX)) : wrappedViewportMinX,
-        Number(fmt(extent.minY)),
-        reportUnwrappedViewport ? Number(fmt(extent.maxX)) : wrappedViewportMaxX,
-        Number(fmt(extent.maxY)),
-      ];
   const sourceExtent: [number, number, number, number] | null = counts.coordinate_positions
-    ? [
-        Number(fmt(wrapLon180(sourceLonInterval.minX))),
-        Number(fmt(minLatRaw)),
-        Number(fmt(wrapLon180(sourceLonInterval.maxX))),
-        Number(fmt(maxLatRaw)),
-      ]
+    ? [sourceLonInterval.sourceMinX, minLatRaw, sourceLonInterval.sourceMaxX, maxLatRaw]
     : null;
   const legendEntries: GenerateMapArtifactOutput['report']['legend']['entries'] = [];
   const polygonCount = counts.Polygon + counts.MultiPolygon;
@@ -807,7 +841,7 @@ async function executeGenerateMapArtifact(
     format: 'GeoJSON',
     artifact: { target_format: 'svg', media_type: 'image/svg+xml; charset=utf-8', bytes: svgBytes, sha256: svgHash },
     crs: { effective: 'OGC:CRS84', axis_order: 'longitude,latitude', units: 'degrees' },
-    extent: { source: sourceExtent, viewport: viewportExtent, antimeridian_crosses: extent.crosses, empty: extent.empty },
+    extent: { source: sourceExtent, viewport: viewportExtent, antimeridian_crosses: antimeridianCrosses, empty: extent.empty },
     viewport: { width: input.width, height: input.height, padding: 48, fit: 'fit-to-extent with fixed padding; degenerate extents expanded deterministically' },
     geometry_counts: counts,
     style_spec: {
