@@ -114,6 +114,7 @@ export const EvidenceBundleSchema = z
         .object({
           name: z.string().min(1),
           sha256: Sha256Schema,
+          bytes: z.number().int().nonnegative().optional(),
           validation: z
             .object({ valid: z.boolean(), checks: z.array(z.string().min(1)), warnings: z.array(z.string()).optional() })
             .strict(),

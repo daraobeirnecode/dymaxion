@@ -1,0 +1,167 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "artifact": {
+      "format": "svg",
+      "media_type": "image/svg+xml; charset=utf-8",
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"600\" height=\"360\" viewBox=\"0 0 600 360\" role=\"img\" aria-labelledby=\"map-title map-desc\">\n<title id=\"map-title\">Empty collection</title>\n<desc id=\"map-desc\">Verify the explicit empty FeatureCollection contract. Audience: GIS reviewer. CRS OGC:CRS84 longitude/latitude. Inline deterministic SVG; no basemap, labels, scale, scripts, or external resources.</desc>\n<rect x=\"0\" y=\"0\" width=\"600\" height=\"360\" fill=\"#ffffff\"/>\n<rect x=\"48\" y=\"54\" width=\"504\" height=\"252\" fill=\"none\" stroke=\"#d4d4d4\" stroke-width=\"1\"/>\n<text x=\"300\" y=\"180\" text-anchor=\"middle\" fill=\"#111111\" font-family=\"system-ui, sans-serif\" font-size=\"14\">Empty FeatureCollection: no drawable geometries</text>\n<g id=\"geojson-primitives\">\n</g>\n<g id=\"legend\">\n<rect x=\"352\" y=\"16\" width=\"232\" height=\"86\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d4d4d4\"/>\n<text x=\"368\" y=\"38\" fill=\"#111111\" font-family=\"system-ui, sans-serif\" font-size=\"12\">GeoJSON geometry counts</text>\n<text x=\"368\" y=\"58\" fill=\"#111111\" font-family=\"system-ui, sans-serif\" font-size=\"11\">Features 0; Positions 0</text>\n<text x=\"368\" y=\"76\" fill=\"#111111\" font-family=\"system-ui, sans-serif\" font-size=\"11\">Pt 0; Line 0; Poly 0</text>\n<text x=\"368\" y=\"94\" fill=\"#111111\" font-family=\"system-ui, sans-serif\" font-size=\"11\">CRS84 extent</text>\n</g>\n<text x=\"16\" y=\"344\" fill=\"#111111\" font-family=\"system-ui, sans-serif\" font-size=\"10\">Source: local GeoJSON source; sha256 6d18edfe75b3. 1 warning(s). No scale or basemap.</text>\n</svg>\n",
+      "bytes": 1548,
+      "sha256": "9baa1a21415fbcfa5a97b53d8cdc61d6cafcd2f238a726f064804920eaa56fb0"
+    },
+    "report": {
+      "schema_version": "1.0.0",
+      "source_uri": "<FIXTURE_URI>",
+      "source_handle": "<FIXTURE_PATH>",
+      "source_attribution": "local GeoJSON source; sha256 6d18edfe75b3",
+      "sources": [
+        {
+          "kind": "local-file",
+          "attribution": "local GeoJSON source; sha256 6d18edfe75b3",
+          "sha256": "6d18edfe75b3149104038dcbca4d0096bbcb923f0f9fa4b49f4815344e75bb90"
+        }
+      ],
+      "retrieved_at": "2026-07-21T12:00:00.000Z",
+      "file_sha256": "6d18edfe75b3149104038dcbca4d0096bbcb923f0f9fa4b49f4815344e75bb90",
+      "file_size_bytes": 43,
+      "format": "GeoJSON",
+      "artifact": {
+        "target_format": "svg",
+        "media_type": "image/svg+xml; charset=utf-8",
+        "bytes": 1548,
+        "sha256": "9baa1a21415fbcfa5a97b53d8cdc61d6cafcd2f238a726f064804920eaa56fb0"
+      },
+      "crs": {
+        "effective": "OGC:CRS84",
+        "axis_order": "longitude,latitude",
+        "units": "degrees"
+      },
+      "extent": {
+        "source": null,
+        "viewport": [
+          -180,
+          -90,
+          180,
+          90
+        ],
+        "antimeridian_crosses": false,
+        "empty": true
+      },
+      "viewport": {
+        "width": 600,
+        "height": 360,
+        "padding": 48,
+        "fit": "fit-to-extent with fixed padding; degenerate extents expanded deterministically"
+      },
+      "geometry_counts": {
+        "features": 0,
+        "coordinate_positions": 0,
+        "Point": 0,
+        "MultiPoint": 0,
+        "LineString": 0,
+        "MultiLineString": 0,
+        "Polygon": 0,
+        "MultiPolygon": 0,
+        "GeometryCollection": 0,
+        "null_geometry": 0
+      },
+      "style_spec": {
+        "style": "monochrome",
+        "point_symbol": "circle",
+        "polygon_fill": "#e5e5e5",
+        "line_stroke": "#404040",
+        "point_fill": "#000000"
+      },
+      "legend": {
+        "title": "Rendered geometry families",
+        "entries": []
+      },
+      "qa": {
+        "checks": [
+          "input_schema",
+          "raw_local_path_no_percent",
+          "boundary_before_stat",
+          "boundary_before_read_file",
+          "geojson_featurecollection_structure",
+          "crs84_coordinate_range",
+          "geometry_family_support",
+          "antimeridian_minimal_interval",
+          "svg_safety_static_primitives",
+          "svg_output_hash_exact_bytes"
+        ],
+        "warnings": [
+          "Empty FeatureCollection or no drawable coordinates; SVG uses a documented full-world viewport."
+        ],
+        "limitations": [
+          "Inline SVG only; no durable storage or filesystem artifact is written.",
+          "No basemap, map labels, representative fraction, scale bar, projection transform, geocoding, classification, statistics, or publication.",
+          "Only RFC 7946 CRS84 longitude/latitude GeoJSON coordinates are supported; source properties and feature names are not rendered.",
+          "Geometry drawing is a deterministic preview, not an OGC/GEOS topology validation or cartographic generalization."
+        ]
+      }
+    },
+    "evidence": {
+      "schema_version": "1.0.0",
+      "bundle_id": "generate_map_artifact:9baa1a21415fbcfa",
+      "generated_at": "2026-07-21T12:00:00.000Z",
+      "source": {
+        "uri": "<FIXTURE_URI>",
+        "identity": {
+          "kind": "file",
+          "value": "<FIXTURE_PATH>"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-21T12:00:00.000Z",
+        "sha256": "6d18edfe75b3149104038dcbca4d0096bbcb923f0f9fa4b49f4815344e75bb90"
+      },
+      "gis_metadata": {
+        "format": "GeoJSON",
+        "crs": "OGC:CRS84",
+        "axis_order": "longitude,latitude",
+        "units": "degrees",
+        "extent": null,
+        "schema": [],
+        "row_count": 0,
+        "geometry_types": [],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "<ENVIRONMENT_DEPENDENT_CANONICAL_PARAMETERS>",
+        "sha256": "<ENVIRONMENT_DEPENDENT_PARAMETER_HASH>"
+      },
+      "execution": {
+        "capability": "generate_map_artifact",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "map_svg",
+          "sha256": "9baa1a21415fbcfa5a97b53d8cdc61d6cafcd2f238a726f064804920eaa56fb0",
+          "bytes": 1548,
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "geojson_parse",
+              "svg_safety",
+              "exact_utf8_output_hash",
+              "output_schema"
+            ],
+            "warnings": [
+              "Empty FeatureCollection or no drawable coordinates; SVG uses a documented full-world viewport."
+            ]
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

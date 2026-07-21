@@ -1,0 +1,197 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "artifact": {
+      "format": "svg",
+      "media_type": "image/svg+xml; charset=utf-8",
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"420\" viewBox=\"0 0 640 420\" role=\"img\" aria-labelledby=\"map-title map-desc\">\n<title id=\"map-title\">Antimeridian crossing</title>\n<desc id=\"map-desc\">Verify minimal longitude interval rendering. Audience: GIS reviewer. CRS OGC:CRS84 longitude/latitude. Inline deterministic SVG; no basemap, labels, scale, scripts, or external resources.</desc>\n<rect x=\"0\" y=\"0\" width=\"640\" height=\"420\" fill=\"#f8fafc\"/>\n<rect x=\"48\" y=\"54.571\" width=\"544\" height=\"310.857\" fill=\"none\" stroke=\"#d1d5db\" stroke-width=\"1\"/>\n<g id=\"geojson-primitives\">\n<polyline points=\"48,365.429 592,210 203.429,54.571\" fill=\"none\" stroke=\"#0f766e\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n<circle cx=\"436.571\" cy=\"287.714\" r=\"3.5\" fill=\"#b91c1c\"/>\n</g>\n<g id=\"legend\">\n<rect x=\"392\" y=\"16\" width=\"232\" height=\"86\" rx=\"6\" fill=\"#f8fafc\" stroke=\"#d1d5db\"/>\n<text x=\"408\" y=\"38\" fill=\"#111827\" font-family=\"system-ui, sans-serif\" font-size=\"12\">GeoJSON geometry counts</text>\n<text x=\"408\" y=\"58\" fill=\"#111827\" font-family=\"system-ui, sans-serif\" font-size=\"11\">Features 2; Positions 4</text>\n<text x=\"408\" y=\"76\" fill=\"#111827\" font-family=\"system-ui, sans-serif\" font-size=\"11\">Pt 1; Line 1; Poly 0</text>\n<text x=\"408\" y=\"94\" fill=\"#111827\" font-family=\"system-ui, sans-serif\" font-size=\"11\">Antimeridian-aware extent</text>\n</g>\n<text x=\"16\" y=\"404\" fill=\"#111827\" font-family=\"system-ui, sans-serif\" font-size=\"10\">Source: local GeoJSON source; sha256 4a70c02e28f3. 1 warning(s). No scale or basemap.</text>\n</svg>\n",
+      "bytes": 1608,
+      "sha256": "5872903be837e1fbd2ef681e4e5f12c988d40eb8d55f948343750bcec74a5298"
+    },
+    "report": {
+      "schema_version": "1.0.0",
+      "source_uri": "<FIXTURE_URI>",
+      "source_handle": "<FIXTURE_PATH>",
+      "source_attribution": "local GeoJSON source; sha256 4a70c02e28f3",
+      "sources": [
+        {
+          "kind": "local-file",
+          "attribution": "local GeoJSON source; sha256 4a70c02e28f3",
+          "sha256": "4a70c02e28f314ac2de9926120c7174b4958721b4292e58a9ef7ba852472ae6b"
+        }
+      ],
+      "retrieved_at": "2026-07-21T12:00:00.000Z",
+      "file_sha256": "4a70c02e28f314ac2de9926120c7174b4958721b4292e58a9ef7ba852472ae6b",
+      "file_size_bytes": 255,
+      "format": "GeoJSON",
+      "artifact": {
+        "target_format": "svg",
+        "media_type": "image/svg+xml; charset=utf-8",
+        "bytes": 1608,
+        "sha256": "5872903be837e1fbd2ef681e4e5f12c988d40eb8d55f948343750bcec74a5298"
+      },
+      "crs": {
+        "effective": "OGC:CRS84",
+        "axis_order": "longitude,latitude",
+        "units": "degrees"
+      },
+      "extent": {
+        "source": [
+          179.6,
+          10,
+          -179.7,
+          10.4
+        ],
+        "viewport": [
+          179.6,
+          10,
+          180.3,
+          10.4
+        ],
+        "antimeridian_crosses": true,
+        "empty": false
+      },
+      "viewport": {
+        "width": 640,
+        "height": 420,
+        "padding": 48,
+        "fit": "fit-to-extent with fixed padding; degenerate extents expanded deterministically"
+      },
+      "geometry_counts": {
+        "features": 2,
+        "coordinate_positions": 4,
+        "Point": 1,
+        "MultiPoint": 0,
+        "LineString": 1,
+        "MultiLineString": 0,
+        "Polygon": 0,
+        "MultiPolygon": 0,
+        "GeometryCollection": 0,
+        "null_geometry": 0
+      },
+      "style_spec": {
+        "style": "dymaxion",
+        "point_symbol": "circle",
+        "polygon_fill": "#bfdbfe",
+        "line_stroke": "#0f766e",
+        "point_fill": "#b91c1c"
+      },
+      "legend": {
+        "title": "Rendered geometry families",
+        "entries": [
+          {
+            "family": "line",
+            "label": "LineString and MultiLineString geometries",
+            "geometry_count": 1,
+            "fill": null,
+            "stroke": "#0f766e",
+            "marker": null
+          },
+          {
+            "family": "point",
+            "label": "Point and MultiPoint geometries",
+            "geometry_count": 1,
+            "fill": "#b91c1c",
+            "stroke": null,
+            "marker": "circle"
+          }
+        ]
+      },
+      "qa": {
+        "checks": [
+          "input_schema",
+          "raw_local_path_no_percent",
+          "boundary_before_stat",
+          "boundary_before_read_file",
+          "geojson_featurecollection_structure",
+          "crs84_coordinate_range",
+          "geometry_family_support",
+          "antimeridian_minimal_interval",
+          "svg_safety_static_primitives",
+          "svg_output_hash_exact_bytes"
+        ],
+        "warnings": [
+          "Antimeridian-aware minimal longitude interval used for viewport fitting."
+        ],
+        "limitations": [
+          "Inline SVG only; no durable storage or filesystem artifact is written.",
+          "No basemap, map labels, representative fraction, scale bar, projection transform, geocoding, classification, statistics, or publication.",
+          "Only RFC 7946 CRS84 longitude/latitude GeoJSON coordinates are supported; source properties and feature names are not rendered.",
+          "Geometry drawing is a deterministic preview, not an OGC/GEOS topology validation or cartographic generalization."
+        ]
+      }
+    },
+    "evidence": {
+      "schema_version": "1.0.0",
+      "bundle_id": "generate_map_artifact:5872903be837e1fb",
+      "generated_at": "2026-07-21T12:00:00.000Z",
+      "source": {
+        "uri": "<FIXTURE_URI>",
+        "identity": {
+          "kind": "file",
+          "value": "<FIXTURE_PATH>"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-21T12:00:00.000Z",
+        "sha256": "4a70c02e28f314ac2de9926120c7174b4958721b4292e58a9ef7ba852472ae6b"
+      },
+      "gis_metadata": {
+        "format": "GeoJSON",
+        "crs": "OGC:CRS84",
+        "axis_order": "longitude,latitude",
+        "units": "degrees",
+        "extent": [
+          179.6,
+          10,
+          -179.7,
+          10.4
+        ],
+        "schema": [],
+        "row_count": 2,
+        "geometry_types": [
+          "Point",
+          "LineString"
+        ],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "<ENVIRONMENT_DEPENDENT_CANONICAL_PARAMETERS>",
+        "sha256": "<ENVIRONMENT_DEPENDENT_PARAMETER_HASH>"
+      },
+      "execution": {
+        "capability": "generate_map_artifact",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "map_svg",
+          "sha256": "5872903be837e1fbd2ef681e4e5f12c988d40eb8d55f948343750bcec74a5298",
+          "bytes": 1608,
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "geojson_parse",
+              "svg_safety",
+              "exact_utf8_output_hash",
+              "output_schema"
+            ],
+            "warnings": [
+              "Antimeridian-aware minimal longitude interval used for viewport fitting."
+            ]
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

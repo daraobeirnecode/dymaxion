@@ -84,3 +84,47 @@ test('GISBench rejects jointly forged validation report/evidence source hashes b
     ),
   );
 });
+
+test('GISBench rejects jointly forged inline SVG hashes before normalization', () => {
+  const content = '<svg xmlns="http://www.w3.org/2000/svg"></svg>\n';
+  const truthful = sha256Text(content);
+  const canonicalParameters = '{"source_uri":"file:///fixture.geojson"}';
+  const result = {
+    ok: true,
+    costUsd: 0,
+    output: {
+      artifact: {
+        content,
+        bytes: Buffer.byteLength(content, 'utf8'),
+        sha256: truthful,
+      },
+      report: {
+        file_sha256: 'a'.repeat(64),
+        artifact: { bytes: Buffer.byteLength(content, 'utf8'), sha256: truthful },
+      },
+      evidence: {
+        source: { sha256: 'a'.repeat(64) },
+        parameters: {
+          canonical_json: canonicalParameters,
+          sha256: sha256Text(canonicalParameters),
+        },
+        outputs: [{ name: 'map_svg', bytes: Buffer.byteLength(content, 'utf8'), sha256: truthful }],
+      },
+    },
+  };
+  assert.doesNotThrow(() => normalizeResult(result, [], '/tmp', '/tmp/fixtures', 'generate_map_artifact'));
+  result.output.evidence.outputs[0]!.bytes += 1;
+  assert.throws(
+    () => normalizeResult(result, [], '/tmp', '/tmp/fixtures', 'generate_map_artifact'),
+    /evidence SVG byte count must match exact UTF-8 bytes/,
+  );
+  result.output.evidence.outputs[0]!.bytes -= 1;
+  const forged = '0'.repeat(64);
+  result.output.artifact.sha256 = forged;
+  result.output.report.artifact.sha256 = forged;
+  result.output.evidence.outputs[0]!.sha256 = forged;
+  assert.throws(
+    () => normalizeResult(result, [], '/tmp', '/tmp/fixtures', 'generate_map_artifact'),
+    /inline SVG hash must match exact UTF-8 bytes/,
+  );
+});

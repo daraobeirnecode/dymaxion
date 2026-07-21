@@ -1,5 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
 import type { CapabilityDefinition, CapabilityExecutionContext } from '../contracts/capability.js';
+import { generateMapArtifactCapability } from './generate-map-artifact.js';
 import { inspectArcgisOrgCapability } from './inspect-arcgis-org.js';
 import { inspectDatasetCapability } from './inspect-dataset.js';
 import { queryFeatureServiceCapability } from './query-feature-service.js';
@@ -23,6 +24,10 @@ const capabilities = new Map<string, CapabilityDefinition<unknown, unknown>>([
   [
     validateSpatialDataCapability.manifest.slug,
     validateSpatialDataCapability as CapabilityDefinition<unknown, unknown>,
+  ],
+  [
+    generateMapArtifactCapability.manifest.slug,
+    generateMapArtifactCapability as CapabilityDefinition<unknown, unknown>,
   ],
 ]);
 

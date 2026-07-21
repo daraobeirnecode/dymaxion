@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0.0",
+  "id": "map-artifact-useful-geometry",
+  "capability": "generate_map_artifact",
+  "input": {
+    "fixture": "map-artifact/useful-geometry.geojson",
+    "title": "Synthetic geometry map",
+    "purpose": "Render useful mixed geometry as deterministic inline SVG.",
+    "audience": "GIS reviewer",
+    "width": 720,
+    "height": 520,
+    "style": "blueprint",
+    "point_symbol": "square"
+  },
+  "expected": { "outcome": "success", "golden_file": "map-artifact-useful-geometry.json" },
+  "tolerances": {
+    "numeric_absolute": 0,
+    "normalized_fields": [
+      "$.output.report.source_uri",
+      "$.output.report.source_handle",
+      "$.output.evidence.source.uri",
+      "$.output.evidence.source.identity.value",
+      "$.output.evidence.parameters.canonical_json",
+      "$.output.evidence.parameters.sha256"
+    ]
+  },
+  "allowed_operations": ["boundary_preflight", "stat", "read_file", "parse_geojson", "render_svg", "hash_sha256", "derive_map_report"],
+  "expected_approval": { "required": false, "decision": "not-requested" }
+}

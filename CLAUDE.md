@@ -102,7 +102,7 @@ Install:
 
 ## Implemented native capabilities
 
-Exactly five native capabilities are implemented and tested; everything else
+Exactly six native capabilities are implemented and tested; everything else
 in the catalog is historical scaffold (see ADR-0001 and the README):
 
 - **`inspect_dataset`** (Phase 0) — deterministic, read-only local GeoJSON
@@ -139,8 +139,17 @@ in the catalog is historical scaffold (see ADR-0001 and the README):
   `checks_not_run` honesty (never a full OGC/GEOS validity claim), and hard
   byte/feature/coordinate/depth/duration/cancellation ceilings.
   Docs: `docs/capabilities/validate-spatial-data.md`.
+- **`generate_map_artifact`** (Phase 1E) — deterministic, read-only rendering
+  of one allowlisted local RFC 7946 GeoJSON FeatureCollection into a bounded,
+  self-contained inline UTF-8 SVG. It supports all GeoJSON geometry families,
+  multipart polygons and holes; uses a minimal circular longitude interval for
+  antimeridian fitting; returns exact SVG byte/hash evidence, structured
+  source/extent/viewport/style/legend/QA metadata; and writes no file. It has
+  no basemap, labels, scale claim, projection transform, classification,
+  statistics, network access or publication path. Docs:
+  `docs/capabilities/generate-map-artifact.md`.
 
-Phase 1A/1B/1C/1D constraints that still hold:
+Phase 1A/1B/1C/1D/1E constraints that still hold:
 
 - **Fixture-only testing.** All `inspect_arcgis_org`,
   `trace_arcgis_dependencies`, and `query_feature_service` tests and
@@ -174,11 +183,17 @@ Phase 1A/1B/1C/1D constraints that still hold:
   values, unrecognized legacy CRS names, unsafe property field names) into
   findings, errors, or evidence, keeps filesystem mtime out of its evidence
   for same-byte determinism, and never claims full OGC/GEOS validity.
-- **GISBench has exactly twenty-five golden tasks** — five Phase 0
-  `inspect_dataset`, five Phase 1A `inspect_arcgis_org`, five Phase 1B
-  `trace_arcgis_dependencies`, five Phase 1C `query_feature_service`, and
-  five Phase 1D `validate_spatial_data` — an evaluation scaffold toward the
-  100-task goal, not a coverage claim.
+- **Map artifact generation never writes or fetches.**
+  `generate_map_artifact` reads exactly one allowlisted raw-path `.geojson`
+  source, never renders source properties, and returns only static inline SVG
+  plus report/evidence. It rejects every percent escape and remote URI before
+  boundary/recorder/I/O, reasserts the boundary before both filesystem sinks,
+  and never claims a scale, basemap, labels or analysis.
+- **GISBench has exactly thirty golden tasks** — five each for Phase 0
+  `inspect_dataset`, Phase 1A `inspect_arcgis_org`, Phase 1B
+  `trace_arcgis_dependencies`, Phase 1C `query_feature_service`, Phase 1D
+  `validate_spatial_data`, and Phase 1E `generate_map_artifact` — an
+  evaluation scaffold toward the 100-task goal, not a coverage claim.
 
 ## Build + verify
 
@@ -189,17 +204,17 @@ Phase 1A/1B/1C/1D constraints that still hold:
 - Worker: `cd windows-worker && npm run build`
 - Stack: `docker compose config -q`; migrations are idempotent (`scripts/apply-migrations.sh`)
 
-## Current task: Phase 1D bounded spatial data validation
+## Current task: Phase 1E deterministic inline map artifact
 
-Implement the plan at `docs/plans/2026-07-20-phase-1d-validate-spatial-data.md` as one bounded vertical slice.
+Implement the plan at `docs/plans/2026-07-21-phase-1e-generate-map-artifact.md` as one bounded vertical slice.
 
-- New native capability: `validate_spatial_data`.
-- MVP target: one allowlisted local RFC 7946 `.geojson` FeatureCollection.
-- Produce a deterministic structured validation report plus versioned evidence.
-- Check strict structure, IDs, nulls, coordinate shape/range/dimensions, line/ring cardinality, closure, duplicate vertices, zero-area rings, bounded ring self-intersection, bbox and stable property-null profiles.
-- Explicitly report unsupported topology/domain checks; never claim full OGC/GEOS validity.
-- Enforce file/feature/coordinate/issue/depth/duration/cancellation ceilings and boundary-before-I/O behavior.
-- Add five synthetic fixture-backed GISBench tasks, raising the suite from 20 to 25, plus focused adversarial tests.
-- Preserve every Phase 0/1A/1B/1C approval, identity, boundary, determinism, evidence, redaction and Worker invariant.
-- Do not access network/live GIS systems, add credentials, implement repair/writes, deploy, push, open a PR or merge.
-- Fable 5 is the sole implementation writer; Mercator prepares the brief, independently verifies, and routes findings back to Fable. Tyr reviews an exact local commit before any publication decision.
+- New native capability: `generate_map_artifact`.
+- MVP target: one allowlisted local RFC 7946 `.geojson` FeatureCollection to self-contained inline SVG.
+- Produce deterministic exact-byte SVG, structured map report and versioned evidence; write no artifact file.
+- Support all GeoJSON geometry families, multipart/hole rendering, fixed-padding extent fitting, explicit empty/degenerate behavior and antimeridian-aware minimal longitude intervals.
+- Permit only closed style/symbol choices; XML-escape text and forbid script, events, links, DTD/entities, `foreignObject`, external resources and raw source properties.
+- Enforce byte/feature/coordinate/depth/output/dimension/text/duration/cancellation ceilings and boundary-before-each-I/O behavior.
+- Add five synthetic fixture-backed GISBench tasks, raising the suite from 25 to 30, plus focused adversarial tests.
+- Preserve every earlier approval, identity, boundary, determinism, evidence, redaction and Worker invariant.
+- Do not access network/live GIS systems, add credentials, implement writes/publication, deploy, or merge without exact-SHA review and green CI.
+- Actual provenance: delegated GPT-5.5 produced a timed-out partial draft; Mercator on GPT-5.6 Sol/Codex inspected, corrected, completed and verifies the implementation. Fable 5 did not author Phase 1E. Tyr reviews an exact local commit before publication.

@@ -9,8 +9,8 @@ import { sha256Canonical, sha256Text } from '../contracts/canonical.js';
 
 // 5 Phase 0 inspect_dataset + 5 Phase 1A inspect_arcgis_org
 // + 5 Phase 1B trace_arcgis_dependencies + 5 Phase 1C query_feature_service
-// + 5 Phase 1D validate_spatial_data
-const TASK_COUNT = 25;
+// + 5 Phase 1D validate_spatial_data + 5 Phase 1E generate_map_artifact
+const TASK_COUNT = 30;
 
 const ExpectationSchema = z
   .object({
@@ -146,12 +146,47 @@ const ValidateTaskSchema = z
   })
   .strict();
 
+const MapArtifactTaskSchema = z
+  .object({
+    schema_version: z.literal('1.0.0'),
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    capability: z.literal('generate_map_artifact'),
+    input: z
+      .object({
+        fixture: z.string().min(1),
+        title: z.string().min(1).optional(),
+        purpose: z.string().min(1).optional(),
+        audience: z.string().min(1).optional(),
+        width: z.number().int().positive().optional(),
+        height: z.number().int().positive().optional(),
+        style: z.enum(['dymaxion', 'monochrome', 'blueprint']).optional(),
+        point_symbol: z.enum(['circle', 'square']).optional(),
+      })
+      .strict(),
+    expected: ExpectationSchema,
+    tolerances: ToleranceSchema,
+    allowed_operations: z.array(
+      z.enum([
+        'boundary_preflight',
+        'stat',
+        'read_file',
+        'parse_geojson',
+        'render_svg',
+        'hash_sha256',
+        'derive_map_report',
+      ]),
+    ),
+    expected_approval: ApprovalExpectationSchema,
+  })
+  .strict();
+
 const TaskSchema = z.discriminatedUnion('capability', [
   DatasetTaskSchema,
   ArcgisTaskSchema,
   TraceTaskSchema,
   QueryTaskSchema,
   ValidateTaskSchema,
+  MapArtifactTaskSchema,
 ]);
 
 type TaskDefinition = z.infer<typeof TaskSchema>;
@@ -360,6 +395,32 @@ function validateValidationEvidenceHashes(output: Record<string, unknown>): void
   );
 }
 
+function validateMapArtifactEvidenceHashes(output: Record<string, unknown>): void {
+  const artifact = output.artifact as Record<string, unknown>;
+  const report = output.report as Record<string, unknown>;
+  const evidence = output.evidence as Record<string, unknown>;
+  assert.ok(artifact && report && evidence, 'successful map result requires artifact, report, and evidence');
+  const parameters = evidence.parameters as Record<string, unknown>;
+  const outputs = evidence.outputs as Array<Record<string, unknown>>;
+  const reportArtifact = report.artifact as Record<string, unknown>;
+  const content = String(artifact.content);
+  const exactBytes = Buffer.byteLength(content, 'utf8');
+  const exactHash = sha256Text(content);
+  assert.equal(artifact.bytes, exactBytes, 'inline SVG byte count must match exact UTF-8 bytes');
+  assert.equal(artifact.sha256, exactHash, 'inline SVG hash must match exact UTF-8 bytes');
+  assert.equal(reportArtifact?.bytes, exactBytes, 'report SVG byte count must match exact UTF-8 bytes');
+  assert.equal(reportArtifact?.sha256, exactHash, 'report SVG hash must match exact UTF-8 bytes');
+  assert.equal(
+    parameters.sha256,
+    sha256Text(String(parameters.canonical_json)),
+    'evidence parameter hash must validate before normalization',
+  );
+  assert.ok(Array.isArray(outputs) && outputs.length === 1, 'exactly one output artifact is required');
+  assert.equal(outputs[0]?.name, 'map_svg');
+  assert.equal(outputs[0]?.bytes, exactBytes, 'evidence SVG byte count must match exact UTF-8 bytes');
+  assert.equal(outputs[0]?.sha256, exactHash, 'evidence SVG hash must match exact UTF-8 bytes');
+}
+
 function validateEvidenceHashes(normalized: Record<string, unknown>, capability: TaskDefinition['capability']): void {
   if (normalized.ok !== true) return;
   assert.ok(normalized.output && typeof normalized.output === 'object', 'successful result requires output');
@@ -368,7 +429,8 @@ function validateEvidenceHashes(normalized: Record<string, unknown>, capability:
   else if (capability === 'inspect_arcgis_org') validateArcgisEvidenceHashes(output);
   else if (capability === 'trace_arcgis_dependencies') validateTraceEvidenceHashes(output);
   else if (capability === 'query_feature_service') validateQueryEvidenceHashes(output);
-  else validateValidationEvidenceHashes(output);
+  else if (capability === 'validate_spatial_data') validateValidationEvidenceHashes(output);
+  else validateMapArtifactEvidenceHashes(output);
 }
 
 export function normalizeResult(
@@ -596,6 +658,61 @@ async function executeValidateTask(
   };
 }
 
+async function executeMapArtifactTask(
+  task: z.infer<typeof MapArtifactTaskSchema>,
+  roots: TaskRoots,
+): Promise<{ normalized: unknown; operations: string[] }> {
+  const operations = new Set<string>(['boundary_preflight']);
+  const sourcePath = resolve(roots.fixtures, task.input.fixture);
+  const dependencies: RunSkillDependencies = {
+    recorder: {
+      begin: async () => `gisbench:${task.id}`,
+      finish: async () => undefined,
+    },
+    audit: async () => undefined,
+    boundaryOptions: { audit: async () => undefined },
+    capabilityContext: {
+      now: () => new Date('2026-07-21T12:00:00.000Z'),
+      io: {
+        stat: async (path: string) => {
+          operations.add('stat');
+          return stat(path);
+        },
+        readFile: async (path: string) => {
+          operations.add('read_file');
+          return readFile(path);
+        },
+      },
+    },
+  };
+  const input: Record<string, unknown> = { ...task.input, source_uri: sourcePath };
+  delete input.fixture;
+  const result = await runSkill(
+    task.capability,
+    input,
+    '00000000-0000-0000-0000-000000000001',
+    dependencies,
+  );
+  if (operations.has('read_file')) operations.add('parse_geojson');
+  if (result.ok) {
+    operations.add('render_svg');
+    operations.add('hash_sha256');
+    operations.add('derive_map_report');
+    assertValidationSourceHashes(result.output as Record<string, unknown>, await readFile(sourcePath));
+  }
+  assertTaskExpectations(task, result.ok, operations);
+  return {
+    normalized: normalizeResult(
+      result,
+      task.tolerances.normalized_fields,
+      roots.workspace,
+      roots.fixtures,
+      task.capability,
+    ),
+    operations: [...operations],
+  };
+}
+
 async function executeArcgisTask(
   task:
     | z.infer<typeof ArcgisTaskSchema>
@@ -665,7 +782,15 @@ async function executeTask(
 ): Promise<{ normalized: unknown; operations: string[] }> {
   if (task.capability === 'inspect_dataset') return executeDatasetTask(task, roots);
   if (task.capability === 'validate_spatial_data') return executeValidateTask(task, roots);
-  return executeArcgisTask(task, roots);
+  if (task.capability === 'generate_map_artifact') return executeMapArtifactTask(task, roots);
+  if (
+    task.capability === 'inspect_arcgis_org' ||
+    task.capability === 'trace_arcgis_dependencies' ||
+    task.capability === 'query_feature_service'
+  ) {
+    return executeArcgisTask(task, roots);
+  }
+  throw new Error('unsupported GISBench capability');
 }
 
 export async function runGisBench(updateGoldens = false): Promise<GisBenchResult> {
@@ -681,7 +806,7 @@ export async function runGisBench(updateGoldens = false): Promise<GisBenchResult
   assert.equal(
     taskFiles.length,
     TASK_COUNT,
-    `GISBench must contain exactly ${TASK_COUNT} tasks (5 Phase 0 + 5 Phase 1A + 5 Phase 1B + 5 Phase 1C + 5 Phase 1D)`,
+    `GISBench must contain exactly ${TASK_COUNT} tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, and 1E)`,
   );
   if (updateGoldens) await mkdir(join(benchmark, 'golden'), { recursive: true });
 
