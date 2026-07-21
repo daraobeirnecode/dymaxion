@@ -1,0 +1,6 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "id": "nf-1", "properties": {} }
+  ]
+}

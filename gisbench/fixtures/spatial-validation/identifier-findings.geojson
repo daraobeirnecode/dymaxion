@@ -1,0 +1,40 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "owner": "alice", "status": null },
+      "geometry": { "type": "Point", "coordinates": [1, 1] }
+    },
+    {
+      "type": "Feature",
+      "id": "dup-1",
+      "properties": { "owner": null, "status": "open" },
+      "geometry": { "type": "Point", "coordinates": [2, 2] }
+    },
+    {
+      "type": "Feature",
+      "id": "dup-1",
+      "properties": { "status": "closed" },
+      "geometry": { "type": "Point", "coordinates": [3, 3] }
+    },
+    {
+      "type": "Feature",
+      "id": 7,
+      "properties": { "owner": "SECRET_PROPERTY_VALUE" },
+      "geometry": null
+    },
+    {
+      "type": "Feature",
+      "id": "7",
+      "properties": null,
+      "geometry": { "type": "Point", "coordinates": [4, 4] }
+    },
+    {
+      "type": "Feature",
+      "id": true,
+      "properties": {},
+      "geometry": { "type": "Point", "coordinates": [5, 5] }
+    }
+  ]
+}

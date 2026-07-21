@@ -1,0 +1,13 @@
+{
+  "type": "FeatureCollection",
+  "crs": { "type": "name", "properties": { "name": "EPSG:3857" } },
+  "bbox": [170, -10, -170, 10],
+  "features": [
+    {
+      "type": "Feature",
+      "id": "am-4",
+      "properties": {},
+      "geometry": { "type": "Point", "coordinates": [175, 0] }
+    }
+  ]
+}

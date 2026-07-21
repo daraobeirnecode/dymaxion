@@ -102,7 +102,7 @@ Install:
 
 ## Implemented native capabilities
 
-Exactly four native capabilities are implemented and tested; everything else
+Exactly five native capabilities are implemented and tested; everything else
 in the catalog is historical scaffold (see ADR-0001 and the README):
 
 - **`inspect_dataset`** (Phase 0) — deterministic, read-only local GeoJSON
@@ -128,8 +128,19 @@ in the catalog is historical scaffold (see ADR-0001 and the README):
   values in URLs). Statistics, ordering, geometry filters, transformations,
   attachments, and related records are rejected in this slice.
   Docs: `docs/capabilities/query-feature-service.md`.
+- **`validate_spatial_data`** (Phase 1D) — deterministic, read-only bounded
+  spatial QA of one allowlisted local RFC 7946 GeoJSON FeatureCollection:
+  strict structure, typed canonical feature IDs, null/empty geometries,
+  position shape/dimension/CRS84-range checks, line/ring cardinality, exact
+  ring closure, consecutive duplicate vertices, zero-area rings, a bounded 2D
+  ring self-intersection check, per-position bbox enclosure (including
+  antimeridian-crossing CRS84 bboxes), and stable property-null profiles,
+  with deterministic bounded top-K finding retention, explicit
+  `checks_not_run` honesty (never a full OGC/GEOS validity claim), and hard
+  byte/feature/coordinate/depth/duration/cancellation ceilings.
+  Docs: `docs/capabilities/validate-spatial-data.md`.
 
-Phase 1A/1B/1C constraints that still hold:
+Phase 1A/1B/1C/1D constraints that still hold:
 
 - **Fixture-only testing.** All `inspect_arcgis_org`,
   `trace_arcgis_dependencies`, and `query_feature_service` tests and
@@ -156,10 +167,18 @@ Phase 1A/1B/1C constraints that still hold:
   and `<layer_url>/query`; query predicates, object IDs, and field lists
   travel in POST form bodies that are hashed into evidence but never
   serialized, and evidence URLs for query dispatches carry no query string.
-- **GISBench has exactly twenty golden tasks** — five Phase 0
+- **Spatial validation never touches the network.** `validate_spatial_data`
+  reads exactly one allowlisted local `.geojson` file through the shared
+  boundary; it accepts no URLs, dispatches no requests, echoes no raw
+  untrusted values (feature IDs, geometry types, coordinates, property
+  values, unrecognized legacy CRS names, unsafe property field names) into
+  findings, errors, or evidence, keeps filesystem mtime out of its evidence
+  for same-byte determinism, and never claims full OGC/GEOS validity.
+- **GISBench has exactly twenty-five golden tasks** — five Phase 0
   `inspect_dataset`, five Phase 1A `inspect_arcgis_org`, five Phase 1B
-  `trace_arcgis_dependencies`, and five Phase 1C `query_feature_service` —
-  an evaluation scaffold toward the 100-task goal, not a coverage claim.
+  `trace_arcgis_dependencies`, five Phase 1C `query_feature_service`, and
+  five Phase 1D `validate_spatial_data` — an evaluation scaffold toward the
+  100-task goal, not a coverage claim.
 
 ## Build + verify
 
@@ -170,19 +189,17 @@ Phase 1A/1B/1C constraints that still hold:
 - Worker: `cd windows-worker && npm run build`
 - Stack: `docker compose config -q`; migrations are idempotent (`scripts/apply-migrations.sh`)
 
-## Current task: Phase 1C safe Feature Service query
+## Current task: Phase 1D bounded spatial data validation
 
-Implement the plan at `docs/plans/2026-07-20-phase-1c-query-feature-service.md` as one bounded vertical slice.
+Implement the plan at `docs/plans/2026-07-20-phase-1d-validate-spatial-data.md` as one bounded vertical slice.
 
-- New native capability: `query_feature_service`.
-- MVP target: one approved anonymous/public HTTPS `FeatureServer/<layer-id>` URL.
-- Inspect metadata and query capabilities first; require explicit fields.
-- Discover object IDs, canonicalize them before ceilings, then POST deterministic object-ID batches.
-- Handle `exceededTransferLimit` with bounded deterministic batch splitting.
-- Add optional geometry and `outSR`; reject statistics, geometry filters, transformations, attachments and related-record modes in this slice.
-- Extend the shared ArcGIS transport non-breakingly with bounded POST-form support; evidence URLs must not expose form values.
-- Enforce record/request/response-byte/total-byte/duration/cancellation ceilings and per-dispatch boundary checks.
-- Add five synthetic fixture-backed GISBench tasks and focused adversarial tests.
-- Preserve every Phase 0/1A/1B approval, identity, boundary, determinism, redaction and Worker invariant.
-- Do not query live ArcGIS systems, add credentials, implement writes, deploy, push, open a PR or merge.
-- Fable 5 edits and verifies locally; Mercator independently verifies and Tyr reviews an exact local commit before any publication decision.
+- New native capability: `validate_spatial_data`.
+- MVP target: one allowlisted local RFC 7946 `.geojson` FeatureCollection.
+- Produce a deterministic structured validation report plus versioned evidence.
+- Check strict structure, IDs, nulls, coordinate shape/range/dimensions, line/ring cardinality, closure, duplicate vertices, zero-area rings, bounded ring self-intersection, bbox and stable property-null profiles.
+- Explicitly report unsupported topology/domain checks; never claim full OGC/GEOS validity.
+- Enforce file/feature/coordinate/issue/depth/duration/cancellation ceilings and boundary-before-I/O behavior.
+- Add five synthetic fixture-backed GISBench tasks, raising the suite from 20 to 25, plus focused adversarial tests.
+- Preserve every Phase 0/1A/1B/1C approval, identity, boundary, determinism, evidence, redaction and Worker invariant.
+- Do not access network/live GIS systems, add credentials, implement repair/writes, deploy, push, open a PR or merge.
+- Fable 5 is the sole implementation writer; Mercator prepares the brief, independently verifies, and routes findings back to Fable. Tyr reviews an exact local commit before any publication decision.

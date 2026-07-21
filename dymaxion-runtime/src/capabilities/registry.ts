@@ -4,6 +4,7 @@ import { inspectArcgisOrgCapability } from './inspect-arcgis-org.js';
 import { inspectDatasetCapability } from './inspect-dataset.js';
 import { queryFeatureServiceCapability } from './query-feature-service.js';
 import { traceArcgisDependenciesCapability } from './trace-arcgis-dependencies.js';
+import { validateSpatialDataCapability } from './validate-spatial-data.js';
 
 const capabilities = new Map<string, CapabilityDefinition<unknown, unknown>>([
   [inspectDatasetCapability.manifest.slug, inspectDatasetCapability as CapabilityDefinition<unknown, unknown>],
@@ -18,6 +19,10 @@ const capabilities = new Map<string, CapabilityDefinition<unknown, unknown>>([
   [
     queryFeatureServiceCapability.manifest.slug,
     queryFeatureServiceCapability as CapabilityDefinition<unknown, unknown>,
+  ],
+  [
+    validateSpatialDataCapability.manifest.slug,
+    validateSpatialDataCapability as CapabilityDefinition<unknown, unknown>,
   ],
 ]);
 

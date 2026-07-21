@@ -1,0 +1,17 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "pc-1",
+      "properties": {
+        "token=FIELDCANARY_A1": "x",
+        "client_secret": "FIELDCANARY_B2",
+        "bad\u0001name_FIELDCANARY_C3": 1,
+        "an_extremely_long_field_name_that_exceeds_the_sixty_four_character_display_bound_FIELDCANARY_D4": 2,
+        "depth_m": 3.5
+      },
+      "geometry": { "type": "Point", "coordinates": [1, 1] }
+    }
+  ]
+}

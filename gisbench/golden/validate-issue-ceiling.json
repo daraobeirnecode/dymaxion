@@ -1,0 +1,186 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "report": {
+      "schema_version": "1.0.0",
+      "source_uri": "<FIXTURE_URI>",
+      "source_handle": "<FIXTURE_PATH>",
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "file_sha256": "060b9864234c5d0609c4aab3971b36a3e872e31f1297c90d06949242d4911da6",
+      "file_size_bytes": 370,
+      "format": "GeoJSON",
+      "crs": {
+        "declared": null,
+        "effective": "OGC:CRS84",
+        "axis_order": "longitude,latitude",
+        "units": "degrees",
+        "crs84_range_checks": true
+      },
+      "scope": {
+        "checks_run": [
+          "bbox",
+          "coordinate_dimensions",
+          "coordinate_range_crs84",
+          "duplicate_vertices",
+          "feature_ids",
+          "geometry_structure",
+          "geometry_types",
+          "json_structure",
+          "linestring_cardinality",
+          "null_geometry",
+          "property_null_profile",
+          "ring_cardinality",
+          "ring_closure",
+          "ring_self_intersection_bounded",
+          "ring_zero_area"
+        ],
+        "checks_not_run": [
+          {
+            "id": "coded_value_domains",
+            "reason": "GeoJSON defines no coded-value domains; domain validation is not applicable to this format."
+          },
+          {
+            "id": "cross_feature_topology",
+            "reason": "Cross-feature topology (overlaps, gaps, shared boundaries) is not implemented in Phase 1D."
+          },
+          {
+            "id": "ogc_simple_features_validity",
+            "reason": "Full OGC Simple Features / GEOS-equivalent validity is not implemented; only the bounded checks listed in checks_run were performed."
+          },
+          {
+            "id": "polygon_hole_containment",
+            "reason": "Polygon interior-ring containment and ring-overlap checks are not implemented in Phase 1D."
+          }
+        ]
+      },
+      "summary": {
+        "feature_count": 2,
+        "coordinate_position_count": 5,
+        "error_count": 1,
+        "warning_count": 1,
+        "total_finding_count": 2,
+        "returned_finding_count": 1,
+        "findings_truncated": true,
+        "valid": false
+      },
+      "issues": [
+        {
+          "code": "ring_not_closed",
+          "severity": "error",
+          "location": {
+            "feature_index": 1,
+            "path": "geometry.coordinates[0]"
+          },
+          "message": "polygon ring first and last positions are not identical"
+        }
+      ],
+      "metrics": {
+        "null_geometry_count": 0,
+        "missing_id_count": 1,
+        "duplicate_id_count": 0,
+        "geometry_type_counts": [
+          {
+            "type": "Point",
+            "count": 1
+          },
+          {
+            "type": "Polygon",
+            "count": 1
+          }
+        ],
+        "coordinate_dimension_counts": [
+          {
+            "dimensions": 2,
+            "count": 5
+          }
+        ],
+        "out_of_range_position_count": 0,
+        "unclosed_ring_count": 1,
+        "zero_area_ring_count": 0,
+        "duplicate_vertex_count": 0,
+        "self_intersecting_ring_count": 0,
+        "self_intersection_checks_skipped": 0,
+        "bbox": {
+          "declared_present": false,
+          "declared_valid": null,
+          "computed_extent": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "encloses_computed": null
+        },
+        "property_null_profile": []
+      }
+    },
+    "evidence": {
+      "schema_version": "1.0.0",
+      "bundle_id": "validate_spatial_data:060b9864234c5d06",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "source": {
+        "uri": "<FIXTURE_URI>",
+        "identity": {
+          "kind": "file",
+          "value": "<FIXTURE_PATH>"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "060b9864234c5d0609c4aab3971b36a3e872e31f1297c90d06949242d4911da6"
+      },
+      "gis_metadata": {
+        "format": "GeoJSON",
+        "crs": "OGC:CRS84",
+        "axis_order": "longitude,latitude",
+        "units": "degrees",
+        "extent": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "schema": [],
+        "row_count": 2,
+        "geometry_types": [
+          "Point",
+          "Polygon"
+        ],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "<ENVIRONMENT_DEPENDENT_CANONICAL_PARAMETERS>",
+        "sha256": "<ENVIRONMENT_DEPENDENT_PARAMETER_HASH>"
+      },
+      "execution": {
+        "capability": "validate_spatial_data",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "validation_report",
+          "sha256": "<ENVIRONMENT_DEPENDENT_OUTPUT_HASH>",
+          "validation": {
+            "valid": false,
+            "checks": [
+              "input_schema",
+              "geojson_structure",
+              "validation_checks",
+              "output_schema"
+            ],
+            "warnings": []
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

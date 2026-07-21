@@ -1,0 +1,11 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "ep-1",
+      "properties": { "": null },
+      "geometry": { "type": "Point", "coordinates": [2, 2] }
+    }
+  ]
+}

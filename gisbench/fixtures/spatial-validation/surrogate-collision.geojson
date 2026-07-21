@@ -1,0 +1,15 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "sc-1",
+      "properties": {
+        "": null,
+        "field_sha256_deadbeefdeadbeef": 1,
+        "ok_name": 2
+      },
+      "geometry": { "type": "Point", "coordinates": [3, 3] }
+    }
+  ]
+}

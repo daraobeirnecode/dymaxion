@@ -1,9 +1,9 @@
 # GISBench fixtures
 
 All files in this directory are small synthetic datasets created for Dymaxion
-Phase 0/1A/1B/1C tests. They contain no City of Sacramento, client, employer,
-private ArcGIS, or production-system data, no real usernames or PII, and no
-real tokens or credentials.
+Phase 0/1A/1B/1C/1D tests. They contain no City of Sacramento, client,
+employer, private ArcGIS, or production-system data, no real usernames or PII,
+and no real tokens or credentials.
 
 ## Phase 0 GeoJSON fixtures
 
@@ -63,6 +63,36 @@ any real ArcGIS endpoint to author them; CC0 test fixtures.
 - `arcgis/query-split/`: a four-ID batch that reports `exceededTransferLimit`, retrieved by deterministic halves with shuffled response order.
 - `arcgis/query-ceiling/`: six matched object IDs with `max_records` 3 selecting the lowest three.
 - `arcgis/query-denied/`: intentionally empty route set for the denied-hostname feature query boundary task; any request against it fails the task.
+
+## Phase 1D spatial-validation GeoJSON fixtures (`spatial-validation/`)
+
+Hand-authored synthetic RFC 7946 FeatureCollections exercising the
+`validate_spatial_data` capability. Every coordinate, feature ID, property
+name/value, and CRS string is invented; canary strings (`ID_CANARY_*`,
+`TYPE_CANARY_*`, `SECRET_PROPERTY_VALUE`) exist solely to prove untrusted
+values never leak into reports. CC0 test fixtures.
+
+- `valid-polygon.geojson`: clean two-feature collection with an enclosing root bbox.
+- `geometry-findings.geojson`: unclosed ring, asymmetric bow-tie self-intersection, control square, duplicate vertices, short LineString, zero-area collinear ring, out-of-range point, interior canary vertex, mixed 2D/3D LineString.
+- `identifier-findings.geojson`: missing/duplicate/typed/invalid feature IDs, null geometry, property null/missing patterns.
+- `legacy-crs.geojson`: deprecated `crs` member naming an unrecognized CRS with Web-Mercator-scale coordinates.
+- `bbox-mismatch.geojson` / `bbox-invalid.geojson`: non-enclosing and structurally invalid root bboxes.
+- `antimeridian-enclosing.geojson` / `antimeridian-nonenclosing.geojson` / `antimeridian-unverified.geojson`: antimeridian-crossing declared bboxes (CRS84 enclosing, CRS84 violated, non-CRS84 unverifiable).
+- `deep-collection.geojson`: GeometryCollection nested past the depth ceiling.
+- `sort-truncation.geojson`: encounter order chosen so stable severity sorting must decide `max_issues` survivors.
+- `empty-geometries.geojson`: empty MultiPoint/MultiLineString/Polygon/MultiPolygon containers plus a null-geometry control.
+- `value-canaries.geojson`: duplicate canary IDs and a canary geometry type for leak canaries.
+- `crs-canary.geojson`: legacy `crs` name shaped like credential material (`client_secret=CRSCANARY_…`) proving unrecognized CRS names are never serialized.
+- `property-canaries.geojson`: credential-shaped, control-bearing, and overlong property keys plus a safe control field, proving unsafe field names surface only as deterministic surrogates.
+- `empty-property-name.geojson`: a feature with an empty-string property key exercising the surrogate path instead of an internal failure.
+- `surrogate-collision.geojson`: an empty property key plus a literal raw key shaped like the reserved surrogate namespace, proving generated display names stay unique and raw surrogate-shaped names are themselves surrogated.
+- `gc-mixed-dimensions.geojson` / `gc-child-mixed-dimensions.geojson`: GeometryCollections with 2D/3D children and an internally mixed child LineString for collection-scope dimension-consistency findings.
+- `bbox-dim-2d-6.geojson` / `bbox-dim-3d-4.geojson`: declared bboxes whose 6/4-value lengths contradict the observed 2D/3D coordinate dimensionality.
+- `bbox-crs84-out-of-range.geojson`: a declared bbox with longitude/latitude values outside CRS84 ranges.
+- `bbox-3d-enclosing.geojson` / `bbox-3d-nonenclosing.geojson`: 6-value bboxes over 3D points where the Z range encloses / excludes a coordinate.
+- `bbox-4d-enclosing.geojson`: an 8-value bbox enclosing a 4-ordinate position (RFC-style 2*n support).
+- `nested-bboxes.geojson`: Feature-level non-enclosing, geometry-level structurally invalid, and GeometryCollection-member non-enclosing bboxes.
+- `not-a-collection.geojson` / `bad-feature.geojson`: malformed envelopes for fail-closed coverage.
 
 The coordinates, attributes, identifiers, and timestamps are invented. They
 are not suitable for operational decisions.

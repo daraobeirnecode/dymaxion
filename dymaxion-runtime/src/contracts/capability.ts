@@ -26,6 +26,13 @@ export const CapabilityManifestSchema = z
         max_bytes: z.number().int().positive(),
         max_duration_ms: z.number().int().positive(),
         max_cost_usd: z.number().nonnegative(),
+        // Optional additive ceilings (evidence schema-compatible): capabilities
+        // with additional hard limits expose them here so manifests stay
+        // traceable to enforced constants. Older manifests simply omit them.
+        max_coordinate_positions: z.number().int().positive().optional(),
+        max_returned_issues: z.number().int().positive().optional(),
+        max_geometry_collection_depth: z.number().int().positive().optional(),
+        max_self_intersection_segments: z.number().int().positive().optional(),
       })
       .strict(),
     idempotency: z

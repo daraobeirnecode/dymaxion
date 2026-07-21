@@ -1,0 +1,17 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "gm-1",
+      "properties": {},
+      "geometry": {
+        "type": "GeometryCollection",
+        "geometries": [
+          { "type": "Point", "coordinates": [1, 2] },
+          { "type": "Point", "coordinates": [3, 4, 5] }
+        ]
+      }
+    }
+  ]
+}

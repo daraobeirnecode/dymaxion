@@ -1,0 +1,23 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "ID_CANARY_ALPHA",
+      "properties": {},
+      "geometry": { "type": "Point", "coordinates": [1, 1] }
+    },
+    {
+      "type": "Feature",
+      "id": "ID_CANARY_ALPHA",
+      "properties": {},
+      "geometry": { "type": "Point", "coordinates": [2, 2] }
+    },
+    {
+      "type": "Feature",
+      "id": "vc-3",
+      "properties": {},
+      "geometry": { "type": "TYPE_CANARY_OMEGA", "coordinates": [[3, 3]] }
+    }
+  ]
+}

@@ -9,7 +9,8 @@ import { sha256Canonical, sha256Text } from '../contracts/canonical.js';
 
 // 5 Phase 0 inspect_dataset + 5 Phase 1A inspect_arcgis_org
 // + 5 Phase 1B trace_arcgis_dependencies + 5 Phase 1C query_feature_service
-const TASK_COUNT = 20;
+// + 5 Phase 1D validate_spatial_data
+const TASK_COUNT = 25;
 
 const ExpectationSchema = z
   .object({
@@ -116,11 +117,41 @@ const QueryTaskSchema = z
   })
   .strict();
 
+const ValidateTaskSchema = z
+  .object({
+    schema_version: z.literal('1.0.0'),
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    capability: z.literal('validate_spatial_data'),
+    input: z
+      .object({
+        fixture: z.string().min(1),
+        max_bytes: z.number().int().positive().optional(),
+        max_features: z.number().int().positive().optional(),
+        max_issues: z.number().int().positive().optional(),
+      })
+      .strict(),
+    expected: ExpectationSchema,
+    tolerances: ToleranceSchema,
+    allowed_operations: z.array(
+      z.enum([
+        'boundary_preflight',
+        'stat',
+        'read_file',
+        'parse_geojson',
+        'hash_sha256',
+        'derive_validation_report',
+      ]),
+    ),
+    expected_approval: ApprovalExpectationSchema,
+  })
+  .strict();
+
 const TaskSchema = z.discriminatedUnion('capability', [
   DatasetTaskSchema,
   ArcgisTaskSchema,
   TraceTaskSchema,
   QueryTaskSchema,
+  ValidateTaskSchema,
 ]);
 
 type TaskDefinition = z.infer<typeof TaskSchema>;
@@ -146,6 +177,8 @@ const FIELD_NORMALIZERS: Record<string, (value: unknown, context: NormalizationC
   },
   '$.output.passport.source_uri': () => '<FIXTURE_URI>',
   '$.output.passport.source_handle': () => '<FIXTURE_PATH>',
+  '$.output.report.source_uri': () => '<FIXTURE_URI>',
+  '$.output.report.source_handle': () => '<FIXTURE_PATH>',
   '$.output.evidence.source.uri': () => '<FIXTURE_URI>',
   '$.output.evidence.source.identity.value': () => '<FIXTURE_PATH>',
   '$.output.evidence.source.version.modified_at': () => '<NORMALIZED_FILE_MTIME>',
@@ -281,6 +314,52 @@ function validateQueryEvidenceHashes(output: Record<string, unknown>): void {
   assert.equal(outputs[0]?.sha256, sha256Canonical(report), 'evidence output hash must validate');
 }
 
+/** Recompute the SHA-256 of the actual raw fixture bytes and require BOTH the
+ * report and evidence source hashes to equal it — comparing the two to each
+ * other alone would accept jointly wrong hashes. Runs before normalization. */
+export function assertValidationSourceHashes(output: Record<string, unknown>, rawBytes: Uint8Array): void {
+  const report = output.report as Record<string, unknown> | undefined;
+  const evidence = output.evidence as Record<string, unknown> | undefined;
+  const expected = sha256Text(rawBytes);
+  assert.equal(
+    report?.file_sha256,
+    expected,
+    'report source hash must equal the recomputed raw fixture hash',
+  );
+  assert.equal(
+    (evidence?.source as Record<string, unknown> | undefined)?.sha256,
+    expected,
+    'evidence source hash must equal the recomputed raw fixture hash',
+  );
+}
+
+function validateValidationEvidenceHashes(output: Record<string, unknown>): void {
+  const report = output.report as Record<string, unknown>;
+  const evidence = output.evidence as Record<string, unknown>;
+  assert.ok(report && evidence, 'successful result requires report and evidence');
+  const source = evidence.source as Record<string, unknown>;
+  const parameters = evidence.parameters as Record<string, unknown>;
+  const outputs = evidence.outputs as Array<Record<string, unknown>>;
+  assert.equal(source.sha256, report.file_sha256, 'evidence source hash must match the validated file hash');
+  assert.equal(
+    (outputs[0]?.validation as Record<string, unknown> | undefined)?.valid,
+    (report.summary as Record<string, unknown> | undefined)?.valid,
+    'evidence artifact validity must mirror the dataset validation result',
+  );
+  assert.equal(
+    parameters.sha256,
+    sha256Text(String(parameters.canonical_json)),
+    'evidence parameter hash must validate before normalization',
+  );
+  assert.ok(Array.isArray(outputs) && outputs.length === 1, 'exactly one output artifact is required');
+  assert.equal(outputs[0]?.name, 'validation_report');
+  assert.equal(
+    outputs[0]?.sha256,
+    sha256Canonical(report),
+    'evidence output hash must validate before normalization',
+  );
+}
+
 function validateEvidenceHashes(normalized: Record<string, unknown>, capability: TaskDefinition['capability']): void {
   if (normalized.ok !== true) return;
   assert.ok(normalized.output && typeof normalized.output === 'object', 'successful result requires output');
@@ -288,7 +367,8 @@ function validateEvidenceHashes(normalized: Record<string, unknown>, capability:
   if (capability === 'inspect_dataset') validateDatasetEvidenceHashes(output);
   else if (capability === 'inspect_arcgis_org') validateArcgisEvidenceHashes(output);
   else if (capability === 'trace_arcgis_dependencies') validateTraceEvidenceHashes(output);
-  else validateQueryEvidenceHashes(output);
+  else if (capability === 'query_feature_service') validateQueryEvidenceHashes(output);
+  else validateValidationEvidenceHashes(output);
 }
 
 export function normalizeResult(
@@ -458,6 +538,64 @@ async function executeDatasetTask(
   };
 }
 
+async function executeValidateTask(
+  task: z.infer<typeof ValidateTaskSchema>,
+  roots: TaskRoots,
+): Promise<{ normalized: unknown; operations: string[] }> {
+  const operations = new Set<string>(['boundary_preflight']);
+  const sourcePath = resolve(roots.fixtures, task.input.fixture);
+  const dependencies: RunSkillDependencies = {
+    recorder: {
+      begin: async () => `gisbench:${task.id}`,
+      finish: async () => undefined,
+    },
+    audit: async () => undefined,
+    boundaryOptions: { audit: async () => undefined },
+    capabilityContext: {
+      now: () => new Date('2026-07-18T12:00:00.000Z'),
+      io: {
+        stat: async (path: string) => {
+          operations.add('stat');
+          return stat(path);
+        },
+        readFile: async (path: string) => {
+          operations.add('read_file');
+          return readFile(path);
+        },
+      },
+    },
+  };
+  const input: Record<string, unknown> = { source_uri: sourcePath };
+  if (task.input.max_bytes !== undefined) input.max_bytes = task.input.max_bytes;
+  if (task.input.max_features !== undefined) input.max_features = task.input.max_features;
+  if (task.input.max_issues !== undefined) input.max_issues = task.input.max_issues;
+  const result = await runSkill(
+    task.capability,
+    input,
+    '00000000-0000-0000-0000-000000000001',
+    dependencies,
+  );
+  if (operations.has('read_file')) operations.add('parse_geojson');
+  if (result.ok) {
+    operations.add('hash_sha256');
+    operations.add('derive_validation_report');
+    // Recompute the source hash from the raw fixture bytes (outside the
+    // operation-accounted capability io) before any normalization.
+    assertValidationSourceHashes(result.output as Record<string, unknown>, await readFile(sourcePath));
+  }
+  assertTaskExpectations(task, result.ok, operations);
+  return {
+    normalized: normalizeResult(
+      result,
+      task.tolerances.normalized_fields,
+      roots.workspace,
+      roots.fixtures,
+      task.capability,
+    ),
+    operations: [...operations],
+  };
+}
+
 async function executeArcgisTask(
   task:
     | z.infer<typeof ArcgisTaskSchema>
@@ -525,9 +663,9 @@ async function executeTask(
   task: TaskDefinition,
   roots: TaskRoots,
 ): Promise<{ normalized: unknown; operations: string[] }> {
-  return task.capability === 'inspect_dataset'
-    ? executeDatasetTask(task, roots)
-    : executeArcgisTask(task, roots);
+  if (task.capability === 'inspect_dataset') return executeDatasetTask(task, roots);
+  if (task.capability === 'validate_spatial_data') return executeValidateTask(task, roots);
+  return executeArcgisTask(task, roots);
 }
 
 export async function runGisBench(updateGoldens = false): Promise<GisBenchResult> {
@@ -543,7 +681,7 @@ export async function runGisBench(updateGoldens = false): Promise<GisBenchResult
   assert.equal(
     taskFiles.length,
     TASK_COUNT,
-    `GISBench must contain exactly ${TASK_COUNT} tasks (5 Phase 0 + 5 Phase 1A + 5 Phase 1B + 5 Phase 1C)`,
+    `GISBench must contain exactly ${TASK_COUNT} tasks (5 Phase 0 + 5 Phase 1A + 5 Phase 1B + 5 Phase 1C + 5 Phase 1D)`,
   );
   if (updateGoldens) await mkdir(join(benchmark, 'golden'), { recursive: true });
 

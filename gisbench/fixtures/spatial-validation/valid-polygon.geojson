@@ -1,0 +1,29 @@
+{
+  "type": "FeatureCollection",
+  "bbox": [-105.2, 39.5, -104.8, 39.8],
+  "features": [
+    {
+      "type": "Feature",
+      "id": "parcel-001",
+      "properties": { "name": "Alpha", "zone": "R1" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-105.1, 39.6],
+            [-104.9, 39.6],
+            [-104.9, 39.7],
+            [-105.1, 39.7],
+            [-105.1, 39.6]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "parcel-002",
+      "properties": { "name": "Beta", "zone": null },
+      "geometry": { "type": "Point", "coordinates": [-105.0, 39.65] }
+    }
+  ]
+}
