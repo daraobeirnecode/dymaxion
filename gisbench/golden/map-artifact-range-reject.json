@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "error": "generate_map_artifact rejected GeoJSON: coordinates must be in CRS84 longitude/latitude ranges",
+  "cost_usd": 0
+}

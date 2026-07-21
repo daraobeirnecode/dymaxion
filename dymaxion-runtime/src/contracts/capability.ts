@@ -33,6 +33,12 @@ export const CapabilityManifestSchema = z
         max_returned_issues: z.number().int().positive().optional(),
         max_geometry_collection_depth: z.number().int().positive().optional(),
         max_self_intersection_segments: z.number().int().positive().optional(),
+        max_svg_bytes: z.number().int().positive().optional(),
+        max_width_px: z.number().int().positive().optional(),
+        max_height_px: z.number().int().positive().optional(),
+        max_title_chars: z.number().int().positive().optional(),
+        max_purpose_chars: z.number().int().positive().optional(),
+        max_audience_chars: z.number().int().positive().optional(),
       })
       .strict(),
     idempotency: z

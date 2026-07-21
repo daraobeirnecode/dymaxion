@@ -75,6 +75,15 @@ test('capability manifests are versioned, complete, and strict', () => {
 
 test('evidence bundles cover provenance and reject unknown fields recursively', () => {
   assert.equal(EvidenceBundleSchema.parse(evidence).execution.mode, 'deterministic');
+  const withBytes = {
+    ...evidence,
+    outputs: [{ ...evidence.outputs[0], bytes: 123 }],
+  };
+  assert.equal(EvidenceBundleSchema.parse(withBytes).outputs[0]?.bytes, 123);
+  assert.throws(
+    () => EvidenceBundleSchema.parse({ ...evidence, outputs: [{ ...evidence.outputs[0], bytes: -1 }] }),
+    /greater than or equal|too small/i,
+  );
   assert.throws(
     () => EvidenceBundleSchema.parse({ ...evidence, source: { ...evidence.source, untrusted: true } }),
     /unrecognized/i,

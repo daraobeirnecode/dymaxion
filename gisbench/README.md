@@ -1,7 +1,7 @@
 # GISBench
 
-GISBench contains exactly twenty-five reproducible golden tasks across the
-five implemented native capabilities.
+GISBench contains exactly thirty reproducible golden tasks across the
+six implemented native capabilities.
 
 Phase 0 — deterministic `inspect_dataset` (local GeoJSON):
 
@@ -68,6 +68,19 @@ GeoJSON fixtures, no network access):
 25. filesystem boundary-escape rejection before any invocation recording or
     dataset I/O.
 
+Phase 1E — deterministic read-only `generate_map_artifact` (local synthetic
+GeoJSON fixtures to inline static SVG, no network or artifact write):
+
+26. useful mixed geometry rendering with points, lines, polygon hole,
+    GeometryCollection, structured legend and exact SVG evidence hash;
+27. antimeridian-crossing LineString fitted through a minimal circular
+    longitude interval rather than stretched across the world;
+28. explicit empty FeatureCollection contract with full-world viewport and
+    no-drawable-geometry message;
+29. CRS84 out-of-range coordinate rejection after bounded local parsing;
+30. filesystem boundary-escape rejection before invocation recording or
+    dataset I/O.
+
 Each versioned task declares its golden output/error, numeric tolerance,
 explicitly normalized environment-dependent fields, permitted operations, and
 expected approval behavior. ArcGIS tasks resolve requests through an
@@ -84,21 +97,24 @@ Run from `dymaxion-runtime/`:
 npm run gisbench
 ```
 
-The runner fixes the evidence retrieval clock. For dataset tasks it
-normalizes checkout-dependent source paths, filesystem modification time,
-and hashes/canonical parameter fields that incorporate those paths; Phase 1D
-validation evidence deliberately carries no filesystem mtime (its
-`source.version` is empty for same-byte determinism), so validation tasks
-normalize only the path-dependent fields and hashes; ArcGIS tasks are fully
-deterministic and normalize nothing.
+The runner fixes the evidence retrieval clock. For Phase 0 dataset tasks it
+normalizes checkout-dependent source paths, filesystem modification time, and
+hashes/canonical parameter fields that incorporate those paths. Phase 1D and
+Phase 1E local-file evidence deliberately carries no filesystem mtime (its
+`source.version` is empty for same-byte determinism), so those tasks normalize
+only path-dependent source/parameter fields; the Phase 1E SVG content and its
+hash remain unnormalized because they are checkout-independent. ArcGIS tasks
+are fully deterministic and normalize nothing.
+
 Evidence hashes (source, canonical parameters, output artifacts, per-request
-bodies) are validated before comparison; Phase 1C query evidence additionally
-validates the POST method, canonical request-body hashes, and the absence of
-query strings from query evidence URLs. Phase 1D validation evidence is
-checked against a source SHA-256 **recomputed from the actual raw fixture
-bytes** — both the report and evidence source hashes must equal it, so
-jointly forged hashes fail closed — plus the canonical parameter/report
-output hashes, and the evidence artifact validity must mirror the dataset
-validation result, all before normalization. GISBench remains an evaluation
-scaffold — twenty-five tasks toward the 100-task roadmap goal, not a claim
-of broad GIS coverage.
+bodies) are validated before comparison. Phase 1C query evidence additionally
+validates POST methods, canonical request-body hashes and absence of query
+strings from query evidence URLs. Phase 1D and Phase 1E evidence is checked
+against a source SHA-256 **recomputed from the actual raw fixture bytes** — both
+the report and evidence source hashes must equal it, so jointly forged source
+hashes fail closed. Phase 1D also validates its canonical parameter/report
+hashes and mirrors dataset validity into evidence. Phase 1E recomputes the
+exact UTF-8 SVG byte count and SHA-256 and requires artifact, report and
+evidence output metadata to agree before normalization; jointly forged SVG
+hashes fail closed. GISBench remains an evaluation scaffold — thirty tasks
+toward the 100-task roadmap goal, not a claim of broad GIS coverage.

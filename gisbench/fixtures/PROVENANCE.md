@@ -1,7 +1,7 @@
 # GISBench fixtures
 
 All files in this directory are small synthetic datasets created for Dymaxion
-Phase 0/1A/1B/1C/1D tests. They contain no City of Sacramento, client,
+Phase 0/1A/1B/1C/1D/1E tests. They contain no City of Sacramento, client,
 employer, private ArcGIS, or production-system data, no real usernames or PII,
 and no real tokens or credentials.
 
@@ -93,6 +93,22 @@ values never leak into reports. CC0 test fixtures.
 - `bbox-4d-enclosing.geojson`: an 8-value bbox enclosing a 4-ordinate position (RFC-style 2*n support).
 - `nested-bboxes.geojson`: Feature-level non-enclosing, geometry-level structurally invalid, and GeometryCollection-member non-enclosing bboxes.
 - `not-a-collection.geojson` / `bad-feature.geojson`: malformed envelopes for fail-closed coverage.
+
+## Phase 1E map-artifact GeoJSON fixtures (`map-artifact/`)
+
+Hand-authored synthetic RFC 7946 FeatureCollections used only by the offline
+`generate_map_artifact` GISBench tasks. Every geometry and coordinate is
+invented; source properties are synthetic controls and are not rendered. CC0
+test fixtures.
+
+- `useful-geometry.geojson`: mixed Point/MultiPoint, LineString/MultiLineString,
+  Polygon with an interior ring, and GeometryCollection coverage.
+- `antimeridian.geojson`: a synthetic LineString crossing from positive to
+  negative longitude near 180 degrees.
+- `empty.geojson`: an empty FeatureCollection proving the explicit no-drawable
+  output contract.
+- `out-of-range.geojson`: a synthetic longitude outside CRS84 bounds for
+  deterministic rejection.
 
 The coordinates, attributes, identifiers, and timestamps are invented. They
 are not suitable for operational decisions.

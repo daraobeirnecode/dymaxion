@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { sha256Canonical, sha256Text } from '../src/contracts/canonical.js';
+import { canonicalJson, sha256Canonical, sha256Text } from '../src/contracts/canonical.js';
 import { assertValidationSourceHashes, normalizeResult } from '../src/gisbench/run.js';
 
 function validResult() {
@@ -82,5 +82,69 @@ test('GISBench rejects jointly forged validation report/evidence source hashes b
       { report: { file_sha256: truthful }, evidence: { source: { sha256: truthful } } },
       rawBytes,
     ),
+  );
+});
+
+test('GISBench rejects jointly forged inline SVG hashes before normalization', () => {
+  const content = '<svg xmlns="http://www.w3.org/2000/svg"></svg>\n';
+  const truthful = sha256Text(content);
+  const capabilityInput = { source_uri: '/fixture.geojson' };
+  const canonicalParameters = canonicalJson({
+    audience: 'GIS operator',
+    height: 600,
+    point_symbol: 'circle',
+    purpose: 'Deterministic inline preview of local GeoJSON geometry.',
+    source_uri: 'file:///fixture.geojson',
+    style: 'dymaxion',
+    target_format: 'svg',
+    title: 'Local GeoJSON map artifact',
+    width: 800,
+  });
+  const result = {
+    ok: true,
+    costUsd: 0,
+    output: {
+      artifact: {
+        content,
+        bytes: Buffer.byteLength(content, 'utf8'),
+        sha256: truthful,
+      },
+      report: {
+        file_sha256: 'a'.repeat(64),
+        artifact: { bytes: Buffer.byteLength(content, 'utf8'), sha256: truthful },
+      },
+      evidence: {
+        source: { sha256: 'a'.repeat(64) },
+        parameters: {
+          canonical_json: canonicalParameters,
+          sha256: sha256Text(canonicalParameters),
+        },
+        outputs: [{ name: 'map_svg', bytes: Buffer.byteLength(content, 'utf8'), sha256: truthful }],
+      },
+    },
+  };
+  assert.doesNotThrow(() => normalizeResult(result, [], '/tmp', '/tmp/fixtures', 'generate_map_artifact', capabilityInput));
+  const forgedCanonicalParameters = canonicalJson({ source_uri: 'file:///forged.geojson' });
+  result.output.evidence.parameters.canonical_json = forgedCanonicalParameters;
+  result.output.evidence.parameters.sha256 = sha256Text(forgedCanonicalParameters);
+  assert.throws(
+    () => normalizeResult(result, [], '/tmp', '/tmp/fixtures', 'generate_map_artifact', capabilityInput),
+    /canonical parameters must match the exact task input/,
+  );
+  result.output.evidence.parameters.canonical_json = canonicalParameters;
+  result.output.evidence.parameters.sha256 = sha256Text(canonicalParameters);
+  result.output.evidence.outputs[0]!.bytes += 1;
+  assert.throws(
+    () => normalizeResult(result, [], '/tmp', '/tmp/fixtures', 'generate_map_artifact', capabilityInput),
+    /evidence SVG byte count must match exact UTF-8 bytes/,
+  );
+  result.output.evidence.outputs[0]!.bytes -= 1;
+  const forged = '0'.repeat(64);
+  result.output.artifact.sha256 = forged;
+  result.output.report.artifact.sha256 = forged;
+  result.output.evidence.outputs[0]!.sha256 = forged;
+  assert.throws(
+    () => normalizeResult(result, [], '/tmp', '/tmp/fixtures', 'generate_map_artifact', capabilityInput),
+    /inline SVG hash must match exact UTF-8 bytes/,
   );
 });
