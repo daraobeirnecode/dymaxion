@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","id":"p-a","properties":{"name":"Alpha","keep":true},"geometry":{"type":"Point","coordinates":[0,0]}},{"type":"Feature","id":2,"properties":{"name":"Bravo"},"geometry":{"type":"Point","coordinates":[0.01,0]}},{"type":"Feature","id":"p-c","properties":{"name":"Charlie"},"geometry":{"type":"Point","coordinates":[10,0]}}]}

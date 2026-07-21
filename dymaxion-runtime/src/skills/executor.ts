@@ -165,6 +165,12 @@ export async function runSkill(
     }
     // Must remain before invocation persistence and all execution adapters.
     await assertExecutionBoundary(validatedInput, dependencies.boundaryOptions);
+    // Generic capability hook: run after the shared boundary succeeds and before
+    // approval, recorder/audit persistence, or execution. Capability-specific
+    // preflight logic must live on the capability definition, not here.
+    if (capability?.preflight) {
+      await capability.preflight(validatedInput, dependencies.capabilityContext);
+    }
 
     const requiresApproval = capability
       ? capability.manifest.classification !== 'read'

@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","id":"p-dateline","properties":{"case":"antimeridian nearest"},"geometry":{"type":"Point","coordinates":[179.9,0]}}]}

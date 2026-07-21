@@ -99,7 +99,7 @@ test('validate_spatial_data is a strict read-only versioned capability', () => {
   assert.doesNotThrow(() => schema.parse({ source_uri: '/absolute/path.GeoJSON' }));
 
   assert.ok(allCapabilities().some((c) => c.manifest.slug === 'validate_spatial_data'));
-  assert.equal(allCapabilities().length, 6);
+  assert.equal(allCapabilities().length, 7);
 });
 
 test('valid polygon collection produces a clean deterministic report end-to-end', async () => {

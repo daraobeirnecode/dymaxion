@@ -73,8 +73,72 @@ test('capability manifests are versioned, complete, and strict', () => {
   );
 });
 
+test('resource limit contract accepts optional vector-analysis ceilings and remains strict', () => {
+  const legacyParsed = CapabilityManifestSchema.parse(capability);
+  assert.deepEqual(legacyParsed.resource_limits, capability.resource_limits);
+
+  const vectorAnalysisCapability = {
+    ...capability,
+    slug: 'run_vector_analysis',
+    name: 'Run vector analysis',
+    resource_limits: {
+      ...capability.resource_limits,
+      max_pair_evaluations: 250_000,
+      max_output_bytes: 2_097_152,
+      max_source_bytes: 1_048_576,
+      max_primary_records: 1_000,
+      max_candidate_records: 1_000,
+      max_coordinate_ordinates: 8_000,
+      max_json_depth: 32,
+      max_json_nodes: 20_000,
+    },
+  };
+
+  const parsed = CapabilityManifestSchema.parse(vectorAnalysisCapability);
+  assert.equal(parsed.resource_limits.max_pair_evaluations, 250_000);
+  assert.equal(parsed.resource_limits.max_output_bytes, 2_097_152);
+  assert.equal(parsed.resource_limits.max_source_bytes, 1_048_576);
+  assert.equal(parsed.resource_limits.max_primary_records, 1_000);
+  assert.equal(parsed.resource_limits.max_candidate_records, 1_000);
+  assert.equal(parsed.resource_limits.max_coordinate_ordinates, 8_000);
+  assert.equal(parsed.resource_limits.max_json_depth, 32);
+  assert.equal(parsed.resource_limits.max_json_nodes, 20_000);
+
+  for (const field of [
+    'max_pair_evaluations',
+    'max_output_bytes',
+    'max_source_bytes',
+    'max_primary_records',
+    'max_candidate_records',
+    'max_coordinate_ordinates',
+    'max_json_depth',
+    'max_json_nodes',
+  ] as const) {
+    for (const value of [0, -1, 1.5]) {
+      assert.throws(
+        () =>
+          CapabilityManifestSchema.parse({
+            ...capability,
+            resource_limits: { ...capability.resource_limits, [field]: value },
+          }),
+        /greater than 0|integer|too small|invalid/i,
+      );
+    }
+  }
+
+  assert.throws(
+    () =>
+      CapabilityManifestSchema.parse({
+        ...capability,
+        resource_limits: { ...capability.resource_limits, unexpected_limit: 1 },
+      }),
+    /unrecognized/i,
+  );
+});
+
 test('evidence bundles cover provenance and reject unknown fields recursively', () => {
   assert.equal(EvidenceBundleSchema.parse(evidence).execution.mode, 'deterministic');
+  assert.deepEqual(EvidenceBundleSchema.parse(evidence), evidence);
   const withBytes = {
     ...evidence,
     outputs: [{ ...evidence.outputs[0], bytes: 123 }],
@@ -91,6 +155,63 @@ test('evidence bundles cover provenance and reject unknown fields recursively', 
   assert.throws(
     () => EvidenceBundleSchema.parse({ ...evidence, execution: { ...evidence.execution, mode: 'hand-wavy' } }),
     /invalid/i,
+  );
+});
+
+test('evidence bundles accept strict non-empty related sources with unique bounded roles', () => {
+  const relatedSource = {
+    role: 'candidate_features',
+    uri: 'file:///workspace/fixtures/candidates.geojson',
+    identity: { kind: 'file', value: '/workspace/fixtures/candidates.geojson' },
+    version: { modified_at: '2026-07-18T11:30:00.000Z' },
+    retrieved_at: '2026-07-18T12:00:00.000Z',
+    sha256: 'd'.repeat(64),
+    gis_metadata: {
+      ...evidence.gis_metadata,
+      row_count: 5,
+    },
+  };
+
+  const withRelatedSources = { ...evidence, related_sources: [relatedSource] };
+  assert.deepEqual(EvidenceBundleSchema.parse(withRelatedSources).related_sources, [relatedSource]);
+
+  assert.throws(() => EvidenceBundleSchema.parse({ ...evidence, related_sources: [] }), /at least 1|too_small/i);
+  assert.throws(
+    () => EvidenceBundleSchema.parse({ ...evidence, related_sources: [{ ...relatedSource, role: '' }] }),
+    /invalid[_ ]string|invalid format|pattern/i,
+  );
+  assert.throws(
+    () => EvidenceBundleSchema.parse({ ...evidence, related_sources: [{ ...relatedSource, role: 'x'.repeat(65) }] }),
+    /invalid[_ ]string|invalid format|pattern/i,
+  );
+  assert.throws(
+    () => EvidenceBundleSchema.parse({ ...evidence, related_sources: [{ ...relatedSource, role: 'candidate\nsource' }] }),
+    /invalid[_ ]string|invalid format|pattern/i,
+  );
+  assert.throws(
+    () =>
+      EvidenceBundleSchema.parse({
+        ...evidence,
+        related_sources: [relatedSource, { ...relatedSource, uri: 'file:///workspace/fixtures/other.geojson' }],
+      }),
+    (error: any) => {
+      const issue = error?.issues?.find((candidate: any) => candidate.message === 'duplicate related source role');
+      assert.deepEqual(issue?.path, ['related_sources', 1, 'role']);
+      assert.equal(issue?.code, 'custom');
+      return true;
+    },
+  );
+  assert.throws(
+    () => EvidenceBundleSchema.parse({ ...evidence, related_sources: [{ ...relatedSource, untrusted: true }] }),
+    /unrecognized/i,
+  );
+  assert.throws(
+    () =>
+      EvidenceBundleSchema.parse({
+        ...evidence,
+        related_sources: [{ ...relatedSource, gis_metadata: { ...relatedSource.gis_metadata, untrusted: true } }],
+      }),
+    /unrecognized/i,
   );
 });
 

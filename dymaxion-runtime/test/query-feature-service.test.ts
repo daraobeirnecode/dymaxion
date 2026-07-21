@@ -148,7 +148,7 @@ test('query_feature_service is a strict read-only versioned capability with no c
   assert.equal(capability.manifest.resource_limits.max_records, 10_000);
   assert.equal(capability.manifest.resource_limits.max_bytes, 16_777_216);
   assert.ok(allCapabilities().some((c) => c.manifest.slug === 'query_feature_service'));
-  assert.equal(allCapabilities().length, 6);
+  assert.equal(allCapabilities().length, 7);
 
   const schema = capability.inputSchema;
   assert.doesNotThrow(() => schema.parse(baseInput));

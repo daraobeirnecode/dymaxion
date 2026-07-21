@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","id":"p-empty-a","properties":{"case":"empty candidate","order":1},"geometry":{"type":"Point","coordinates":[0,0]}},{"type":"Feature","id":22,"properties":{"case":"empty candidate","order":2},"geometry":{"type":"Point","coordinates":[1,1]}}]}

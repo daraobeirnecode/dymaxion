@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","id":"east","properties":{"candidate_note":"same rounded distance, lower source index"},"geometry":{"type":"Point","coordinates":[0.001,0]}},{"type":"Feature","id":"west","properties":{"candidate_note":"same rounded distance, higher source index"},"geometry":{"type":"Point","coordinates":[-0.001,0]}}]}

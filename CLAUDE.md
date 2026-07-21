@@ -102,7 +102,7 @@ Install:
 
 ## Implemented native capabilities
 
-Exactly six native capabilities are implemented and tested; everything else
+Exactly seven native capabilities are implemented and tested; everything else
 in the catalog is historical scaffold (see ADR-0001 and the README):
 
 - **`inspect_dataset`** (Phase 0) — deterministic, read-only local GeoJSON
@@ -148,8 +148,17 @@ in the catalog is historical scaffold (see ADR-0001 and the README):
   no basemap, labels, scale claim, projection transform, classification,
   statistics, network access or publication path. Docs:
   `docs/capabilities/generate-map-artifact.md`.
+- **`run_vector_analysis`** (Phase 1F) — deterministic, read-only nearest-point
+  analysis between two allowlisted local RFC 7946 CRS84 Point FeatureCollections.
+  It returns an inline canonical GeoJSON artifact plus report/evidence, uses
+  spherical Haversine distance with authalic radius `6,371,008.8` meters,
+  rounds to the nearest millimetre, resolves ties by candidate source index,
+  supports optional `max_distance_meters`, and writes/fetches nothing. It is
+  Point-only and nearest-point-only: no reprojection, topology validation,
+  spatial index, buffering, overlay, routing, geocoding, QGIS, ArcPy, or live
+  service analysis.
 
-Phase 1A/1B/1C/1D/1E constraints that still hold:
+Phase 1A/1B/1C/1D/1E/1F constraints that still hold:
 
 - **Fixture-only testing.** All `inspect_arcgis_org`,
   `trace_arcgis_dependencies`, and `query_feature_service` tests and
@@ -189,11 +198,19 @@ Phase 1A/1B/1C/1D/1E constraints that still hold:
   plus report/evidence. It rejects every percent escape and remote URI before
   boundary/recorder/I/O, reasserts the boundary before both filesystem sinks,
   and never claims a scale, basemap, labels or analysis.
-- **GISBench has exactly thirty golden tasks** — five each for Phase 0
+- **Vector analysis is local nearest-point only.** `run_vector_analysis` reads
+  exactly two distinct allowlisted raw-path `.geojson` Point FeatureCollections,
+  returns one inline derived GeoJSON artifact plus report/evidence, omits
+  candidate properties, and rejects percent escapes, remote URI syntax,
+  credential-shaped path text, reserved `_dymaxion` primary properties, legacy
+  `crs`, non-Point geometries and paths outside the workspace boundary. Do not
+  expand beyond `nearest_point` without a new plan and review.
+- **GISBench has exactly thirty-five golden tasks** — five each for Phase 0
   `inspect_dataset`, Phase 1A `inspect_arcgis_org`, Phase 1B
   `trace_arcgis_dependencies`, Phase 1C `query_feature_service`, Phase 1D
-  `validate_spatial_data`, and Phase 1E `generate_map_artifact` — an
-  evaluation scaffold toward the 100-task goal, not a coverage claim.
+  `validate_spatial_data`, Phase 1E `generate_map_artifact`, and Phase 1F
+  `run_vector_analysis` — an evaluation scaffold toward the 100-task goal, not
+  a coverage claim.
 
 ## Build + verify
 
@@ -204,17 +221,24 @@ Phase 1A/1B/1C/1D/1E constraints that still hold:
 - Worker: `cd windows-worker && npm run build`
 - Stack: `docker compose config -q`; migrations are idempotent (`scripts/apply-migrations.sh`)
 
-## Current task: Phase 1E deterministic inline map artifact
+## Current task: Phase 1F deterministic local vector analysis
 
-Implement the plan at `docs/plans/2026-07-21-phase-1e-generate-map-artifact.md` as one bounded vertical slice.
+Implement the plan at `docs/plans/2026-07-21-phase-1f-run-vector-analysis.md` as one bounded vertical slice.
 
-- New native capability: `generate_map_artifact`.
-- MVP target: one allowlisted local RFC 7946 `.geojson` FeatureCollection to self-contained inline SVG.
-- Produce deterministic exact-byte SVG, structured map report and versioned evidence; write no artifact file.
-- Support all GeoJSON geometry families, multipart/hole rendering, fixed-padding extent fitting, explicit empty/degenerate behavior and antimeridian-aware minimal longitude intervals.
-- Permit only closed style/symbol choices; XML-escape text and forbid script, events, links, DTD/entities, `foreignObject`, external resources and raw source properties.
-- Enforce byte/feature/coordinate/depth/output/dimension/text/duration/cancellation ceilings and boundary-before-each-I/O behavior.
-- Add five synthetic fixture-backed GISBench tasks, raising the suite from 25 to 30, plus focused adversarial tests.
-- Preserve every earlier approval, identity, boundary, determinism, evidence, redaction and Worker invariant.
-- Do not access network/live GIS systems, add credentials, implement writes/publication, deploy, or merge without exact-SHA review and green CI.
-- Actual provenance: delegated GPT-5.5 produced a timed-out partial draft; Mercator on GPT-5.6 Sol/Codex inspected, corrected, completed and verifies the implementation. Fable 5 did not author Phase 1E. Tyr reviews an exact local commit before publication.
+- New native capability: `run_vector_analysis`.
+- MVP target: `nearest_point` only between two allowlisted local RFC 7946 CRS84
+  Point FeatureCollections.
+- Produce deterministic inline canonical GeoJSON, structured report and
+  versioned evidence; write no artifact file.
+- Use fixed-radius spherical Haversine distance, millimetre rounding,
+  antimeridian-normalized longitude deltas, candidate-index tie-breaking and
+  optional `max_distance_meters` unmatched output.
+- Enforce byte/source/feature/coordinate/depth/pair/output/duration/cancellation
+  ceilings and boundary-before-each-stat/read behavior.
+- Add five synthetic fixture-backed GISBench tasks, raising the suite from 30
+  to 35, plus focused adversarial tests.
+- Preserve every earlier approval, identity, boundary, determinism, evidence,
+  redaction and Worker invariant.
+- Do not access network/live GIS systems, use QGIS/ArcPy, add credentials,
+  implement writes/publication, deploy, merge, or expand beyond `nearest_point`
+  without a new plan and exact-SHA review.

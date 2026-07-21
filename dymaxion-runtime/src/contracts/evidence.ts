@@ -4,6 +4,7 @@ const SemverSchema = z.string().regex(/^\d+\.\d+\.\d+$/);
 const IsoDateSchema = z.string().datetime({ offset: true });
 const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
 const ExtentSchema = z.tuple([z.number(), z.number(), z.number(), z.number()]);
+const RelatedSourceRoleSchema = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
 
 const FieldSchema = z
   .object({
@@ -35,6 +36,46 @@ export const GisMetadataSchema = z
     temporal_fields: z.array(TemporalFieldSchema),
   })
   .strict();
+
+export const EvidenceSourceSchema = z
+  .object({
+    uri: z.string().min(1),
+    identity: z
+      .object({ kind: z.string().min(1), value: z.string().min(1) })
+      .strict(),
+    version: z
+      .object({
+        etag: z.string().min(1).optional(),
+        modified_at: IsoDateSchema.optional(),
+        version: z.string().min(1).optional(),
+      })
+      .strict(),
+    retrieved_at: IsoDateSchema,
+    sha256: Sha256Schema,
+  })
+  .strict();
+
+const RelatedSourceSchema = EvidenceSourceSchema.extend({
+  role: RelatedSourceRoleSchema,
+  gis_metadata: GisMetadataSchema.optional(),
+}).strict();
+
+const RelatedSourcesSchema = z
+  .array(RelatedSourceSchema)
+  .min(1)
+  .superRefine((relatedSources, context) => {
+    const seenRoles = new Set<string>();
+    relatedSources.forEach((relatedSource, index) => {
+      if (seenRoles.has(relatedSource.role)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, 'role'],
+          message: 'duplicate related source role',
+        });
+      }
+      seenRoles.add(relatedSource.role);
+    });
+  });
 
 // Optional per-request retrieval evidence for capabilities that assemble one
 // bundle from several bounded remote reads (e.g. paginated ArcGIS REST calls).
@@ -76,23 +117,8 @@ export const EvidenceBundleSchema = z
     bundle_id: z.string().min(1),
     generated_at: IsoDateSchema,
     requests: z.array(RetrievalRequestSchema).optional(),
-    source: z
-      .object({
-        uri: z.string().min(1),
-        identity: z
-          .object({ kind: z.string().min(1), value: z.string().min(1) })
-          .strict(),
-        version: z
-          .object({
-            etag: z.string().min(1).optional(),
-            modified_at: IsoDateSchema.optional(),
-            version: z.string().min(1).optional(),
-          })
-          .strict(),
-        retrieved_at: IsoDateSchema,
-        sha256: Sha256Schema,
-      })
-      .strict(),
+    source: EvidenceSourceSchema,
+    related_sources: RelatedSourcesSchema.optional(),
     gis_metadata: GisMetadataSchema,
     parameters: z
       .object({ canonical_json: z.string().min(1), sha256: Sha256Schema })
@@ -145,4 +171,5 @@ export const EvidenceBundleSchema = z
   .strict();
 
 export type GisMetadata = z.infer<typeof GisMetadataSchema>;
+export type EvidenceSource = z.infer<typeof EvidenceSourceSchema>;
 export type EvidenceBundle = z.infer<typeof EvidenceBundleSchema>;

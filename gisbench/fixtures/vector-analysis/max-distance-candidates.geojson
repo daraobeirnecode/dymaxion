@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","id":"too-far","properties":{"candidate_note":"outside 100 meter threshold"},"geometry":{"type":"Point","coordinates":[1,0]}}]}

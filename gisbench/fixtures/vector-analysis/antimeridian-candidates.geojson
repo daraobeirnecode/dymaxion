@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","id":"same-side","properties":{"candidate_note":"same side but farther"},"geometry":{"type":"Point","coordinates":[179,0]}},{"type":"Feature","id":"across-dateline","properties":{"candidate_note":"nearer across antimeridian; omitted from output"},"geometry":{"type":"Point","coordinates":[-179.95,0]}}]}

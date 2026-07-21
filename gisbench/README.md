@@ -1,7 +1,7 @@
 # GISBench
 
-GISBench contains exactly thirty reproducible golden tasks across the
-six implemented native capabilities.
+GISBench contains exactly thirty-five reproducible golden tasks across the
+seven implemented native capabilities.
 
 Phase 0 — deterministic `inspect_dataset` (local GeoJSON):
 
@@ -81,6 +81,18 @@ GeoJSON fixtures to inline static SVG, no network or artifact write):
 30. filesystem boundary-escape rejection before invocation recording or
     dataset I/O.
 
+Phase 1F — deterministic read-only `run_vector_analysis` (two local
+synthetic RFC 7946 Point FeatureCollections to inline canonical GeoJSON, no
+network or artifact write):
+
+31. normal nearest-point matching with stable output ordering, rounded
+    Haversine distances, primary property/ID preservation, and candidate
+    property omission;
+32. rounded-distance tie resolved by lower candidate source index;
+33. antimeridian-aware nearest selection using normalized longitude deltas;
+34. `max_distance_meters` threshold yielding an unmatched primary feature;
+35. empty candidate FeatureCollection yielding unmatched primary features.
+
 Each versioned task declares its golden output/error, numeric tolerance,
 explicitly normalized environment-dependent fields, permitted operations, and
 expected approval behavior. ArcGIS tasks resolve requests through an
@@ -99,22 +111,27 @@ npm run gisbench
 
 The runner fixes the evidence retrieval clock. For Phase 0 dataset tasks it
 normalizes checkout-dependent source paths, filesystem modification time, and
-hashes/canonical parameter fields that incorporate those paths. Phase 1D and
-Phase 1E local-file evidence deliberately carries no filesystem mtime (its
+hashes/canonical parameter fields that incorporate those paths. Phase 1D,
+Phase 1E, and Phase 1F local-file evidence deliberately carries no filesystem
+mtime (its
 `source.version` is empty for same-byte determinism), so those tasks normalize
-only path-dependent source/parameter fields; the Phase 1E SVG content and its
-hash remain unnormalized because they are checkout-independent. ArcGIS tasks
+only path-dependent source/parameter fields; the Phase 1E SVG content and
+Phase 1F canonical GeoJSON artifact content plus their hashes remain
+unnormalized because they are checkout-independent. ArcGIS tasks
 are fully deterministic and normalize nothing.
 
 Evidence hashes (source, canonical parameters, output artifacts, per-request
 bodies) are validated before comparison. Phase 1C query evidence additionally
 validates POST methods, canonical request-body hashes and absence of query
-strings from query evidence URLs. Phase 1D and Phase 1E evidence is checked
-against a source SHA-256 **recomputed from the actual raw fixture bytes** — both
-the report and evidence source hashes must equal it, so jointly forged source
-hashes fail closed. Phase 1D also validates its canonical parameter/report
-hashes and mirrors dataset validity into evidence. Phase 1E recomputes the
-exact UTF-8 SVG byte count and SHA-256 and requires artifact, report and
-evidence output metadata to agree before normalization; jointly forged SVG
-hashes fail closed. GISBench remains an evaluation scaffold — thirty tasks
-toward the 100-task roadmap goal, not a claim of broad GIS coverage.
+strings from query evidence URLs. Phase 1D, Phase 1E, and Phase 1F evidence is
+checked against source SHA-256 values **recomputed from the actual raw fixture
+bytes** — report and evidence source hashes must equal those bytes, so jointly
+forged source hashes fail closed. Phase 1D also validates its canonical
+parameter/report hashes and mirrors dataset validity into evidence. Phase 1E
+recomputes the exact UTF-8 SVG byte count and SHA-256 and requires artifact,
+report and evidence output metadata to agree before normalization; jointly
+forged SVG hashes fail closed. Phase 1F recomputes exact UTF-8 GeoJSON artifact
+bytes and SHA-256 and requires artifact, report and evidence output metadata to
+agree before normalization; jointly forged nearest-point artifact hashes fail
+closed. GISBench remains an evaluation scaffold — thirty-five tasks toward the
+100-task roadmap goal, not a claim of broad GIS coverage.
