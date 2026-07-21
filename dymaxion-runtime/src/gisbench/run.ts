@@ -5,13 +5,15 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { canonicalFormBody, type ArcGisRestTransport } from '../capabilities/arcgis-rest.js';
 import { GenerateMapArtifactInputSchema } from '../capabilities/generate-map-artifact.js';
+import { RunVectorAnalysisInputSchema } from '../capabilities/run-vector-analysis.js';
 import { runSkill, type RunSkillDependencies } from '../skills/executor.js';
 import { canonicalJson, sha256Canonical, sha256Text } from '../contracts/canonical.js';
 
 // 5 Phase 0 inspect_dataset + 5 Phase 1A inspect_arcgis_org
 // + 5 Phase 1B trace_arcgis_dependencies + 5 Phase 1C query_feature_service
 // + 5 Phase 1D validate_spatial_data + 5 Phase 1E generate_map_artifact
-const TASK_COUNT = 30;
+// + 5 Phase 1F run_vector_analysis
+const TASK_COUNT = 35;
 
 const ExpectationSchema = z
   .object({
@@ -181,6 +183,35 @@ const MapArtifactTaskSchema = z
   })
   .strict();
 
+const VectorAnalysisTaskSchema = z
+  .object({
+    schema_version: z.literal('1.0.0'),
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    capability: z.literal('run_vector_analysis'),
+    input: z
+      .object({
+        source_fixture: z.string().min(1),
+        candidate_fixture: z.string().min(1),
+        operation: z.literal('nearest_point').optional(),
+        max_distance_meters: z.number().positive().optional(),
+      })
+      .strict(),
+    expected: ExpectationSchema,
+    tolerances: ToleranceSchema,
+    allowed_operations: z.array(
+      z.enum([
+        'boundary_preflight',
+        'stat',
+        'read_file',
+        'parse_geojson',
+        'hash_sha256',
+        'derive_vector_report',
+      ]),
+    ),
+    expected_approval: ApprovalExpectationSchema,
+  })
+  .strict();
+
 const TaskSchema = z.discriminatedUnion('capability', [
   DatasetTaskSchema,
   ArcgisTaskSchema,
@@ -188,6 +219,7 @@ const TaskSchema = z.discriminatedUnion('capability', [
   QueryTaskSchema,
   ValidateTaskSchema,
   MapArtifactTaskSchema,
+  VectorAnalysisTaskSchema,
 ]);
 
 type TaskDefinition = z.infer<typeof TaskSchema>;
@@ -215,8 +247,14 @@ const FIELD_NORMALIZERS: Record<string, (value: unknown, context: NormalizationC
   '$.output.passport.source_handle': () => '<FIXTURE_PATH>',
   '$.output.report.source_uri': () => '<FIXTURE_URI>',
   '$.output.report.source_handle': () => '<FIXTURE_PATH>',
+  '$.output.report.source.source_uri': () => '<FIXTURE_URI>',
+  '$.output.report.source.source_handle': () => '<FIXTURE_PATH>',
+  '$.output.report.candidate.source_uri': () => '<CANDIDATE_FIXTURE_URI>',
+  '$.output.report.candidate.source_handle': () => '<CANDIDATE_FIXTURE_PATH>',
   '$.output.evidence.source.uri': () => '<FIXTURE_URI>',
   '$.output.evidence.source.identity.value': () => '<FIXTURE_PATH>',
+  '$.output.evidence.related_sources[0].uri': () => '<CANDIDATE_FIXTURE_URI>',
+  '$.output.evidence.related_sources[0].identity.value': () => '<CANDIDATE_FIXTURE_PATH>',
   '$.output.evidence.source.version.modified_at': () => '<NORMALIZED_FILE_MTIME>',
   '$.output.evidence.parameters.canonical_json': () => '<ENVIRONMENT_DEPENDENT_CANONICAL_PARAMETERS>',
   '$.output.evidence.parameters.sha256': () => '<ENVIRONMENT_DEPENDENT_PARAMETER_HASH>',
@@ -444,6 +482,61 @@ function validateMapArtifactEvidenceHashes(
   assert.equal(outputs[0]?.sha256, exactHash, 'evidence SVG hash must match exact UTF-8 bytes');
 }
 
+function validateVectorAnalysisEvidenceHashes(
+  output: Record<string, unknown>,
+  capabilityInput: Record<string, unknown> | undefined,
+): void {
+  const artifact = output.artifact as Record<string, unknown>;
+  const report = output.report as Record<string, unknown>;
+  const evidence = output.evidence as Record<string, unknown>;
+  assert.ok(artifact && report && evidence, 'successful vector result requires artifact, report, and evidence');
+  assert.ok(capabilityInput, 'successful vector result requires the exact capability input');
+
+  const content = String(artifact.content);
+  const exactBytes = Buffer.byteLength(content, 'utf8');
+  const exactHash = sha256Text(content);
+  assert.equal(artifact.bytes, exactBytes, 'inline GeoJSON byte count must match exact UTF-8 bytes');
+  assert.equal(artifact.sha256, exactHash, 'inline GeoJSON hash must match exact UTF-8 bytes');
+  const reportOutput = report.output as Record<string, unknown>;
+  assert.equal(reportOutput?.bytes, exactBytes, 'report GeoJSON byte count must match exact UTF-8 bytes');
+  assert.equal(reportOutput?.sha256, exactHash, 'report GeoJSON hash must match exact UTF-8 bytes');
+
+  const outputs = evidence.outputs as Array<Record<string, unknown>>;
+  assert.ok(Array.isArray(outputs) && outputs.length === 1, 'exactly one output artifact is required');
+  assert.equal(outputs[0]?.name, 'nearest_point_geojson');
+  assert.equal(outputs[0]?.bytes, exactBytes, 'evidence GeoJSON byte count must match exact UTF-8 bytes');
+  assert.equal(outputs[0]?.sha256, exactHash, 'evidence GeoJSON hash must match exact UTF-8 bytes');
+
+  const source = evidence.source as Record<string, unknown>;
+  const relatedSources = evidence.related_sources as Array<Record<string, unknown>> | undefined;
+  assert.ok(Array.isArray(relatedSources), 'vector evidence requires related candidate source');
+  const candidateSources = relatedSources.filter((relatedSource) => relatedSource.role === 'candidate_features');
+  assert.equal(candidateSources.length, 1, 'vector evidence requires exactly one candidate source');
+  const candidateSource = candidateSources[0];
+  const reportSource = report.source as Record<string, unknown>;
+  const reportCandidate = report.candidate as Record<string, unknown>;
+  assert.equal(reportSource?.source_uri, source?.uri, 'primary report source URI must match evidence source');
+  assert.equal(reportSource?.sha256, source?.sha256, 'primary report source hash must match evidence source');
+  assert.equal(reportCandidate?.source_uri, candidateSource?.uri, 'candidate report source URI must match evidence source');
+  assert.equal(reportCandidate?.sha256, candidateSource?.sha256, 'candidate report source hash must match evidence source');
+
+  const parameters = evidence.parameters as Record<string, unknown>;
+  assert.equal(
+    parameters.sha256,
+    sha256Text(String(parameters.canonical_json)),
+    'vector evidence parameter hash must validate before normalization',
+  );
+  assert.equal(
+    evidence.bundle_id,
+    `run_vector_analysis:${String(artifact.sha256).slice(0, 16)}`,
+    'vector evidence bundle id must match artifact hash fragment',
+  );
+
+  const parsedInput = RunVectorAnalysisInputSchema.parse(capabilityInput);
+  assert.equal(reportSource?.source_uri, pathToFileURL(parsedInput.source_uri).href, 'primary report source URI must match exact task input');
+  assert.equal(reportCandidate?.source_uri, pathToFileURL(parsedInput.candidate_source_uri).href, 'candidate report source URI must match exact task input');
+}
+
 function validateEvidenceHashes(
   normalized: Record<string, unknown>,
   capability: TaskDefinition['capability'],
@@ -457,7 +550,8 @@ function validateEvidenceHashes(
   else if (capability === 'trace_arcgis_dependencies') validateTraceEvidenceHashes(output);
   else if (capability === 'query_feature_service') validateQueryEvidenceHashes(output);
   else if (capability === 'validate_spatial_data') validateValidationEvidenceHashes(output);
-  else validateMapArtifactEvidenceHashes(output, capabilityInput);
+  else if (capability === 'generate_map_artifact') validateMapArtifactEvidenceHashes(output, capabilityInput);
+  else validateVectorAnalysisEvidenceHashes(output, capabilityInput);
 }
 
 export function normalizeResult(
@@ -742,6 +836,95 @@ async function executeMapArtifactTask(
   };
 }
 
+async function executeVectorAnalysisTask(
+  task: z.infer<typeof VectorAnalysisTaskSchema>,
+  roots: TaskRoots,
+): Promise<{ normalized: unknown; operations: string[] }> {
+  const operations = new Set<string>(['boundary_preflight']);
+  const sourcePath = resolve(roots.fixtures, task.input.source_fixture);
+  const candidatePath = resolve(roots.fixtures, task.input.candidate_fixture);
+  const dependencies: RunSkillDependencies = {
+    recorder: {
+      begin: async () => `gisbench:${task.id}`,
+      finish: async () => undefined,
+    },
+    audit: async () => undefined,
+    boundaryOptions: { audit: async () => undefined },
+    capabilityContext: {
+      now: () => new Date('2026-07-21T12:00:00.000Z'),
+      monotonicNow: (() => {
+        let tick = 0;
+        return () => tick;
+      })(),
+      io: {
+        stat: async (path: string) => {
+          operations.add('stat');
+          return stat(path);
+        },
+        readFile: async (path: string) => {
+          operations.add('read_file');
+          return readFile(path);
+        },
+      },
+    },
+  };
+  const input: Record<string, unknown> = {
+    source_uri: sourcePath,
+    candidate_source_uri: candidatePath,
+  };
+  if (task.input.operation !== undefined) input.operation = task.input.operation;
+  if (task.input.max_distance_meters !== undefined) input.max_distance_meters = task.input.max_distance_meters;
+  const result = await runSkill(
+    task.capability,
+    input,
+    '00000000-0000-0000-0000-000000000001',
+    dependencies,
+  );
+  if (operations.has('read_file')) operations.add('parse_geojson');
+  if (result.ok) {
+    operations.add('hash_sha256');
+    operations.add('derive_vector_report');
+    const output = result.output as Record<string, unknown>;
+    const primaryHash = sha256Text(await readFile(sourcePath));
+    assert.equal(
+      ((output.report as Record<string, unknown>).source as Record<string, unknown> | undefined)?.sha256,
+      primaryHash,
+      'primary report source hash must equal the recomputed raw fixture hash',
+    );
+    assert.equal(
+      ((output.evidence as Record<string, unknown>).source as Record<string, unknown> | undefined)?.sha256,
+      primaryHash,
+      'primary evidence source hash must equal the recomputed raw fixture hash',
+    );
+    const candidateHash = sha256Text(await readFile(candidatePath));
+    assert.equal(
+      ((output.report as Record<string, unknown>).candidate as Record<string, unknown> | undefined)?.sha256,
+      candidateHash,
+      'candidate report source hash must equal the recomputed raw fixture hash',
+    );
+    const candidateSources = ((output.evidence as Record<string, unknown>).related_sources as Array<Record<string, unknown>> | undefined)?.filter(
+      (source) => source.role === 'candidate_features',
+    );
+    assert.equal(
+      candidateSources?.[0]?.sha256,
+      candidateHash,
+      'candidate evidence source hash must equal the recomputed raw fixture hash',
+    );
+  }
+  assertTaskExpectations(task, result.ok, operations);
+  return {
+    normalized: normalizeResult(
+      result,
+      task.tolerances.normalized_fields,
+      roots.workspace,
+      roots.fixtures,
+      task.capability,
+      input,
+    ),
+    operations: [...operations],
+  };
+}
+
 async function executeArcgisTask(
   task:
     | z.infer<typeof ArcgisTaskSchema>
@@ -812,6 +995,7 @@ async function executeTask(
   if (task.capability === 'inspect_dataset') return executeDatasetTask(task, roots);
   if (task.capability === 'validate_spatial_data') return executeValidateTask(task, roots);
   if (task.capability === 'generate_map_artifact') return executeMapArtifactTask(task, roots);
+  if (task.capability === 'run_vector_analysis') return executeVectorAnalysisTask(task, roots);
   if (
     task.capability === 'inspect_arcgis_org' ||
     task.capability === 'trace_arcgis_dependencies' ||
@@ -835,7 +1019,7 @@ export async function runGisBench(updateGoldens = false): Promise<GisBenchResult
   assert.equal(
     taskFiles.length,
     TASK_COUNT,
-    `GISBench must contain exactly ${TASK_COUNT} tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, and 1E)`,
+    `GISBench must contain exactly ${TASK_COUNT} tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, 1E, and 1F)`,
   );
   if (updateGoldens) await mkdir(join(benchmark, 'golden'), { recursive: true });
 

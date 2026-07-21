@@ -1,7 +1,7 @@
 # GISBench fixtures
 
 All files in this directory are small synthetic datasets created for Dymaxion
-Phase 0/1A/1B/1C/1D/1E tests. They contain no City of Sacramento, client,
+Phase 0/1A/1B/1C/1D/1E/1F tests. They contain no City of Sacramento, client,
 employer, private ArcGIS, or production-system data, no real usernames or PII,
 and no real tokens or credentials.
 
@@ -109,6 +109,25 @@ test fixtures.
   output contract.
 - `out-of-range.geojson`: a synthetic longitude outside CRS84 bounds for
   deterministic rejection.
+
+## Phase 1F vector-analysis GeoJSON fixtures (`vector-analysis/`)
+
+Hand-authored synthetic RFC 7946 Point FeatureCollections used only by the
+offline `run_vector_analysis` GISBench tasks. Every coordinate, feature ID,
+and property is invented; candidate properties are controls proving omission
+from the output artifact. CC0 test fixtures.
+
+- `nearest-primary.geojson` / `nearest-candidates.geojson`: normal nearest-point
+  ordering, rounded distances, primary property preservation, and candidate
+  property omission.
+- `tie-primary.geojson` / `tie-candidates.geojson`: equal rounded distances
+  where the lower candidate source index wins.
+- `antimeridian-primary.geojson` / `antimeridian-candidates.geojson`: nearest
+  selection across the antimeridian using normalized longitude deltas.
+- `max-distance-primary.geojson` / `max-distance-candidates.geojson`: a
+  thresholded nearest candidate that becomes an unmatched primary feature.
+- `empty-candidate-primary.geojson` / `empty-candidates.geojson`: non-empty
+  primary features with an empty candidate FeatureCollection.
 
 The coordinates, attributes, identifiers, and timestamps are invented. They
 are not suitable for operational decisions.

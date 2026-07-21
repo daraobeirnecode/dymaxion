@@ -4,6 +4,7 @@ import { generateMapArtifactCapability } from './generate-map-artifact.js';
 import { inspectArcgisOrgCapability } from './inspect-arcgis-org.js';
 import { inspectDatasetCapability } from './inspect-dataset.js';
 import { queryFeatureServiceCapability } from './query-feature-service.js';
+import { runVectorAnalysisCapability } from './run-vector-analysis.js';
 import { traceArcgisDependenciesCapability } from './trace-arcgis-dependencies.js';
 import { validateSpatialDataCapability } from './validate-spatial-data.js';
 
@@ -28,6 +29,10 @@ const capabilities = new Map<string, CapabilityDefinition<unknown, unknown>>([
   [
     generateMapArtifactCapability.manifest.slug,
     generateMapArtifactCapability as CapabilityDefinition<unknown, unknown>,
+  ],
+  [
+    runVectorAnalysisCapability.manifest.slug,
+    runVectorAnalysisCapability as CapabilityDefinition<unknown, unknown>,
   ],
 ]);
 

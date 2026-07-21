@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0.0",
+  "id": "vector-analysis-rounded-tie",
+  "capability": "run_vector_analysis",
+  "input": {
+    "source_fixture": "vector-analysis/tie-primary.geojson",
+    "candidate_fixture": "vector-analysis/tie-candidates.geojson"
+  },
+  "expected": { "outcome": "success", "golden_file": "vector-analysis-rounded-tie.json" },
+  "tolerances": {
+    "numeric_absolute": 0,
+    "normalized_fields": [
+      "$.output.report.source.source_uri",
+      "$.output.report.source.source_handle",
+      "$.output.report.candidate.source_uri",
+      "$.output.report.candidate.source_handle",
+      "$.output.evidence.source.uri",
+      "$.output.evidence.source.identity.value",
+      "$.output.evidence.related_sources[0].uri",
+      "$.output.evidence.related_sources[0].identity.value",
+      "$.output.evidence.parameters.canonical_json",
+      "$.output.evidence.parameters.sha256"
+    ]
+  },
+  "allowed_operations": ["boundary_preflight", "stat", "read_file", "parse_geojson", "hash_sha256", "derive_vector_report"],
+  "expected_approval": { "required": false, "decision": "not-requested" }
+}

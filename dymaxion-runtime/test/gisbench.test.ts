@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runGisBench } from '../src/gisbench/run.js';
 
-test('GISBench matches exactly thirty committed golden tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, and 1E)', async () => {
+test('GISBench matches exactly thirty-five committed golden tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, 1E, and 1F)', async () => {
   const result = await runGisBench(false);
-  assert.equal(result.tasks.length, 30);
+  assert.equal(result.tasks.length, 35);
   assert.equal(result.failed, 0, JSON.stringify(result.tasks.filter((task) => !task.ok), null, 2));
-  assert.equal(result.passed, 30);
+  assert.equal(result.passed, 35);
   for (const task of result.tasks) {
     assert.equal(task.ok, true);
     assert.ok(task.operations.includes('boundary_preflight'));
@@ -21,4 +21,6 @@ test('GISBench matches exactly thirty committed golden tasks (5 each for Phases 
   assert.equal(validateTasks.length, 5);
   const mapArtifactTasks = result.tasks.filter((task) => task.id.startsWith('map-artifact-'));
   assert.equal(mapArtifactTasks.length, 5);
+  const vectorAnalysisTasks = result.tasks.filter((task) => task.id.startsWith('vector-analysis-'));
+  assert.equal(vectorAnalysisTasks.length, 5);
 });

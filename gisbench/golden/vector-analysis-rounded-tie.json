@@ -1,0 +1,187 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "artifact": {
+      "format": "geojson",
+      "media_type": "application/geo+json; charset=utf-8",
+      "content": "{\"features\":[{\"geometry\":{\"coordinates\":[0,0],\"type\":\"Point\"},\"id\":\"p-tie\",\"properties\":{\"_dymaxion\":{\"candidate_id\":\"east\",\"candidate_index\":0,\"distance_meters\":111.195,\"matched\":true,\"operation\":\"nearest_point\"},\"case\":\"rounded-distance tie\"},\"type\":\"Feature\"}],\"type\":\"FeatureCollection\"}",
+      "bytes": 291,
+      "sha256": "3fada2753820cbf1972dd312e1571d65e1a813fbf83bca551dadb179dd63264d"
+    },
+    "report": {
+      "schema_version": "1.0.0",
+      "generated_at": "2026-07-21T12:00:00.000Z",
+      "operation": "nearest_point",
+      "source": {
+        "kind": "local-file",
+        "role": "primary_features",
+        "source_uri": "<FIXTURE_URI>",
+        "source_handle": "<FIXTURE_PATH>",
+        "source_attribution": "local GeoJSON primary_features; sha256 09f7040161bf",
+        "sha256": "09f7040161bf4f930b8b75e803a291e8179b88a8fcdb404c79c26aaf3417032a",
+        "bytes": 167,
+        "row_count": 1
+      },
+      "candidate": {
+        "kind": "local-file",
+        "role": "candidate_features",
+        "source_uri": "<CANDIDATE_FIXTURE_URI>",
+        "source_handle": "<CANDIDATE_FIXTURE_PATH>",
+        "source_attribution": "local GeoJSON candidate_features; sha256 e6fb62b515a7",
+        "sha256": "e6fb62b515a75b4935d254ecf23fa9e03c56ced339251e8899ea8d985f4e34de",
+        "bytes": 362,
+        "row_count": 2
+      },
+      "algorithm": {
+        "name": "haversine_spherical_great_circle",
+        "authalic_radius_meters": 6371008.8,
+        "distance_units": "meters",
+        "rounding": "nearest millimetre",
+        "tie_break": "rounded distance then candidate source index",
+        "longitude_delta": "normalized across antimeridian to [-180,180]"
+      },
+      "max_distance_meters": null,
+      "counts": {
+        "input_features": 1,
+        "candidate_features": 2,
+        "output_features": 1,
+        "matched": 1,
+        "unmatched": 0,
+        "pair_evaluations": 2,
+        "primary_coordinate_positions": 1,
+        "candidate_coordinate_positions": 2,
+        "total_coordinate_positions": 3,
+        "primary_ordinates": 2,
+        "candidate_ordinates": 4,
+        "total_ordinates": 6
+      },
+      "crs": {
+        "effective": "OGC:CRS84",
+        "axis_order": "longitude,latitude",
+        "units": "degrees"
+      },
+      "output": {
+        "format": "geojson",
+        "media_type": "application/geo+json; charset=utf-8",
+        "bytes": 291,
+        "sha256": "3fada2753820cbf1972dd312e1571d65e1a813fbf83bca551dadb179dd63264d"
+      },
+      "qa": {
+        "checks": [
+          "input_schema_strict",
+          "raw_local_paths_no_percent_or_credentials",
+          "filesystem_boundary_before_each_stat_and_read",
+          "utf8_decode_fatal",
+          "geojson_featurecollection_root",
+          "rfc7946_no_legacy_crs",
+          "point_only_non_null_geometry",
+          "crs84_longitude_latitude_ranges",
+          "haversine_authalic_radius_distance",
+          "rounded_millimetre_tie_break_by_candidate_index",
+          "exact_canonical_geojson_output_hash"
+        ],
+        "warnings": [],
+        "limitations": [
+          "Distances are spherical great-circle Haversine distances with a fixed authalic radius, not ellipsoidal geodesic or projected distances.",
+          "Point-only RFC 7946 CRS84 GeoJSON FeatureCollections are supported; no topology validation, projection transform, or legacy CRS conversion is performed.",
+          "Nearest-neighbor search is brute-force O(n*m) and bounded by a hard pair-evaluation ceiling.",
+          "Inline artifact only; no filesystem, database, network, portal, or durable artifact write is performed.",
+          "Primary source properties are copied except the reserved _dymaxion namespace is rejected; candidate properties are omitted from output.",
+          "No topology, projection transform, spatial index, geocoding, buffering, or overlay analysis is performed."
+        ]
+      }
+    },
+    "evidence": {
+      "schema_version": "1.0.0",
+      "bundle_id": "run_vector_analysis:3fada2753820cbf1",
+      "generated_at": "2026-07-21T12:00:00.000Z",
+      "source": {
+        "uri": "<FIXTURE_URI>",
+        "identity": {
+          "kind": "file",
+          "value": "<FIXTURE_PATH>"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-21T12:00:00.000Z",
+        "sha256": "09f7040161bf4f930b8b75e803a291e8179b88a8fcdb404c79c26aaf3417032a",
+        "bytes": 167
+      },
+      "related_sources": [
+        {
+          "uri": "<CANDIDATE_FIXTURE_URI>",
+          "identity": {
+            "kind": "file",
+            "value": "<CANDIDATE_FIXTURE_PATH>"
+          },
+          "version": {},
+          "retrieved_at": "2026-07-21T12:00:00.000Z",
+          "sha256": "e6fb62b515a75b4935d254ecf23fa9e03c56ced339251e8899ea8d985f4e34de",
+          "bytes": 362,
+          "role": "candidate_features",
+          "gis_metadata": {
+            "format": "GeoJSON",
+            "crs": "OGC:CRS84",
+            "axis_order": "longitude,latitude",
+            "units": "degrees",
+            "extent": null,
+            "schema": [],
+            "row_count": 2,
+            "geometry_types": [
+              "Point"
+            ],
+            "temporal_fields": []
+          }
+        }
+      ],
+      "gis_metadata": {
+        "format": "GeoJSON",
+        "crs": "OGC:CRS84",
+        "axis_order": "longitude,latitude",
+        "units": "degrees",
+        "extent": null,
+        "schema": [],
+        "row_count": 1,
+        "geometry_types": [
+          "Point"
+        ],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "<ENVIRONMENT_DEPENDENT_CANONICAL_PARAMETERS>",
+        "sha256": "<ENVIRONMENT_DEPENDENT_PARAMETER_HASH>"
+      },
+      "execution": {
+        "capability": "run_vector_analysis",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "nearest_point_geojson",
+          "sha256": "3fada2753820cbf1972dd312e1571d65e1a813fbf83bca551dadb179dd63264d",
+          "bytes": 291,
+          "validation": {
+            "valid": true,
+            "checks": [
+              "input_schema",
+              "geojson_parse",
+              "point_only",
+              "exact_utf8_output_hash",
+              "output_schema"
+            ],
+            "warnings": []
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

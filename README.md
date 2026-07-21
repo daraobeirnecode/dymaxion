@@ -7,11 +7,18 @@ an operator you delegate to, not a chatbot.
 - **Framework**: TypeScript + Vercel AI SDK + openid-client; Mastra is retained as development-only compatibility scaffolding in Phase 0
 - **Providers**: Anthropic (API key), OpenAI / Google / Azure / Cohere (OAuth 2.0), Ollama (local)
 - **Memory**: Postgres 18 + pgvector, Voyage voyage-3-large embeddings
-- **Capabilities**: six implemented native capabilities — the Phase 0 `inspect_dataset` GeoJSON slice, the Phase 1A read-only `inspect_arcgis_org` organization inventory ([docs](docs/capabilities/inspect-arcgis-org.md)), the Phase 1B read-only `trace_arcgis_dependencies` dependency graph ([docs](docs/capabilities/trace-arcgis-dependencies.md)), the Phase 1C read-only `query_feature_service` bounded Feature Service query ([docs](docs/capabilities/query-feature-service.md)), the Phase 1D read-only `validate_spatial_data` bounded local GeoJSON QA report ([docs](docs/capabilities/validate-spatial-data.md)), and the Phase 1E read-only `generate_map_artifact` deterministic inline SVG renderer ([docs](docs/capabilities/generate-map-artifact.md)) — plus 45 historical Sprint 1 skill scaffolds; folder presence is not a production-readiness claim, and the remaining roadmap capabilities are not implemented
+- **Capabilities**: seven implemented native capabilities — the Phase 0 `inspect_dataset` GeoJSON slice, the Phase 1A read-only `inspect_arcgis_org` organization inventory ([docs](docs/capabilities/inspect-arcgis-org.md)), the Phase 1B read-only `trace_arcgis_dependencies` dependency graph ([docs](docs/capabilities/trace-arcgis-dependencies.md)), the Phase 1C read-only `query_feature_service` bounded Feature Service query ([docs](docs/capabilities/query-feature-service.md)), the Phase 1D read-only `validate_spatial_data` bounded local GeoJSON QA report ([docs](docs/capabilities/validate-spatial-data.md)), the Phase 1E read-only `generate_map_artifact` deterministic inline SVG renderer ([docs](docs/capabilities/generate-map-artifact.md)), and the Phase 1F read-only `run_vector_analysis` deterministic local nearest-point analysis between two Point GeoJSON FeatureCollections — plus 45 historical Sprint 1 skill scaffolds; folder presence is not a production-readiness claim, and the remaining roadmap capabilities are not implemented
 - **Gateways**: Telegram + CLI + Web (Sprint 1); Teams, Slack, Email, ArcGIS Portal, SMS stubbed
 - **Safety**: employer boundary (structural allow/deny lists), human-in-the-loop approvals for destructive ops, per-tier monthly USD budget caps enforced pre-call, append-only audit log, LangFuse tracing
 
 Architecture authority: [ADR-0001](docs/adr/0001-phase-0-runtime-and-execution-boundaries.md) selects the TypeScript/Vercel AI SDK runtime with native middleware and a Mastra-compatible migration path, excludes core LiteLLM, and disables Windows execution pending an allowlisted-job redesign and security testing. Conflicting Sprint 1 statements are historical.
+
+Current verified phase: **Phase 1F deterministic local vector analysis**. The
+runtime has seven native read-only capabilities and GISBench has 35 committed
+golden tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, 1E, and 1F). Phase 1F is
+nearest-point only over bounded local RFC 7946 CRS84 Point FeatureCollections;
+it does not use QGIS, ArcPy, live services, basemaps, geocoding, buffering,
+overlay, reprojection, topology validation, network access, or artifact writes.
 
 ## Install
 

@@ -39,6 +39,14 @@ export const CapabilityManifestSchema = z
         max_title_chars: z.number().int().positive().optional(),
         max_purpose_chars: z.number().int().positive().optional(),
         max_audience_chars: z.number().int().positive().optional(),
+        max_pair_evaluations: z.number().int().positive().optional(),
+        max_output_bytes: z.number().int().positive().optional(),
+        max_source_bytes: z.number().int().positive().optional(),
+        max_primary_records: z.number().int().positive().optional(),
+        max_candidate_records: z.number().int().positive().optional(),
+        max_coordinate_ordinates: z.number().int().positive().optional(),
+        max_json_depth: z.number().int().positive().optional(),
+        max_json_nodes: z.number().int().positive().optional(),
       })
       .strict(),
     idempotency: z
@@ -89,6 +97,14 @@ export interface CapabilityDefinition<TInput, TOutput> {
   outputSchema: z.ZodType<TOutput>;
   inputSummary: readonly string[];
   boundaryFields: readonly string[];
+  /**
+   * Optional capability-specific preflight that runs after the shared execution
+   * boundary accepts the validated input and before approval, invocation
+   * recording, audit logging, or execution. Use only for checks that require
+   * canonicalization or other capability-local context; never duplicate this in
+   * the shared executor.
+   */
+  preflight?(input: TInput, context: CapabilityExecutionContext): Promise<void>;
   execute(input: TInput, context: CapabilityExecutionContext): Promise<TOutput>;
 }
 
@@ -96,6 +112,8 @@ export interface CapabilityExecutionContext {
   agentRunId?: string;
   signal?: AbortSignal;
   now?: () => Date;
+  /** Testable monotonic milliseconds clock for duration enforcement. Production defaults to performance.now(). */
+  monotonicNow?: () => number;
   io?: Record<string, unknown>;
   /** Boundary enforcement options for capabilities that dispatch outbound
    * requests; capabilities must pass these to the shared URL checks so
