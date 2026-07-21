@@ -759,6 +759,156 @@ test('non-local source_uri forms are rejected before recorder or any I/O', async
   assert.equal(ok.ok, true, ok.error);
 });
 
+test('credential-shaped local paths are rejected before audit, recorder, or I/O without echo', async () => {
+  const attempts = [
+    {
+      source: '/private/tmp/access_token=BOUNDARYCANARY.geojson',
+      canary: 'BOUNDARYCANARY',
+    },
+    {
+      source: join(spatialFixtures, 'access_token=PATHCANARY.geojson'),
+      canary: 'PATHCANARY',
+    },
+    {
+      source: join(spatialFixtures, 'api_key%3DENCODEDCANARY.geojson'),
+      canary: 'ENCODEDCANARY',
+    },
+    {
+      source: join(spatialFixtures, 'client_secret%253DDOUBLECANARY.geojson'),
+      canary: 'DOUBLECANARY',
+    },
+    {
+      source: join(spatialFixtures, 'access_token%2525253DFOURCANARY.geojson'),
+      canary: 'FOURCANARY',
+    },
+    {
+      source: join(spatialFixtures, 'access_token%ZZ%253DINTERPOSECANARY.geojson'),
+      canary: 'INTERPOSECANARY',
+    },
+    {
+      source: join(spatialFixtures, 'Bearer%ZZ%2520INTERPOSEBEARER.geojson'),
+      canary: 'INTERPOSEBEARER',
+    },
+    {
+      source: join(spatialFixtures, 'access_token%C0%AE%3DUTF8CANARY.geojson'),
+      canary: 'UTF8CANARY',
+    },
+    {
+      source: join(spatialFixtures, 'access_token%C0%AE%253DUTF8NESTEDCANARY.geojson'),
+      canary: 'UTF8NESTEDCANARY',
+    },
+    {
+      source: join(spatialFixtures, 'Bearer%C0%AE%20UTF8BEARER.geojson'),
+      canary: 'UTF8BEARER',
+    },
+    {
+      source: join(spatialFixtures, 'Authorization%20Bearer%20AUTHCANARY.geojson'),
+      canary: 'AUTHCANARY',
+    },
+  ];
+
+  for (const { source, canary } of attempts) {
+    let began = 0;
+    let ioCalls = 0;
+    const boundaryAudits: unknown[] = [];
+    const result = await validate(
+      { source_uri: source },
+      {
+        recorder: {
+          begin: async () => {
+            began += 1;
+            return 'should-not-begin';
+          },
+          finish: async () => undefined,
+        },
+        boundaryOptions: {
+          audit: async (...args: unknown[]) => {
+            boundaryAudits.push(args);
+          },
+        },
+        capabilityContext: {
+          now: () => FIXED_NOW,
+          io: {
+            stat: async () => {
+              ioCalls += 1;
+              return { size: 1, mtime: FIXED_NOW };
+            },
+            readFile: async () => {
+              ioCalls += 1;
+              return Buffer.from('{}');
+            },
+          },
+        },
+      },
+    );
+
+    assert.equal(result.ok, false);
+    assert.match(
+      result.error ?? '',
+      /source_uri must (?:not contain credential-shaped path text|use a raw local filesystem path without percent escapes)/,
+    );
+    assert.equal(began, 0);
+    assert.equal(ioCalls, 0);
+    assert.deepEqual(boundaryAudits, []);
+
+    const serialized = JSON.stringify({ result, boundaryAudits });
+    assert.ok(!serialized.includes(canary), `rejection must not echo ${canary}`);
+    assert.ok(!serialized.includes(source), 'rejection must not echo the source path');
+  }
+});
+
+test('ordinary credential-ish filename words remain valid local paths', async () => {
+  const benignNames = [
+    'token-inventory.geojson',
+    'password-reset-zones.geojson',
+    'authorization-codebook.geojson',
+    'key-signature-index.geojson',
+    'district map.geojson',
+    'café inventory.geojson',
+  ];
+  const bytes = Buffer.from(
+    '{"type":"FeatureCollection","features":[{"type":"Feature","id":"ok","properties":{},' +
+      '"geometry":{"type":"Point","coordinates":[1,1]}}]}',
+  );
+
+  for (const name of benignNames) {
+    let began = 0;
+    let statCalls = 0;
+    let readCalls = 0;
+    const result = await validate(
+      { source_uri: join(spatialFixtures, name) },
+      {
+        recorder: {
+          begin: async () => {
+            began += 1;
+            return 'benign-invocation';
+          },
+          finish: async () => undefined,
+        },
+        capabilityContext: {
+          now: () => FIXED_NOW,
+          io: {
+            stat: async () => {
+              statCalls += 1;
+              return { size: bytes.byteLength, mtime: FIXED_NOW };
+            },
+            readFile: async () => {
+              readCalls += 1;
+              return bytes;
+            },
+          },
+        },
+      },
+    );
+
+    assert.equal(result.ok, true, result.error);
+    assert.equal(began, 1);
+    assert.equal(statCalls, 1);
+    assert.equal(readCalls, 1);
+    assert.equal(result.output.report.summary.valid, true);
+  }
+});
+
 test('direct capability execution re-asserts the filesystem boundary at each I/O sink', async () => {
   let ioCalls = 0;
   const countingIo = {

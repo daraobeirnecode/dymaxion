@@ -135,8 +135,18 @@ const SourceUriSchema = z
   .refine((value) => !value.includes('?') && !value.includes('#'), {
     message: 'source_uri must not contain URL query or fragment delimiters',
   })
+  .refine((value) => !value.includes('%'), {
+    message: 'source_uri must use a raw local filesystem path without percent escapes',
+  })
   .refine((value) => value.toLowerCase().endsWith('.geojson'), {
     message: 'unsupported dataset format: source_uri must be a bounded local .geojson filesystem path',
+  })
+  // Raw credential-shaped assignments/header material are rejected here.
+  // Percent-encoded, multiply encoded, malformed, and invalid-UTF-8 forms are
+  // already rejected by the raw-path rule above, removing decoding ambiguity
+  // before boundary audit, invocation persistence, stat, readFile, or output.
+  .refine((value) => !containsCredentialMaterial(value), {
+    message: 'source_uri must not contain credential-shaped path text',
   })
   // Bare relative paths (x.geojson) are part of the advertised local-path
   // contract, but the shared executor boundary classifies bare strings in
