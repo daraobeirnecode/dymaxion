@@ -290,6 +290,11 @@ function wrapLon180(lon: number): number {
   return Object.is(value, -180) ? 180 : value;
 }
 
+function wrapViewportLon180(lon: number, bound: 'lower' | 'upper'): number {
+  const value = ((((lon + 180) % 360) + 360) % 360) - 180;
+  return Object.is(value, -180) && bound === 'upper' ? 180 : value;
+}
+
 type LongitudeInterval = {
   minX: number;
   maxX: number;
@@ -766,8 +771,8 @@ async function executeGenerateMapArtifact(
     crosses: sourceLonInterval.crosses,
     empty: counts.coordinate_positions === 0,
   };
-  const wrappedViewportMinX = wrapLon180(extent.minX);
-  const wrappedViewportMaxX = wrapLon180(extent.maxX);
+  const wrappedViewportMinX = wrapViewportLon180(extent.minX, 'lower');
+  const wrappedViewportMaxX = wrapViewportLon180(extent.maxX, 'upper');
   const rawPaddedViewportCrosses = extent.crosses || wrappedViewportMinX > wrappedViewportMaxX;
   const viewportExtent: [number, number, number, number] = extent.empty
     ? [-180, -90, 180, 90]

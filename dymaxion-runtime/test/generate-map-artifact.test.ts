@@ -313,6 +313,19 @@ test('antimeridian and empty/point degenerate extents are deliberate and determi
     assert.equal(roundedBoundary.output.report.qa.warnings.some((warning) => warning.includes('Antimeridian-aware')), false);
     assert.match(roundedBoundary.output.artifact.content, />CRS84 extent<\/text>/);
     assert.doesNotMatch(roundedBoundary.output.artifact.content, />Antimeridian-aware extent<\/text>/);
+
+    const negativeBoundaryPath = await writeGeojson(dir, 'negative-boundary.geojson', {
+      type: 'FeatureCollection',
+      features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [-179.5, 0] } }],
+    });
+    const negativeBoundary = await generate({ source_uri: negativeBoundaryPath });
+    assert.equal(negativeBoundary.ok, true, negativeBoundary.error);
+    assert.deepEqual(negativeBoundary.output.report.extent.source, [-179.5, 0, -179.5, 0]);
+    assert.deepEqual(negativeBoundary.output.report.extent.viewport, [-180, -0.5, -179, 0.5]);
+    assert.equal(negativeBoundary.output.report.extent.antimeridian_crosses, false);
+    assert.equal(negativeBoundary.output.report.qa.warnings.some((warning) => warning.includes('Antimeridian-aware')), false);
+    assert.match(negativeBoundary.output.artifact.content, />CRS84 extent<\/text>/);
+    assert.doesNotMatch(negativeBoundary.output.artifact.content, />Antimeridian-aware extent<\/text>/);
   });
 });
 
