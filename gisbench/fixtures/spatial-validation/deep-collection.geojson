@@ -1,0 +1,41 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "d1",
+      "properties": {},
+      "geometry": {
+        "type": "GeometryCollection",
+        "geometries": [
+          {
+            "type": "GeometryCollection",
+            "geometries": [
+              {
+                "type": "GeometryCollection",
+                "geometries": [
+                  {
+                    "type": "GeometryCollection",
+                    "geometries": [
+                      {
+                        "type": "GeometryCollection",
+                        "geometries": [
+                          {
+                            "type": "GeometryCollection",
+                            "geometries": [
+                              { "type": "Point", "coordinates": [0, 0] }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

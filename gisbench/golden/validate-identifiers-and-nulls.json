@@ -1,0 +1,234 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "report": {
+      "schema_version": "1.0.0",
+      "source_uri": "<FIXTURE_URI>",
+      "source_handle": "<FIXTURE_PATH>",
+      "retrieved_at": "2026-07-18T12:00:00.000Z",
+      "file_sha256": "679575282314b53a18827d8fae09196532cf9f11220b5e9e213b0006942cfdcb",
+      "file_size_bytes": 969,
+      "format": "GeoJSON",
+      "crs": {
+        "declared": null,
+        "effective": "OGC:CRS84",
+        "axis_order": "longitude,latitude",
+        "units": "degrees",
+        "crs84_range_checks": true
+      },
+      "scope": {
+        "checks_run": [
+          "bbox",
+          "coordinate_dimensions",
+          "coordinate_range_crs84",
+          "duplicate_vertices",
+          "feature_ids",
+          "geometry_structure",
+          "geometry_types",
+          "json_structure",
+          "linestring_cardinality",
+          "null_geometry",
+          "property_null_profile",
+          "ring_cardinality",
+          "ring_closure",
+          "ring_self_intersection_bounded",
+          "ring_zero_area"
+        ],
+        "checks_not_run": [
+          {
+            "id": "coded_value_domains",
+            "reason": "GeoJSON defines no coded-value domains; domain validation is not applicable to this format."
+          },
+          {
+            "id": "cross_feature_topology",
+            "reason": "Cross-feature topology (overlaps, gaps, shared boundaries) is not implemented in Phase 1D."
+          },
+          {
+            "id": "ogc_simple_features_validity",
+            "reason": "Full OGC Simple Features / GEOS-equivalent validity is not implemented; only the bounded checks listed in checks_run were performed."
+          },
+          {
+            "id": "polygon_hole_containment",
+            "reason": "Polygon interior-ring containment and ring-overlap checks are not implemented in Phase 1D."
+          }
+        ]
+      },
+      "summary": {
+        "feature_count": 6,
+        "coordinate_position_count": 5,
+        "error_count": 2,
+        "warning_count": 2,
+        "total_finding_count": 4,
+        "returned_finding_count": 4,
+        "findings_truncated": false,
+        "valid": false
+      },
+      "issues": [
+        {
+          "code": "feature_id_duplicate",
+          "severity": "error",
+          "location": {
+            "feature_index": 2,
+            "path": "id"
+          },
+          "message": "feature id duplicates the id of feature 1"
+        },
+        {
+          "code": "feature_id_invalid_type",
+          "severity": "error",
+          "location": {
+            "feature_index": 5,
+            "path": "id"
+          },
+          "message": "feature id must be a JSON string or number"
+        },
+        {
+          "code": "feature_id_missing",
+          "severity": "warning",
+          "location": {
+            "feature_index": 0,
+            "path": "id"
+          },
+          "message": "feature has no id member"
+        },
+        {
+          "code": "geometry_null",
+          "severity": "warning",
+          "location": {
+            "feature_index": 3,
+            "path": "geometry"
+          },
+          "message": "feature geometry is null"
+        }
+      ],
+      "metrics": {
+        "null_geometry_count": 1,
+        "missing_id_count": 1,
+        "duplicate_id_count": 1,
+        "geometry_type_counts": [
+          {
+            "type": "Point",
+            "count": 5
+          }
+        ],
+        "coordinate_dimension_counts": [
+          {
+            "dimensions": 2,
+            "count": 5
+          }
+        ],
+        "out_of_range_position_count": 0,
+        "unclosed_ring_count": 0,
+        "zero_area_ring_count": 0,
+        "duplicate_vertex_count": 0,
+        "self_intersecting_ring_count": 0,
+        "self_intersection_checks_skipped": 0,
+        "bbox": {
+          "declared_present": false,
+          "declared_valid": null,
+          "computed_extent": [
+            1,
+            1,
+            5,
+            5
+          ],
+          "encloses_computed": null
+        },
+        "property_null_profile": [
+          {
+            "name": "owner",
+            "null_count": 1,
+            "missing_count": 3
+          },
+          {
+            "name": "status",
+            "null_count": 1,
+            "missing_count": 3
+          }
+        ]
+      }
+    },
+    "evidence": {
+      "schema_version": "1.0.0",
+      "bundle_id": "validate_spatial_data:679575282314b53a",
+      "generated_at": "2026-07-18T12:00:00.000Z",
+      "source": {
+        "uri": "<FIXTURE_URI>",
+        "identity": {
+          "kind": "file",
+          "value": "<FIXTURE_PATH>"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-18T12:00:00.000Z",
+        "sha256": "679575282314b53a18827d8fae09196532cf9f11220b5e9e213b0006942cfdcb"
+      },
+      "gis_metadata": {
+        "format": "GeoJSON",
+        "crs": "OGC:CRS84",
+        "axis_order": "longitude,latitude",
+        "units": "degrees",
+        "extent": [
+          1,
+          1,
+          5,
+          5
+        ],
+        "schema": [
+          {
+            "name": "owner",
+            "types": [
+              "string"
+            ],
+            "nullable": true
+          },
+          {
+            "name": "status",
+            "types": [
+              "string"
+            ],
+            "nullable": true
+          }
+        ],
+        "row_count": 6,
+        "geometry_types": [
+          "Point"
+        ],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "<ENVIRONMENT_DEPENDENT_CANONICAL_PARAMETERS>",
+        "sha256": "<ENVIRONMENT_DEPENDENT_PARAMETER_HASH>"
+      },
+      "execution": {
+        "capability": "validate_spatial_data",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "validation_report",
+          "sha256": "<ENVIRONMENT_DEPENDENT_OUTPUT_HASH>",
+          "validation": {
+            "valid": false,
+            "checks": [
+              "input_schema",
+              "geojson_structure",
+              "validation_checks",
+              "output_schema"
+            ],
+            "warnings": []
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

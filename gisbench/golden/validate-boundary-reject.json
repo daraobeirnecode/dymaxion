@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "error": "Employer boundary violation (path/path_not_allowlisted): <WORKSPACE_ROOT>/gisbench/boundary-escape.geojson",
+  "cost_usd": 0
+}

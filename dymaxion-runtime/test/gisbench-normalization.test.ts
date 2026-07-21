@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { sha256Canonical, sha256Text } from '../src/contracts/canonical.js';
-import { normalizeResult } from '../src/gisbench/run.js';
+import { assertValidationSourceHashes, normalizeResult } from '../src/gisbench/run.js';
 
 function validResult() {
   const passport = {
@@ -59,5 +59,28 @@ test('GISBench validates evidence hashes before normalization can hide them', ()
         '/tmp/fixtures',
       ),
     /output hash must validate before normalization/,
+  );
+});
+
+test('GISBench rejects jointly forged validation report/evidence source hashes before normalization', () => {
+  const rawBytes = Buffer.from('{"type":"FeatureCollection","features":[]}');
+  const truthful = sha256Text(rawBytes);
+  const forged = 'b'.repeat(64);
+  assert.notEqual(forged, truthful);
+  // report and evidence agree with each other but both differ from the raw
+  // fixture bytes — the recomputation must fail closed.
+  assert.throws(
+    () =>
+      assertValidationSourceHashes(
+        { report: { file_sha256: forged }, evidence: { source: { sha256: forged } } },
+        rawBytes,
+      ),
+    /recomputed raw fixture hash/,
+  );
+  assert.doesNotThrow(() =>
+    assertValidationSourceHashes(
+      { report: { file_sha256: truthful }, evidence: { source: { sha256: truthful } } },
+      rawBytes,
+    ),
   );
 });

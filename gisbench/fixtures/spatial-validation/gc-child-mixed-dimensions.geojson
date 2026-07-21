@@ -1,0 +1,19 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "gm-2",
+      "properties": {},
+      "geometry": {
+        "type": "GeometryCollection",
+        "geometries": [
+          {
+            "type": "LineString",
+            "coordinates": [[1, 2], [3, 4, 5]]
+          }
+        ]
+      }
+    }
+  ]
+}

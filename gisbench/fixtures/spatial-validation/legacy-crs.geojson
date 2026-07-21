@@ -1,0 +1,15 @@
+{
+  "type": "FeatureCollection",
+  "crs": { "type": "name", "properties": { "name": "EPSG:3857" } },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "m1",
+      "properties": { "label": "web-mercator-point" },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-13627361.03, 4547675.35]
+      }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 # GISBench
 
-GISBench contains exactly twenty reproducible golden tasks across the four
-implemented native capabilities.
+GISBench contains exactly twenty-five reproducible golden tasks across the
+five implemented native capabilities.
 
 Phase 0 — deterministic `inspect_dataset` (local GeoJSON):
 
@@ -50,6 +50,24 @@ access):
 20. employer-boundary rejection of a denied FeatureServer hostname before
     any request.
 
+Phase 1D — deterministic read-only `validate_spatial_data` (local synthetic
+GeoJSON fixtures, no network access):
+
+21. clean polygon/point FeatureCollection with an enclosing declared bbox
+    (`valid: true`, zero findings, full checks-run/checks-not-run scope);
+22. geometry defect findings (unclosed ring, bow-tie self-intersection with
+    a non-intersecting control, duplicate vertices, short LineString,
+    zero-area ring, out-of-range position, mixed coordinate dimensions)
+    sorted deterministically with `valid: false`;
+23. identifier and null QA (missing/duplicate/invalid typed feature IDs,
+    null geometry, stable property-null profile) with no raw untrusted
+    values echoed;
+24. stable issue-ceiling truncation (`max_issues: 1`): the error survives
+    over an earlier-encountered warning because sorting precedes truncation,
+    while summary totals still count every finding;
+25. filesystem boundary-escape rejection before any invocation recording or
+    dataset I/O.
+
 Each versioned task declares its golden output/error, numeric tolerance,
 explicitly normalized environment-dependent fields, permitted operations, and
 expected approval behavior. ArcGIS tasks resolve requests through an
@@ -67,12 +85,20 @@ npm run gisbench
 ```
 
 The runner fixes the evidence retrieval clock. For dataset tasks it
-normalizes only checkout-dependent source paths, filesystem modification
-time, and hashes/canonical parameter fields that incorporate those paths;
-ArcGIS tasks are fully deterministic and normalize nothing. Evidence hashes
-(source, canonical parameters, output artifacts, per-request bodies) are
-validated before comparison; Phase 1C query evidence additionally validates
-the POST method, canonical request-body hashes, and the absence of query
-strings from query evidence URLs. GISBench remains an evaluation scaffold —
-twenty tasks toward the 100-task roadmap goal, not a claim of broad GIS
-coverage.
+normalizes checkout-dependent source paths, filesystem modification time,
+and hashes/canonical parameter fields that incorporate those paths; Phase 1D
+validation evidence deliberately carries no filesystem mtime (its
+`source.version` is empty for same-byte determinism), so validation tasks
+normalize only the path-dependent fields and hashes; ArcGIS tasks are fully
+deterministic and normalize nothing.
+Evidence hashes (source, canonical parameters, output artifacts, per-request
+bodies) are validated before comparison; Phase 1C query evidence additionally
+validates the POST method, canonical request-body hashes, and the absence of
+query strings from query evidence URLs. Phase 1D validation evidence is
+checked against a source SHA-256 **recomputed from the actual raw fixture
+bytes** — both the report and evidence source hashes must equal it, so
+jointly forged hashes fail closed — plus the canonical parameter/report
+output hashes, and the evidence artifact validity must mirror the dataset
+validation result, all before normalization. GISBench remains an evaluation
+scaffold — twenty-five tasks toward the 100-task roadmap goal, not a claim
+of broad GIS coverage.

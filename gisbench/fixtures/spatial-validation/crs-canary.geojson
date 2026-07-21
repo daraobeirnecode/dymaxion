@@ -1,0 +1,12 @@
+{
+  "type": "FeatureCollection",
+  "crs": { "type": "name", "properties": { "name": "client_secret=CRSCANARY_9Q7" } },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "cc-1",
+      "properties": { "label": "plain" },
+      "geometry": { "type": "Point", "coordinates": [10, 20] }
+    }
+  ]
+}

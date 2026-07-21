@@ -1,0 +1,18 @@
+{
+  "type": "FeatureCollection",
+  "bbox": [170, -10, -170, 10],
+  "features": [
+    {
+      "type": "Feature",
+      "id": "am-1",
+      "properties": {},
+      "geometry": { "type": "Point", "coordinates": [175, 0] }
+    },
+    {
+      "type": "Feature",
+      "id": "am-3",
+      "properties": {},
+      "geometry": { "type": "Point", "coordinates": [0, 0] }
+    }
+  ]
+}

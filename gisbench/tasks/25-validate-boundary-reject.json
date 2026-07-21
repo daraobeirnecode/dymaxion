@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0.0",
+  "id": "validate-boundary-reject",
+  "capability": "validate_spatial_data",
+  "input": { "fixture": "../boundary-escape.geojson" },
+  "expected": { "outcome": "error", "golden_file": "validate-boundary-reject.json" },
+  "tolerances": { "numeric_absolute": 0, "normalized_fields": ["$.error"] },
+  "allowed_operations": ["boundary_preflight"],
+  "expected_approval": { "required": false, "decision": "not-requested" }
+}
