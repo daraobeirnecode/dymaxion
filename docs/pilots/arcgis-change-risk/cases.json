@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0.0",
+  "cases": [
+    {
+      "slug": "juneau-old-public-gis",
+      "project_id": "519e8c7c-5176-5de6-a8cf-52b7772e0e34",
+      "portal_url": "https://juneaucounty.maps.arcgis.com",
+      "org_id": "bT3EoWZjN5T5Pbld",
+      "organization_name": "Juneau County, Wisconsin",
+      "root_item_id": "ba201516e5ed4c289d33150f640fdfb2",
+      "expected_root_title": "1 - OLD Public GIS Viewer",
+      "expected_web_map_id": "7cd80aa02a95494e976261f56d883200",
+      "expected_minimum_direct_reference_count": 7,
+      "review_posture": "retirement_cleanup"
+    },
+    {
+      "slug": "la-county-cannabis-zones",
+      "project_id": "abc84dda-6997-5b9d-a312-388f140ddb36",
+      "portal_url": "https://lacounty.maps.arcgis.com",
+      "org_id": "RmCCgQtiZLDCtblq",
+      "organization_name": "County of Los Angeles",
+      "root_item_id": "df60d1a4b1014df7866949fe46519711",
+      "expected_root_title": "Eligibility Zones for Commercial Cannabis in Unincorporated LA County",
+      "expected_web_map_id": "bf87b9c1dddf46c7a01cbdd9753eca89",
+      "expected_minimum_direct_reference_count": 24,
+      "review_posture": "change_review"
+    },
+    {
+      "slug": "tweed-planning-detail",
+      "project_id": "db86ca81-01a6-5d7c-81b7-6ae26be11136",
+      "portal_url": "https://tweed.maps.arcgis.com",
+      "org_id": "KURAxOhGWn5RdCPg",
+      "organization_name": "Tweed Shire Council",
+      "root_item_id": "227c90c55bbf41f38453fab13e58f492",
+      "expected_root_title": "DA Tracker Planning Detail",
+      "expected_web_map_id": "f14affbcc56b4cddafc5c7624f0ceab2",
+      "expected_minimum_direct_reference_count": 22,
+      "review_posture": "change_review"
+    }
+  ]
+}

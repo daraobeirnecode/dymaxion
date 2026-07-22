@@ -72,12 +72,14 @@ fields produces a deterministic warning, not a guess.
   into terminal `service:` nodes whose IDs are the full SHA-256 of the
   sanitized URL, so no credential or signed query string can reach output.
   The PATH is additionally decoded to a stable point with a bounded pass
-  ceiling (3), and credential-shaped assignments or Bearer/Basic
-  authorization material are checked after **every** decode pass, so singly
-  or multiply percent-encoded smuggling (`/token=…`, `/token%3D…`,
-  `/token%253D…`) is rejected as `credential_bearing_url` without echoing
-  the raw value. Malformed percent encoding or nesting deeper than the
-  ceiling fails closed as `unparseable_url`. Ordinary service names —
+  ceiling (3). Credential-shaped assignments, Bearer/Basic authorization
+  material, and narrow adjacent key/value conventions such as
+  `/apikey/{value}` or `/access_token/{value}` are checked after **every**
+  decode pass, so singly or multiply percent-encoded smuggling
+  (`/token=…`, `/token%3D…`, `/api%5Fkey/{value}`) is rejected as
+  `credential_bearing_url` without echoing the raw value. Malformed percent
+  encoding or nesting beyond the pass ceiling fails closed as
+  `unparseable_url`. Ordinary service names —
   including percent-encoded names like `Fire%20Hydrants` and a segment
   literally named `token` without an assignment — are unaffected.
 - No credential field exists in the input schema; token/key/password-like

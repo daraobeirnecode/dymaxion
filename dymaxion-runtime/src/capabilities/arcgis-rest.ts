@@ -185,6 +185,21 @@ const API_KEY_HEADER = /\b((?:x-)?api[-_]?key\s*:\s*)[^\s"',;}]+/gi;
 // Assignment pairs inside URL path text: unlike KEY_VALUE_PAIR above, the key
 // may directly follow a '/' segment boundary ('/token=abc/FeatureServer').
 const PATH_ASSIGNMENT = /([A-Za-z0-9_.-]+)\s*[=:]\s*[^\s/]+/g;
+// Some service providers place credentials in adjacent path segments rather
+// than assignments (`/apikey/{value}`). Keep this list intentionally narrow
+// so legitimate service names such as `/services/token/FeatureServer` remain
+// valid while unambiguous key/value path conventions fail closed.
+const PATH_VALUE_CREDENTIAL_KEYS = new Set([
+  'apikey',
+  'api-key',
+  'api_key',
+  'access-token',
+  'access_token',
+  'accesstoken',
+  'client-secret',
+  'client_secret',
+  'clientsecret',
+]);
 // Non-global: safe for .test() detection; same shared token68 grammar.
 const AUTH_MATERIAL = new RegExp(String.raw`\b(?:bearer|basic)\s+${TOKEN68_RUN}`, 'i');
 
@@ -203,6 +218,15 @@ export function containsCredentialMaterial(text: string): boolean {
   }
   for (const match of text.matchAll(PATH_ASSIGNMENT)) {
     if (isCredentialKey(match[1])) return true;
+  }
+  const pathSegments = text.split('/');
+  for (let index = 0; index < pathSegments.length - 1; index += 1) {
+    if (
+      PATH_VALUE_CREDENTIAL_KEYS.has(pathSegments[index]!.toLowerCase()) &&
+      pathSegments[index + 1]!.length > 0
+    ) {
+      return true;
+    }
   }
   return AUTH_MATERIAL.test(text);
 }

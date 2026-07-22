@@ -769,7 +769,13 @@ test('item data envelopes leave the node unexpanded with a warning', async () =>
 });
 
 test('credential-shaped decoded path content in service URLs is rejected without echoing', async () => {
-  const pathCanaries = ['CANARY_PATH_TOKEN_6a', 'CANARY_PATH_ENC_7b', 'CANARY_PATH_BEARER_8c'];
+  const pathCanaries = [
+    'CANARY_PATH_TOKEN_6a',
+    'CANARY_PATH_ENC_7b',
+    'CANARY_PATH_BEARER_8c',
+    'CANARY_PATH_APIKEY_9d',
+    'CANARY_PATH_APIKEY_ENC_0e',
+  ];
   const transport = fixtureTransport({
     [metaUrl(MAP)]: meta(MAP, 'Web Map', 'Path Canary Map'),
     [dataUrl(MAP)]: {
@@ -781,6 +787,9 @@ test('credential-shaped decoded path content in service URLs is rejected without
           { url: 'https://services.arcgis.com/api_key%3DCANARY_PATH_ENC_7b/FeatureServer' },
           // Authorization material embedded in a path segment.
           { url: 'https://services.arcgis.com/Bearer%20CANARY_PATH_BEARER_8c/FeatureServer' },
+          // Provider-style path-pair credentials, raw and encoded key names.
+          { url: 'https://tiles.example.com/wms/apikey/CANARY_PATH_APIKEY_9d' },
+          { url: 'https://tiles.example.com/wms/api%5Fkey/CANARY_PATH_APIKEY_ENC_0e' },
           // Ordinary service names must NOT be rejected.
           { url: 'https://services.arcgis.com/rest/services/Hydrants_2026/FeatureServer' },
           { url: 'https://services.arcgis.com/rest/services/token/FeatureServer' },
@@ -807,7 +816,7 @@ test('credential-shaped decoded path content in service URLs is rejected without
     'https://services.arcgis.com/rest/services/token/FeatureServer',
   ]);
 
-  // All three credential-shaped paths are unresolved credential_bearing_url.
+  // All credential-shaped paths are unresolved credential_bearing_url.
   const credentialRefs = report.unresolved_references.filter(
     (ref: any) => ref.reason === 'credential_bearing_url',
   );
