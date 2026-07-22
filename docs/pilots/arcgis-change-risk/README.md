@@ -1,9 +1,9 @@
 # ArcGIS change-risk value pilot
 
-**Status:** in progress<br>
-**Branch:** `feat/value-validation-change-risk-pilot`<br>
-**Baseline:** `356b5241b8fcd54b651305ceadf7c81cc2f07142`<br>
-**Model attribution:** Fable 5 authored the Phase 1 capability baseline. Mercator is composing the value-pilot runner and records; all changes require independent exact-SHA review before merge.
+**Status:** value pilot merged; operator change-ticket packet enrichment in progress<br>
+**Current branch:** `feat/operator-change-risk-packet`<br>
+**Pilot merge baseline:** `c8117615c77c462794f30b9992584445c769d3d7` ([PR #11](https://github.com/daraobeirnecode/dymaxion/pull/11))<br>
+**Model attribution:** Fable 5 authored the Phase 1 capability baseline and initial operator-packet implementation. A GPT-5.5 worker drafted the value-pilot runner; Mercator (GPT-5.6 Sol/Codex) materially corrected, executed, reviewed, and released that pilot, then materially hardened the operator packet's schemas, rendering and export sinks, exact-Node command, exploit regressions, verification, and documentation. The current enrichment still requires independent review and exact-SHA approval before merge.
 
 ## User and decision
 
@@ -113,6 +113,16 @@ DYMAXION_CONFIG_DIR=../config DYMAXION_WORKSPACE_ROOT=.. \
 ```
 
 Do not use Sacramento, authenticated, private, or employer targets. Generated records and ZIP bundles are local artifacts and are not committed.
+
+## Operator change-ticket packet (2026-07-22 enrichment)
+
+The runner's output was enriched into an operator change-ticket packet —
+denser Markdown report with structurally distinct observed/derived/
+human-entered/unavailable evidence classes, a dependency-map SVG artifact,
+an embedded exact rerun command, and an operator-baseline protocol whose
+status stays `unavailable` until a human ArcGIS administrator completes it.
+Scope stays frozen; no new capability or CLI surface was added. See
+[operator-change-ticket-packet.md](operator-change-ticket-packet.md).
 
 ## Non-goals
 
