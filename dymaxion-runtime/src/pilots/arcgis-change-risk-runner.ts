@@ -1134,7 +1134,7 @@ function mdCell(value: string | number | boolean | null): string {
     .replace(/\\/g, '\\\\')
     .replace(/\|/g, '\\|')
     .replace(/`/g, '\\`')
-    .replace(/\r?\n/g, ' ');
+    .replace(/[\r\n]+/g, ' ');
 }
 
 export function renderMarkdownRecord(record: Omit<PilotCaseRecord, 'markdown'>): string {

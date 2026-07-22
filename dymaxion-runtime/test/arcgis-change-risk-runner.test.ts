@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { executeCapability } from '../src/capabilities/registry.js';
-import type { TraceArcgisDependenciesOutput } from '../src/capabilities/trace-arcgis-dependencies.js';
+import {
+  TraceArcgisDependenciesOutputSchema,
+  type TraceArcgisDependenciesOutput,
+} from '../src/capabilities/trace-arcgis-dependencies.js';
 import { canonicalJson, sha256Canonical, sha256Text } from '../src/contracts/canonical.js';
 import { EvidenceBundleSchema } from '../src/contracts/evidence.js';
 import { runSkill, type RunSkillDependencies, type SkillResult } from '../src/skills/executor.js';
@@ -510,10 +513,25 @@ test('markdown packet contains all sections, the empty human-entered label, and 
   const hostileRoot = 'Root before\n```bash\necho ROOT_SINK_CANARY\n```\nafter | root <b>';
   const hostileMap = 'Map before\n```bash\necho MARKDOWN_SINK_CANARY\n```\nafter | map <script>alert(1)</script>';
   const hostileOrg = 'Juneau | County <b>operator</b>';
+  const hostileCrTitle = 'CR title before\r## CR_TITLE_SINK_CANARY';
+  const hostileCrOwner = 'owner.before\r## CR_OWNER_SINK_CANARY';
+  const hostileCrWarning = 'warning before\r## CR_WARNING_SINK_CANARY';
+  const hostileCrUnresolved = `item:${MAP}\r## CR_UNRESOLVED_SINK_CANARY`;
+  const invalidUnresolvedTrace = richTraceOutput();
+  invalidUnresolvedTrace.report.unresolved_references.find(
+    (reference) => reference.reason === 'malformed_item_id',
+  )!.from = hostileCrUnresolved;
+  assert.throws(
+    () => TraceArcgisDependenciesOutputSchema.parse(invalidUnresolvedTrace),
+    /Invalid/,
+  );
   const hostileTrace = (): TraceArcgisDependenciesOutput => {
     const trace = richTraceOutput();
     trace.report.nodes.find((node) => node.id === `item:${APP}`)!.title = hostileRoot;
     trace.report.nodes.find((node) => node.id === `item:${MAP}`)!.title = hostileMap;
+    trace.report.nodes.find((node) => node.id === `item:${LAYER}`)!.title = hostileCrTitle;
+    trace.report.nodes.find((node) => node.id === `item:${LAYER}`)!.owner = hostileCrOwner;
+    trace.report.warnings.push(hostileCrWarning);
     return trace;
   };
   const fakeRunSkill = async (slug: string, input: Record<string, unknown>): Promise<SkillResult> => {
@@ -552,8 +570,7 @@ test('markdown packet contains all sections, the empty human-entered label, and 
   assert.ok(markdown.includes('never contacted'));
   assert.ok(markdown.includes('Review posture: **retirement_cleanup**'));
   assert.ok(markdown.includes('```bash\n' + buildRerunCommand('juneau-old-public-gis') + '\n```'));
-  // Hostile title cannot inject raw HTML or break the dependency table.
-  assert.ok(markdown.includes('Layer &lt;b&gt;"quoted"&lt;/b&gt; &amp; co'));
+  // Hostile titles cannot inject raw HTML or break the dependency table.
   assert.ok(!markdown.includes('Layer <b>'));
   assert.ok(!markdown.includes('\n```bash\necho MARKDOWN_SINK_CANARY'));
   assert.ok(!markdown.includes('\n```bash\necho ROOT_SINK_CANARY'));
@@ -561,6 +578,11 @@ test('markdown packet contains all sections, the empty human-entered label, and 
   assert.ok(markdown.includes('after \\| map &lt;script&gt;alert(1)&lt;/script&gt;'));
   assert.ok(markdown.includes('Juneau \\| County &lt;b&gt;operator&lt;/b&gt;'));
   assert.ok(!markdown.includes('<script>'));
+  assert.ok(!markdown.includes('\r'));
+  assert.ok(markdown.includes('CR title before ## CR_TITLE_SINK_CANARY'));
+  assert.ok(markdown.includes('owner.before ## CR_OWNER_SINK_CANARY'));
+  assert.ok(!markdown.includes('CR_WARNING_SINK_CANARY'));
+  assert.ok(!markdown.includes('CR_UNRESOLVED_SINK_CANARY'));
 });
 
 test('explicit approval path uses runSkill approval APIs and verifies the persisted ZIP hash', async () => {
