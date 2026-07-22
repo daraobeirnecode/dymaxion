@@ -1,7 +1,7 @@
 # Dymaxion runtime
 
 `dymaxion-runtime` is the TypeScript/Node.js 22+ runtime for the Dymaxion GIS
-agent. It currently implements seven native, versioned, read-only capabilities:
+agent. It currently implements eight native, versioned capabilities:
 
 1. `inspect_dataset`
 2. `inspect_arcgis_org`
@@ -10,6 +10,46 @@ agent. It currently implements seven native, versioned, read-only capabilities:
 5. `validate_spatial_data`
 6. `generate_map_artifact`
 7. `run_vector_analysis`
+8. `export_evidence_bundle`
+
+## `export_evidence_bundle` (Phase 1G)
+
+Phase 1G packages one strict report object, one strict upstream EvidenceBundle,
+and one named inline UTF-8 artifact into a deterministic ZIP32 STORE archive.
+The archive has exactly four members in fixed order:
+
+1. `manifest.json`
+2. `report.json`
+3. `evidence.json`
+4. `<validated-file-name>`
+
+`preview` is copy-on-write: it assembles and hashes the exact candidate archive
+without a filesystem mutation or approval. `persist` requires
+`target_bundle_sha256` from preview and a fresh approval bound to the canonical
+full input, exact project/bundle target, agent run, skill, configured execution
+identity, and expiry. The one-execution grant is consumed once by the capability
+and may be revalidated at each storage sink; the raw receipt is not sink
+authority. Publication is project-scoped, create-only, content-addressed,
+read-back verified, and idempotent only for exact existing bytes.
+Export responses serialize no unsigned approval claims; the approval subsystem
+and audit record remain authoritative for the consumed receipt and binding.
+Injected `export_evidence.approvals` claims fail output validation.
+
+The storage root is trusted runtime configuration (`DYMAXION_ARTIFACT_ROOT`) or
+an injected internal adapter, never caller input. Symlinked roots/components,
+path traversal, substitutions, non-directories, hash mismatches, quota excess,
+and unauthorized sink creation fail closed. Approval facts are retained only by
+the approval subsystem/audit record and are not embedded in the response or
+archive, preserving preview/persist archive identity.
+
+Hard limits: report `1 MiB`, upstream evidence `1 MiB`, artifact `2 MiB`, archive
+input `4 MiB`, archive output `5 MiB`, four ZIP entries, JSON depth `32`, JSON
+nodes `20,000`, 100 stored bundles/project, `64 MiB`/project, and a `5,000 ms`
+deadline with cancellation checkpoints. This slice does not export raw source
+data, publish GIS services, upload remotely, sign/encrypt archives, compress
+members, update/delete artifacts, or provide a download endpoint.
+
+Full contract: `../docs/capabilities/export-evidence-bundle.md`.
 
 ## `run_vector_analysis` (Phase 1F)
 
@@ -89,11 +129,11 @@ Safety, integrity, and limitations:
 
 ## GISBench
 
-GISBench currently has exactly 35 committed golden tasks: 5 each for Phases 0,
-1A, 1B, 1C, 1D, 1E, and 1F. Phase 1F contributes five offline fixture-backed
-`run_vector_analysis` tasks covering normal nearest ordering, rounded-distance
-tie-breaks, antimeridian selection, `max_distance_meters` unmatched output, and
-empty candidate FeatureCollections.
+GISBench currently has exactly 40 committed golden tasks: 5 each for Phases 0,
+1A, 1B, 1C, 1D, 1E, 1F, and 1G. Phase 1G contributes five offline
+`export_evidence_bundle` tasks covering useful preview, deterministic repeat,
+approval-bound persist plus a fresh-approval exact-existing attempt, tamper/hash
+mismatch rejection before approval/storage, and symlinked storage-root rejection.
 
 Run from this directory:
 

@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "id": "export-bundle-approved-persist-idempotent",
+  "capability": "export_evidence_bundle",
+  "input": {
+    "scenario": "approved_persist_idempotent",
+    "project_id": "33333333-3333-4333-8333-333333333333",
+    "bundle_slug": "gisbench-approved-persist",
+    "report_fixture": "export-evidence-bundle/preview-report.json",
+    "evidence_fixture": "export-evidence-bundle/preview-evidence.json",
+    "artifact_fixture": "export-evidence-bundle/useful-map.svg",
+    "artifact_output_name": "map_svg",
+    "artifact_file_name": "useful-map.svg",
+    "artifact_media_type": "image/svg+xml; charset=utf-8"
+  },
+  "expected": { "outcome": "success", "golden_file": "export-bundle-approved-persist-idempotent.json" },
+  "tolerances": {
+    "numeric_absolute": 0,
+    "normalized_fields": []
+  },
+  "allowed_operations": ["boundary_preflight", "canonicalize_json", "build_zip_store", "hash_sha256", "approval_request", "approval_consume", "storage_publish", "storage_readback"],
+  "expected_approval": { "required": true, "decision": "approved", "consumed": true }
+}

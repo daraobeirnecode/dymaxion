@@ -5,14 +5,24 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
-import { executeCapability, getCapability } from '../capabilities/registry.js';
+import {
+  executeCapability,
+  getCapability,
+  preflightCapabilityDefinition,
+} from '../capabilities/registry.js';
 import type { CapabilityExecutionContext } from '../contracts/capability.js';
+import { capabilityRequiresApproval } from '../contracts/capability.js';
 import { db, schema } from '../db/client.js';
 import type { ApprovalRequest } from '../gateways/common.js';
 import { recordInvocationOutcome } from '../memory/skill-history.js';
 import { logger } from '../observability/logger.js';
 import { auditEvent, type AuditEventType } from '../security/audit.js';
-import { consumeApproval, deriveApprovalTarget } from '../security/approval.js';
+import {
+  consumeApproval,
+  deriveApprovalTarget,
+  type ApprovalDependencies,
+  type ConsumedApprovalReceipt,
+} from '../security/approval.js';
 import { assertExecutionBoundary, type BoundaryOptions } from '../security/boundary.js';
 import { resolveExecutionCredentialIdentity } from '../security/execution-identity.js';
 import { runArcpy, runProCli } from '../worker/client.js';
@@ -54,6 +64,7 @@ export interface RunSkillDependencies {
   boundaryOptions: BoundaryOptions;
   capabilityContext: CapabilityExecutionContext;
   approvalRequest?: ApprovalRequest;
+  approvalDependencies?: ApprovalDependencies;
 }
 
 const databaseRecorder: InvocationRecorder = {
@@ -93,6 +104,8 @@ function resolveDependencies(
   supplied: Partial<RunSkillDependencies>,
 ): RunSkillDependencies {
   const audit = supplied.audit ?? auditEvent;
+  const { approvalReceipt: _ignoredApprovalReceipt, ...trustedCapabilityContext } =
+    supplied.capabilityContext ?? {};
   return {
     recorder: supplied.recorder ?? databaseRecorder,
     audit,
@@ -103,7 +116,7 @@ function resolveDependencies(
     },
     capabilityContext: {
       agentRunId,
-      ...(supplied.capabilityContext ?? {}),
+      ...trustedCapabilityContext,
       // Outbound-request capabilities must enforce the same boundary policy
       // (audit sink, DNS resolution) the executor preflight uses.
       boundary: supplied.capabilityContext?.boundary ?? {
@@ -113,6 +126,7 @@ function resolveDependencies(
       },
     },
     approvalRequest: supplied.approvalRequest,
+    approvalDependencies: supplied.approvalDependencies,
   };
 }
 
@@ -155,6 +169,7 @@ export async function runSkill(
   }
 
   let validatedInput: Record<string, unknown>;
+  let capabilityPreflightGrant: unknown;
   try {
     if (capability) {
       validatedInput = capability.inputSchema.parse(input) as Record<string, unknown>;
@@ -163,18 +178,34 @@ export async function runSkill(
       if (inputError) throw new Error(inputError);
       validatedInput = input;
     }
+    // Native capabilities declare the exact top-level fields that can drive
+    // path/URL dispatch. Scan only those fields so inert provenance strings in
+    // reports or EvidenceBundles are not treated as execution sources. Legacy
+    // skills retain whole-input scanning because they have no typed field map.
+    const boundaryInput = capability
+      ? Object.fromEntries(
+          capability.boundaryFields
+            .filter((field) => Object.prototype.hasOwnProperty.call(validatedInput, field))
+            .map((field) => [field, validatedInput[field]]),
+        )
+      : validatedInput;
     // Must remain before invocation persistence and all execution adapters.
-    await assertExecutionBoundary(validatedInput, dependencies.boundaryOptions);
+    await assertExecutionBoundary(boundaryInput, dependencies.boundaryOptions);
     // Generic capability hook: run after the shared boundary succeeds and before
-    // approval, recorder/audit persistence, or execution. Capability-specific
-    // preflight logic must live on the capability definition, not here.
-    if (capability?.preflight) {
-      await capability.preflight(validatedInput, dependencies.capabilityContext);
+    // approval, recorder/audit persistence, or execution. The opaque grant lets
+    // the registry prove this exact canonical input was already preflighted.
+    if (capability) {
+      capabilityPreflightGrant = await preflightCapabilityDefinition(
+        capability,
+        validatedInput,
+        dependencies.capabilityContext,
+      );
     }
 
     const requiresApproval = capability
-      ? capability.manifest.classification !== 'read'
+      ? capabilityRequiresApproval(capability, { alreadyParsed: true, parsedInput: validatedInput })
       : Boolean(skill?.manifest.destructive || skill?.manifest.requires_approval);
+    let approvalReceipt: ConsumedApprovalReceipt | undefined;
     if (requiresApproval) {
       const request = dependencies.approvalRequest;
       if (!request) throw new Error(`approval required before executing '${slug}'`);
@@ -183,12 +214,20 @@ export async function runSkill(
       }
       // Re-resolve trusted bindings and atomically consume at the shared sink,
       // immediately before invocation persistence and dispatch.
-      await consumeApproval(
+      approvalReceipt = await consumeApproval(
         request,
         validatedInput,
         deriveApprovalTarget(slug, validatedInput),
         resolveExecutionCredentialIdentity(slug),
+        dependencies.approvalDependencies,
       );
+    }
+    if (capability) {
+      dependencies.capabilityContext = {
+        ...dependencies.capabilityContext,
+        capabilityPreflightGrant,
+        approvalReceipt,
+      };
     }
   } catch (error) {
     return {

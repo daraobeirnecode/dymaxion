@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0.0",
+  "bundle_id": "gisbench-synthetic-map-artifact",
+  "generated_at": "2026-07-21T12:00:00.000Z",
+  "source": {
+    "uri": "dymaxion:synthetic:gisb-ench-export-evidence-bundle",
+    "identity": {
+      "kind": "synthetic-fixture",
+      "value": "export-evidence-bundle/useful-map.svg"
+    },
+    "version": {},
+    "retrieved_at": "2026-07-21T12:00:00.000Z",
+    "sha256": "9cab88edf20b55d04875d28be0171d2e1a555d547f35a6abbbb1b6a2e57dc6cf",
+    "bytes": 1003
+  },
+  "gis_metadata": {
+    "format": "SVG",
+    "crs": "CRS84",
+    "axis_order": "longitude,latitude",
+    "units": "degrees",
+    "extent": [-120.1, 38.6, -120.05, 38.63],
+    "schema": [],
+    "row_count": 2,
+    "geometry_types": ["Point"],
+    "temporal_fields": []
+  },
+  "parameters": {
+    "canonical_json": "{\"artifact\":\"useful-map.svg\",\"fixture\":\"synthetic-export-evidence-bundle\"}",
+    "sha256": "ff92be152c3a7880c6594ef3685136067824dcdefeb6ba6a81cbf52fd80e96d5"
+  },
+  "execution": {
+    "capability": "generate_map_artifact",
+    "capability_version": "1.0.0",
+    "mode": "deterministic",
+    "model_planning": []
+  },
+  "outputs": [
+    {
+      "name": "map_svg",
+      "sha256": "9cab88edf20b55d04875d28be0171d2e1a555d547f35a6abbbb1b6a2e57dc6cf",
+      "bytes": 1003,
+      "validation": {
+        "valid": true,
+        "checks": ["synthetic SVG fixture hash and byte count verified"],
+        "warnings": []
+      }
+    }
+  ],
+  "approvals": [],
+  "rollback": {
+    "required": false,
+    "strategy": "none",
+    "artifacts": []
+  }
+}

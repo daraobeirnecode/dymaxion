@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runGisBench } from '../src/gisbench/run.js';
 
-test('GISBench matches exactly thirty-five committed golden tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, 1E, and 1F)', async () => {
+test('GISBench matches exactly forty committed golden tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, 1E, 1F, and 1G)', async () => {
   const result = await runGisBench(false);
-  assert.equal(result.tasks.length, 35);
+  assert.equal(result.tasks.length, 40);
   assert.equal(result.failed, 0, JSON.stringify(result.tasks.filter((task) => !task.ok), null, 2));
-  assert.equal(result.passed, 35);
+  assert.equal(result.passed, 40);
   for (const task of result.tasks) {
     assert.equal(task.ok, true);
     assert.ok(task.operations.includes('boundary_preflight'));

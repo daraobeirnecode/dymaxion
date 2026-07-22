@@ -1,19 +1,31 @@
 import assert from 'node:assert/strict';
-import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { canonicalFormBody, type ArcGisRestTransport } from '../capabilities/arcgis-rest.js';
+import { createProjectArtifactStorage, type ProjectArtifactStorage } from '../capabilities/artifact-storage.js';
+import { createDeterministicZip } from '../capabilities/deterministic-zip.js';
+import { ExportEvidenceBundleInputSchema } from '../capabilities/export-evidence-bundle.js';
 import { GenerateMapArtifactInputSchema } from '../capabilities/generate-map-artifact.js';
 import { RunVectorAnalysisInputSchema } from '../capabilities/run-vector-analysis.js';
 import { runSkill, type RunSkillDependencies } from '../skills/executor.js';
 import { canonicalJson, sha256Canonical, sha256Text } from '../contracts/canonical.js';
+import {
+  createApprovalRequest,
+  decideApproval,
+  deriveApprovalTarget,
+  InMemoryApprovalStore,
+  type ApprovalDependencies,
+} from '../security/approval.js';
+import { resolveExecutionCredentialIdentity } from '../security/execution-identity.js';
 
 // 5 Phase 0 inspect_dataset + 5 Phase 1A inspect_arcgis_org
 // + 5 Phase 1B trace_arcgis_dependencies + 5 Phase 1C query_feature_service
 // + 5 Phase 1D validate_spatial_data + 5 Phase 1E generate_map_artifact
-// + 5 Phase 1F run_vector_analysis
-const TASK_COUNT = 35;
+// + 5 Phase 1F run_vector_analysis + 5 Phase 1G export_evidence_bundle
+const TASK_COUNT = 40;
 
 const ExpectationSchema = z
   .object({
@@ -29,9 +41,10 @@ const ToleranceSchema = z
   })
   .strict();
 
-const ApprovalExpectationSchema = z
-  .object({ required: z.literal(false), decision: z.literal('not-requested') })
-  .strict();
+const ApprovalExpectationSchema = z.discriminatedUnion('required', [
+  z.object({ required: z.literal(false), decision: z.literal('not-requested') }).strict(),
+  z.object({ required: z.literal(true), decision: z.enum(['approved', 'rejected']), consumed: z.boolean() }).strict(),
+]);
 
 const DatasetTaskSchema = z
   .object({
@@ -212,6 +225,52 @@ const VectorAnalysisTaskSchema = z
   })
   .strict();
 
+const ExportBundleTaskSchema = z
+  .object({
+    schema_version: z.literal('1.0.0'),
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    capability: z.literal('export_evidence_bundle'),
+    input: z
+      .object({
+        scenario: z.enum([
+          'useful_preview',
+          'deterministic_repeat',
+          'approved_persist_idempotent',
+          'tamper_mismatch_reject',
+          'storage_root_reject',
+        ]),
+        project_id: z.string().uuid(),
+        bundle_slug: z.string().min(1),
+        report_fixture: z.string().regex(/^export-evidence-bundle\/[a-z0-9-]+\.json$/),
+        evidence_fixture: z.string().regex(/^export-evidence-bundle\/[a-z0-9-]+\.json$/),
+        artifact_fixture: z.string().regex(/^export-evidence-bundle\/[A-Za-z0-9_.-]+\.(?:svg|geojson)$/),
+        artifact_output_name: z.string().min(1),
+        artifact_file_name: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}\.(?:svg|geojson)$/),
+        artifact_media_type: z.enum([
+          'image/svg+xml; charset=utf-8',
+          'application/geo+json; charset=utf-8',
+        ]),
+      })
+      .strict(),
+    expected: ExpectationSchema,
+    tolerances: ToleranceSchema,
+    allowed_operations: z.array(
+      z.enum([
+        'boundary_preflight',
+        'canonicalize_json',
+        'build_zip_store',
+        'hash_sha256',
+        'approval_request',
+        'approval_consume',
+        'storage_publish',
+        'storage_readback',
+        'storage_reject',
+      ]),
+    ),
+    expected_approval: ApprovalExpectationSchema,
+  })
+  .strict();
+
 const TaskSchema = z.discriminatedUnion('capability', [
   DatasetTaskSchema,
   ArcgisTaskSchema,
@@ -220,6 +279,7 @@ const TaskSchema = z.discriminatedUnion('capability', [
   ValidateTaskSchema,
   MapArtifactTaskSchema,
   VectorAnalysisTaskSchema,
+  ExportBundleTaskSchema,
 ]);
 
 type TaskDefinition = z.infer<typeof TaskSchema>;
@@ -537,6 +597,93 @@ function validateVectorAnalysisEvidenceHashes(
   assert.equal(reportCandidate?.source_uri, pathToFileURL(parsedInput.candidate_source_uri).href, 'candidate report source URI must match exact task input');
 }
 
+type ParsedZipEntry = { name: string; bytes: Uint8Array };
+
+function readUInt16(bytes: Uint8Array, offset: number): number {
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint16(offset, true);
+}
+
+function readUInt32(bytes: Uint8Array, offset: number): number {
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(offset, true);
+}
+
+function parseStoreZipEntries(bytes: Uint8Array): ParsedZipEntry[] {
+  const entries: ParsedZipEntry[] = [];
+  let offset = 0;
+  while (offset + 4 <= bytes.byteLength && readUInt32(bytes, offset) === 0x04034b50) {
+    assert.equal(readUInt16(bytes, offset + 6), 0x0800, 'ZIP entries must set only the UTF-8 flag');
+    assert.equal(readUInt16(bytes, offset + 8), 0, 'ZIP entries must use STORE/no compression');
+    assert.equal(readUInt16(bytes, offset + 10), 0, 'ZIP entry DOS time must be fixed');
+    assert.equal(readUInt16(bytes, offset + 12), 33, 'ZIP entry DOS date must be fixed');
+    const compressedBytes = readUInt32(bytes, offset + 18);
+    const uncompressedBytes = readUInt32(bytes, offset + 22);
+    assert.equal(compressedBytes, uncompressedBytes, 'STORE compressed/uncompressed byte counts must match');
+    const nameLength = readUInt16(bytes, offset + 26);
+    const extraLength = readUInt16(bytes, offset + 28);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const dataEnd = dataStart + uncompressedBytes;
+    assert.ok(dataEnd <= bytes.byteLength, 'ZIP local entry exceeds archive length');
+    entries.push({
+      name: Buffer.from(bytes.subarray(nameStart, nameStart + nameLength)).toString('utf8'),
+      bytes: bytes.subarray(dataStart, dataEnd),
+    });
+    offset = dataEnd;
+  }
+  assert.equal(readUInt32(bytes, offset), 0x02014b50, 'ZIP central directory must follow local entries');
+  return entries;
+}
+
+function validateExportBundleEvidenceHashes(
+  output: Record<string, unknown>,
+  capabilityInput: Record<string, unknown> | undefined,
+): void {
+  assert.ok(capabilityInput, 'export bundle validation requires exact capability input');
+  const parsedInput = ExportEvidenceBundleInputSchema.parse(capabilityInput);
+  const archive = output.archive as Record<string, unknown>;
+  const manifest = output.manifest as Record<string, unknown>;
+  const exportEvidence = output.export_evidence as Record<string, unknown>;
+  assert.ok(archive && manifest && exportEvidence, 'successful export result requires archive, manifest, and export_evidence');
+  assert.equal(String(output.handle).endsWith(String(archive.sha256)), true, 'handle suffix must equal archive sha256');
+  assert.equal(archive.entries, 4, 'archive entry count must be exactly four');
+
+  const reportBytes = Buffer.from(canonicalJson(parsedInput.report), 'utf8');
+  const evidenceBytes = Buffer.from(canonicalJson(parsedInput.evidence), 'utf8');
+  const artifactBytes = Buffer.from(parsedInput.artifact.content, 'utf8');
+  const manifestBytes = Buffer.from(canonicalJson(manifest), 'utf8');
+  const zip = createDeterministicZip([
+    { name: 'manifest.json', bytes: manifestBytes },
+    { name: 'report.json', bytes: reportBytes },
+    { name: 'evidence.json', bytes: evidenceBytes },
+    { name: parsedInput.artifact.file_name, bytes: artifactBytes },
+  ]);
+  assert.equal(zip.sha256, archive.sha256, 'recomputed deterministic ZIP hash must match response archive hash');
+  assert.equal(zip.bytes.byteLength, archive.bytes, 'recomputed deterministic ZIP byte count must match response archive bytes');
+  const parsedEntries = parseStoreZipEntries(zip.bytes);
+  assert.deepEqual(
+    parsedEntries.map((entry) => entry.name),
+    ['manifest.json', 'report.json', 'evidence.json', parsedInput.artifact.file_name],
+    'ZIP entries must be exactly four in manifest order',
+  );
+  const manifestEntries = manifest.entries as Record<string, Record<string, unknown>>;
+  assert.equal(manifestEntries.artifact?.sha256, sha256Text(artifactBytes), 'manifest artifact hash must equal exact fixture bytes');
+  assert.equal(manifestEntries.artifact?.bytes, artifactBytes.byteLength, 'manifest artifact byte count must equal exact fixture bytes');
+  assert.equal(manifestEntries.report?.sha256, sha256Text(reportBytes), 'manifest report hash must equal exact fixture bytes');
+  assert.equal(manifestEntries.evidence?.sha256, sha256Text(evidenceBytes), 'manifest evidence hash must equal canonical upstream evidence bytes');
+  assert.equal(Buffer.from(parsedEntries[2]!.bytes).toString('utf8'), canonicalJson(parsedInput.evidence), 'ZIP evidence.json must equal canonical upstream evidence');
+  assert.equal(parsedInput.evidence.approvals.length, 0, 'upstream fixture evidence must not carry approval facts');
+
+  const parameters = exportEvidence.parameters as Record<string, unknown>;
+  assert.equal(parameters.sha256, sha256Text(String(parameters.canonical_json)), 'export evidence parameter hash must validate before normalization');
+  const approvals = exportEvidence.approvals as Array<Record<string, unknown>>;
+  assert.deepEqual(approvals, [], 'export response must not serialize unverifiable approval claims');
+  if (parsedInput.operation === 'preview') {
+    assert.equal(archive.read_back_verified, false, 'preview must not claim storage read-back');
+  } else {
+    assert.equal(archive.read_back_verified, true, 'persist must report storage read-back verification');
+  }
+}
+
 function validateEvidenceHashes(
   normalized: Record<string, unknown>,
   capability: TaskDefinition['capability'],
@@ -551,7 +698,8 @@ function validateEvidenceHashes(
   else if (capability === 'query_feature_service') validateQueryEvidenceHashes(output);
   else if (capability === 'validate_spatial_data') validateValidationEvidenceHashes(output);
   else if (capability === 'generate_map_artifact') validateMapArtifactEvidenceHashes(output, capabilityInput);
-  else validateVectorAnalysisEvidenceHashes(output, capabilityInput);
+  else if (capability === 'run_vector_analysis') validateVectorAnalysisEvidenceHashes(output, capabilityInput);
+  else validateExportBundleEvidenceHashes(output, capabilityInput);
 }
 
 export function normalizeResult(
@@ -925,6 +1073,231 @@ async function executeVectorAnalysisTask(
   };
 }
 
+async function loadExportBundleInput(
+  task: z.infer<typeof ExportBundleTaskSchema>,
+  roots: TaskRoots,
+  operation: 'preview' | 'persist',
+  targetBundleSha256?: string,
+): Promise<Record<string, unknown>> {
+  const report = JSON.parse(await readFile(resolve(roots.fixtures, task.input.report_fixture), 'utf8'));
+  const evidence = JSON.parse(await readFile(resolve(roots.fixtures, task.input.evidence_fixture), 'utf8'));
+  const artifactContent = await readFile(resolve(roots.fixtures, task.input.artifact_fixture), 'utf8');
+  return ExportEvidenceBundleInputSchema.parse({
+    operation,
+    project_id: task.input.project_id,
+    bundle_slug: task.input.bundle_slug,
+    report,
+    evidence,
+    artifact: {
+      output_name: task.input.artifact_output_name,
+      file_name: task.input.artifact_file_name,
+      media_type: task.input.artifact_media_type,
+      content: artifactContent,
+    },
+    ...(targetBundleSha256 ? { target_bundle_sha256: targetBundleSha256 } : {}),
+  }) as Record<string, unknown>;
+}
+
+function instrumentStorage(storage: ProjectArtifactStorage, operations: Set<string>): ProjectArtifactStorage {
+  return {
+    async storeBundle(request) {
+      try {
+        const stored = await storage.storeBundle(request);
+        if (stored.created) operations.add('storage_publish');
+        operations.add('storage_readback');
+        return stored;
+      } catch (error) {
+        operations.add('storage_reject');
+        throw error;
+      }
+    },
+  };
+}
+
+function exportDependencies(
+  task: z.infer<typeof ExportBundleTaskSchema>,
+  operations: Set<string>,
+  approvalDependencies: ApprovalDependencies,
+  artifactRoot: string,
+): RunSkillDependencies {
+  const storage = createProjectArtifactStorage({
+    trustedRoot: artifactRoot,
+    authorizeSink: () => undefined,
+    randomSuffix: () => `gisbench-${task.id}`,
+  });
+  return {
+    recorder: {
+      begin: async () => `gisbench:${task.id}`,
+      finish: async () => undefined,
+    },
+    audit: async () => undefined,
+    boundaryOptions: { audit: async () => undefined },
+    approvalDependencies,
+    capabilityContext: {
+      now: () => new Date('2026-07-21T12:00:00.000Z'),
+      monotonicNow: (() => {
+        let tick = 0;
+        return () => tick;
+      })(),
+      io: { artifactStorage: instrumentStorage(storage, operations) },
+    },
+  };
+}
+
+async function approveExportPersist(
+  input: Record<string, unknown>,
+  agentRunId: string,
+  approvalDependencies: ApprovalDependencies,
+  operations: Set<string>,
+) {
+  operations.add('approval_request');
+  const request = await createApprovalRequest(
+    agentRunId,
+    'Persist deterministic evidence bundle',
+    input,
+    {
+      timeoutMinutes: 5,
+      target: deriveApprovalTarget('export_evidence_bundle', input),
+      credentialIdentity: resolveExecutionCredentialIdentity('export_evidence_bundle'),
+    },
+    approvalDependencies,
+  );
+  assert.equal(await decideApproval(request.id, 'approved', 'gisbench.operator', approvalDependencies), true);
+  return request;
+}
+
+async function executeExportBundleTask(
+  task: z.infer<typeof ExportBundleTaskSchema>,
+  roots: TaskRoots,
+): Promise<{ normalized: unknown; operations: string[] }> {
+  const operations = new Set<string>(['boundary_preflight']);
+  const agentRunId = '00000000-0000-4000-8000-00000000001a';
+  const previousIdentityEnv = process.env.DYMAXION_CREDENTIAL_IDENTITIES_JSON;
+  const tempRoot = await mkdtemp(join(tmpdir(), `gisbench-${task.id}-`));
+  const store = new InMemoryApprovalStore();
+  const approvalDependencies: ApprovalDependencies = {
+    store,
+    now: () => new Date('2026-07-21T12:00:00.000Z'),
+    sleep: async () => undefined,
+  };
+  try {
+    process.env.DYMAXION_CREDENTIAL_IDENTITIES_JSON = JSON.stringify({
+      export_evidence_bundle: 'gisbench:synthetic-operator',
+    });
+    await mkdir(join(tempRoot, 'trusted'), { recursive: true });
+    const previewInput = await loadExportBundleInput(task, roots, 'preview');
+    const runPreview = async () => {
+      const result = await runSkill(
+        task.capability,
+        previewInput,
+        agentRunId,
+        exportDependencies(task, operations, approvalDependencies, join(tempRoot, 'trusted')),
+      );
+      operations.add('canonicalize_json');
+      operations.add('build_zip_store');
+      if (result.ok) operations.add('hash_sha256');
+      return result;
+    };
+
+    let result = await runPreview();
+    let capabilityInput = previewInput;
+
+    if (task.input.scenario === 'deterministic_repeat') {
+      const second = await runPreview();
+      assert.deepEqual(second.output, result.output, 'preview output must be deterministic across repeated execution');
+      result = second;
+    } else if (task.input.scenario === 'approved_persist_idempotent') {
+      assert.ok(result.ok && result.output && typeof result.output === 'object', 'persist scenario requires successful preview');
+      const target = String(((result.output as Record<string, unknown>).archive as Record<string, unknown>).sha256);
+      const persistInput = await loadExportBundleInput(task, roots, 'persist', target);
+      const firstApproval = await approveExportPersist(persistInput, agentRunId, approvalDependencies, operations);
+      operations.add('approval_consume');
+      const first = await runSkill(
+        task.capability,
+        persistInput,
+        agentRunId,
+        { ...exportDependencies(task, operations, approvalDependencies, join(tempRoot, 'trusted')), approvalRequest: firstApproval },
+      );
+      operations.add('canonicalize_json');
+      operations.add('build_zip_store');
+      if (first.ok) operations.add('hash_sha256');
+      assert.equal((first.output as Record<string, unknown> | undefined)?.created, true, 'first approved persist must create the bundle');
+      const secondApproval = await approveExportPersist(persistInput, agentRunId, approvalDependencies, operations);
+      operations.add('approval_consume');
+      result = await runSkill(
+        task.capability,
+        persistInput,
+        agentRunId,
+        { ...exportDependencies(task, operations, approvalDependencies, join(tempRoot, 'trusted')), approvalRequest: secondApproval },
+      );
+      operations.add('canonicalize_json');
+      operations.add('build_zip_store');
+      if (result.ok) operations.add('hash_sha256');
+      assert.equal((result.output as Record<string, unknown> | undefined)?.created, false, 'second fresh-approval persist must be idempotent');
+      assert.equal(
+        ((result.output as Record<string, unknown>).archive as Record<string, unknown>).sha256,
+        target,
+        'idempotent persist must keep preview archive hash',
+      );
+      capabilityInput = persistInput;
+    } else if (task.input.scenario === 'tamper_mismatch_reject') {
+      assert.ok(result.ok && result.output && typeof result.output === 'object', 'tamper scenario requires successful preview');
+      const target = String(((result.output as Record<string, unknown>).archive as Record<string, unknown>).sha256);
+      const persistInput = await loadExportBundleInput(task, roots, 'persist', target);
+      persistInput.report = { ...(persistInput.report as Record<string, unknown>), tampered_after_preview: true };
+      result = await runSkill(
+        task.capability,
+        persistInput,
+        agentRunId,
+        exportDependencies(task, operations, approvalDependencies, join(tempRoot, 'trusted')),
+      );
+      operations.add('canonicalize_json');
+      operations.add('build_zip_store');
+      capabilityInput = persistInput;
+      assert.equal(operations.has('approval_consume'), false, 'tamper mismatch must fail before approval consumption');
+      assert.equal(operations.has('storage_publish'), false, 'tamper mismatch must fail before storage');
+    } else if (task.input.scenario === 'storage_root_reject') {
+      assert.ok(result.ok && result.output && typeof result.output === 'object', 'storage reject scenario requires successful preview');
+      const target = String(((result.output as Record<string, unknown>).archive as Record<string, unknown>).sha256);
+      const persistInput = await loadExportBundleInput(task, roots, 'persist', target);
+      const outside = join(tempRoot, 'outside');
+      await mkdir(outside, { recursive: true });
+      const linkedRoot = join(tempRoot, 'linked-root');
+      await symlink(outside, linkedRoot, 'dir');
+      const approval = await approveExportPersist(persistInput, agentRunId, approvalDependencies, operations);
+      operations.add('approval_consume');
+      result = await runSkill(
+        task.capability,
+        persistInput,
+        agentRunId,
+        { ...exportDependencies(task, operations, approvalDependencies, linkedRoot), approvalRequest: approval },
+      );
+      operations.add('canonicalize_json');
+      operations.add('build_zip_store');
+      capabilityInput = persistInput;
+      assert.equal(operations.has('storage_publish'), false, 'symlinked storage root must not publish bytes');
+      assert.equal(operations.has('storage_reject'), true, 'symlinked storage root must reject at storage sink');
+    }
+
+    assertTaskExpectations(task, result.ok, operations);
+    return {
+      normalized: normalizeResult(
+        result,
+        task.tolerances.normalized_fields,
+        roots.workspace,
+        roots.fixtures,
+        task.capability,
+        capabilityInput,
+      ),
+      operations: [...operations],
+    };
+  } finally {
+    if (previousIdentityEnv === undefined) delete process.env.DYMAXION_CREDENTIAL_IDENTITIES_JSON;
+    else process.env.DYMAXION_CREDENTIAL_IDENTITIES_JSON = previousIdentityEnv;
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+}
+
 async function executeArcgisTask(
   task:
     | z.infer<typeof ArcgisTaskSchema>
@@ -982,8 +1355,15 @@ async function executeArcgisTask(
 
 function assertTaskExpectations(task: TaskDefinition, ok: boolean, operations: Set<string>): void {
   assert.equal(ok, task.expected.outcome === 'success', `${task.id}: unexpected outcome`);
-  assert.equal(task.expected_approval.required, false);
-  assert.equal(task.expected_approval.decision, 'not-requested');
+  if (task.expected_approval.required) {
+    assert.equal(task.expected_approval.decision, 'approved', `${task.id}: GISBench only auto-drives approved Phase 1G approvals`);
+    assert.equal(operations.has('approval_request'), true, `${task.id}: expected approval request`);
+    assert.equal(operations.has('approval_consume'), task.expected_approval.consumed, `${task.id}: approval consumption mismatch`);
+  } else {
+    assert.equal(task.expected_approval.decision, 'not-requested');
+    assert.equal(operations.has('approval_request'), false, `${task.id}: approval must not be requested`);
+    assert.equal(operations.has('approval_consume'), false, `${task.id}: approval must not be consumed`);
+  }
   const disallowed = [...operations].filter((operation) => !task.allowed_operations.includes(operation as never));
   assert.deepEqual(disallowed, [], `${task.id}: disallowed operations`);
 }
@@ -996,6 +1376,7 @@ async function executeTask(
   if (task.capability === 'validate_spatial_data') return executeValidateTask(task, roots);
   if (task.capability === 'generate_map_artifact') return executeMapArtifactTask(task, roots);
   if (task.capability === 'run_vector_analysis') return executeVectorAnalysisTask(task, roots);
+  if (task.capability === 'export_evidence_bundle') return executeExportBundleTask(task, roots);
   if (
     task.capability === 'inspect_arcgis_org' ||
     task.capability === 'trace_arcgis_dependencies' ||
@@ -1019,7 +1400,7 @@ export async function runGisBench(updateGoldens = false): Promise<GisBenchResult
   assert.equal(
     taskFiles.length,
     TASK_COUNT,
-    `GISBench must contain exactly ${TASK_COUNT} tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, 1E, and 1F)`,
+    `GISBench must contain exactly ${TASK_COUNT} tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, 1E, 1F, and 1G)`,
   );
   if (updateGoldens) await mkdir(join(benchmark, 'golden'), { recursive: true });
 

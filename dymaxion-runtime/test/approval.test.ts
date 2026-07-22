@@ -3,10 +3,13 @@ import test from 'node:test';
 import { sha256Canonical } from '../src/contracts/canonical.js';
 import {
   InMemoryApprovalStore,
+  claimConsumedApprovalReceipt,
   consumeApproval,
+  consumeApprovalExecutionGrant,
   createApprovalRequest,
   decideApproval,
   deriveApprovalTarget,
+  verifyConsumedApprovalExecutionGrant,
 } from '../src/security/approval.js';
 
 const now = new Date('2026-07-18T12:00:00.000Z');
@@ -100,10 +103,46 @@ test('approval is bound to canonical payload, exact target, identity, and expiry
     credentialIdentity,
     dependencies(store),
   );
-  assert.equal(consumed.decision, 'approved');
+  assert.equal(consumed.snapshot.decision, 'approved');
+  assert.equal(consumed.snapshot.approval_id, req.id);
   await assert.rejects(
     () => consumeApproval(req, payload, target, credentialIdentity, dependencies(store)),
     /already consumed|not consumable/i,
+  );
+});
+
+test('execution grants consume once, verify repeatedly at sinks, and source receipts claim once', async () => {
+  const store = new InMemoryApprovalStore();
+  const req = await createApprovalRequest(
+    'run-grant',
+    'One-shot execution grant',
+    payload,
+    { timeoutMinutes: 30, target, credentialIdentity },
+    dependencies(store),
+  );
+  assert.equal(await decideApproval(req.id, 'approved', 'operator-a', dependencies(store)), true);
+  const receipt = await consumeApproval(req, payload, target, credentialIdentity, dependencies(store));
+  const binding = {
+    agentRunId: 'run-grant',
+    skill: 'edit_feature_service',
+    payload,
+    credentialIdentity,
+  };
+  const grant = claimConsumedApprovalReceipt(receipt, binding);
+  assert.throws(
+    () => verifyConsumedApprovalExecutionGrant(grant, binding),
+    /invalid consumed approval execution grant/i,
+  );
+  assert.equal(consumeApprovalExecutionGrant(grant, binding).approval_id, req.id);
+  assert.equal(verifyConsumedApprovalExecutionGrant(grant, binding).approval_id, req.id);
+  assert.equal(verifyConsumedApprovalExecutionGrant(grant, binding).approval_id, req.id);
+  assert.throws(
+    () => consumeApprovalExecutionGrant(grant, binding),
+    /already used/i,
+  );
+  assert.throws(
+    () => claimConsumedApprovalReceipt(receipt, binding),
+    /already claimed/i,
   );
 });
 

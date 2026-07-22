@@ -1,7 +1,7 @@
 # GISBench
 
-GISBench contains exactly thirty-five reproducible golden tasks across the
-seven implemented native capabilities.
+GISBench contains exactly forty reproducible golden tasks across the
+eight implemented native capabilities.
 
 Phase 0 — deterministic `inspect_dataset` (local GeoJSON):
 
@@ -93,6 +93,19 @@ network or artifact write):
 34. `max_distance_meters` threshold yielding an unmatched primary feature;
 35. empty candidate FeatureCollection yielding unmatched primary features.
 
+Phase 1G — deterministic `export_evidence_bundle` (synthetic inline report,
+EvidenceBundle and SVG artifact; injected temporary trusted roots and in-memory
+approvals; no network or production/repository artifact writes):
+
+36. useful copy-on-write preview with exact four-member archive integrity;
+37. repeated preview producing identical archive and artifact hashes;
+38. approval-bound persist followed by a second fresh-approval exact-existing
+    attempt (`created: false` with the same verified bytes);
+39. post-preview report tamper causing target-hash mismatch before approval or
+    storage;
+40. approved persist rejecting a symlinked/untrusted storage root without an
+    outside write.
+
 Each versioned task declares its golden output/error, numeric tolerance,
 explicitly normalized environment-dependent fields, permitted operations, and
 expected approval behavior. ArcGIS tasks resolve requests through an
@@ -117,8 +130,12 @@ mtime (its
 `source.version` is empty for same-byte determinism), so those tasks normalize
 only path-dependent source/parameter fields; the Phase 1E SVG content and
 Phase 1F canonical GeoJSON artifact content plus their hashes remain
-unnormalized because they are checkout-independent. ArcGIS tasks
-are fully deterministic and normalize nothing.
+unnormalized because they are checkout-independent. Phase 1G preserves archive,
+artifact, manifest, report and evidence hashes exactly and normalizes nothing;
+approval consumption is asserted by harness operations rather than unsigned
+response claims. Temporary storage roots never
+enter the golden output. ArcGIS tasks are fully deterministic and normalize
+nothing.
 
 Evidence hashes (source, canonical parameters, output artifacts, per-request
 bodies) are validated before comparison. Phase 1C query evidence additionally
@@ -133,5 +150,8 @@ report and evidence output metadata to agree before normalization; jointly
 forged SVG hashes fail closed. Phase 1F recomputes exact UTF-8 GeoJSON artifact
 bytes and SHA-256 and requires artifact, report and evidence output metadata to
 agree before normalization; jointly forged nearest-point artifact hashes fail
-closed. GISBench remains an evaluation scaffold — thirty-five tasks toward the
+closed. Phase 1G decodes the candidate ZIP before normalization, requires exactly
+four members, recomputes every member hash/byte count, validates manifest/report/
+evidence/artifact cross-bindings, and keeps deterministic archive/artifact hashes
+unnormalized. GISBench remains an evaluation scaffold — forty tasks toward the
 100-task roadmap goal, not a claim of broad GIS coverage.

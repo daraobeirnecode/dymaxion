@@ -102,7 +102,7 @@ Install:
 
 ## Implemented native capabilities
 
-Exactly seven native capabilities are implemented and tested; everything else
+Exactly eight native capabilities are implemented and tested; everything else
 in the catalog is historical scaffold (see ADR-0001 and the README):
 
 - **`inspect_dataset`** (Phase 0) — deterministic, read-only local GeoJSON
@@ -157,8 +157,16 @@ in the catalog is historical scaffold (see ADR-0001 and the README):
   Point-only and nearest-point-only: no reprojection, topology validation,
   spatial index, buffering, overlay, routing, geocoding, QGIS, ArcPy, or live
   service analysis.
+- **`export_evidence_bundle`** (Phase 1G) — deterministic packaging of one
+  bounded report, one upstream EvidenceBundle and one inline artifact into an
+  exact four-entry ZIP32 STORE archive. `preview` is mutation-free; `persist`
+  requires approval bound to the full input and exact project/archive target,
+  then performs project-scoped create-only publication under a trusted internal
+  root with read-back verification. Approval facts remain authoritative in the
+  approval subsystem/audit record and are not serialized into the response or ZIP. Docs:
+  `docs/capabilities/export-evidence-bundle.md`.
 
-Phase 1A/1B/1C/1D/1E/1F constraints that still hold:
+Phase 1A/1B/1C/1D/1E/1F/1G constraints that still hold:
 
 - **Fixture-only testing.** All `inspect_arcgis_org`,
   `trace_arcgis_dependencies`, and `query_feature_service` tests and
@@ -205,12 +213,18 @@ Phase 1A/1B/1C/1D/1E/1F constraints that still hold:
   credential-shaped path text, reserved `_dymaxion` primary properties, legacy
   `crs`, non-Point geometries and paths outside the workspace boundary. Do not
   expand beyond `nearest_point` without a new plan and review.
-- **GISBench has exactly thirty-five golden tasks** — five each for Phase 0
+- **Evidence export is bounded and internal only.** `export_evidence_bundle`
+  reads no caller path and dispatches no request. It accepts one inline derived
+  artifact, never raw source data; preview never mutates; persist uses a trusted
+  configured root, exact-hash approval, a one-execution grant, create-only
+  publication, quota enforcement and read-back verification. No remote upload,
+  GIS publication, signing, encryption, update/delete or download endpoint.
+- **GISBench has exactly forty golden tasks** — five each for Phase 0
   `inspect_dataset`, Phase 1A `inspect_arcgis_org`, Phase 1B
   `trace_arcgis_dependencies`, Phase 1C `query_feature_service`, Phase 1D
-  `validate_spatial_data`, Phase 1E `generate_map_artifact`, and Phase 1F
-  `run_vector_analysis` — an evaluation scaffold toward the 100-task goal, not
-  a coverage claim.
+  `validate_spatial_data`, Phase 1E `generate_map_artifact`, Phase 1F
+  `run_vector_analysis`, and Phase 1G `export_evidence_bundle` — an evaluation
+  scaffold toward the 100-task goal, not a coverage claim.
 
 ## Build + verify
 
@@ -221,24 +235,21 @@ Phase 1A/1B/1C/1D/1E/1F constraints that still hold:
 - Worker: `cd windows-worker && npm run build`
 - Stack: `docker compose config -q`; migrations are idempotent (`scripts/apply-migrations.sh`)
 
-## Current task: Phase 1F deterministic local vector analysis
+## Current task: Phase 1G deterministic evidence export
 
-Implement the plan at `docs/plans/2026-07-21-phase-1f-run-vector-analysis.md` as one bounded vertical slice.
+Implement `docs/plans/2026-07-21-phase-1g-export-evidence-bundle.md` as one
+bounded vertical slice.
 
-- New native capability: `run_vector_analysis`.
-- MVP target: `nearest_point` only between two allowlisted local RFC 7946 CRS84
-  Point FeatureCollections.
-- Produce deterministic inline canonical GeoJSON, structured report and
-  versioned evidence; write no artifact file.
-- Use fixed-radius spherical Haversine distance, millimetre rounding,
-  antimeridian-normalized longitude deltas, candidate-index tie-breaking and
-  optional `max_distance_meters` unmatched output.
-- Enforce byte/source/feature/coordinate/depth/pair/output/duration/cancellation
-  ceilings and boundary-before-each-stat/read behavior.
-- Add five synthetic fixture-backed GISBench tasks, raising the suite from 30
-  to 35, plus focused adversarial tests.
-- Preserve every earlier approval, identity, boundary, determinism, evidence,
-  redaction and Worker invariant.
-- Do not access network/live GIS systems, use QGIS/ArcPy, add credentials,
-  implement writes/publication, deploy, merge, or expand beyond `nearest_point`
-  without a new plan and exact-SHA review.
+- New native capability: `export_evidence_bundle`.
+- Package one report, one upstream EvidenceBundle and one inline artifact into
+  exactly four deterministic ZIP32 STORE members.
+- Keep `preview` mutation-free; require full-input/exact-target approval for
+  `persist`, with a one-execution grant revalidated at storage sinks.
+- Publish create-only under a trusted internal project-scoped root with strict
+  symlink/race/quota/read-back checks; never accept the root from caller input.
+- Add five synthetic GISBench tasks, raising the suite from 35 to 40, plus
+  focused adversarial tests and exact integrity validation before normalization.
+- Preserve all earlier approval, identity, boundary, determinism, evidence,
+  redaction and Worker invariants.
+- Do not access live GIS systems, add credentials, upload/publish remotely,
+  sign/encrypt, export raw sources, deploy or merge without exact-SHA review.

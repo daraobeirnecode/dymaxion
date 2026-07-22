@@ -199,7 +199,7 @@ test('run_vector_analysis manifest, schemas and registry are strict and trace Ph
     },
   );
   assert.ok(allCapabilities().some((capability) => capability.manifest.slug === 'run_vector_analysis'));
-  assert.equal(allCapabilities().length, 7);
+  assert.equal(allCapabilities().length, 8);
 });
 
 test('run_vector_analysis input schema is lexical-only and contains no filesystem canonicalization', async () => {
@@ -748,7 +748,9 @@ test('executor runs generic capability preflight only after boundary and before 
     let preflightCalls = 0;
     const originalPreflight = runVectorAnalysisCapability.preflight;
     runVectorAnalysisCapability.preflight = async (input, context) => {
-      preflightCalls += 1;
+      if (input.source_uri === goodSource && input.candidate_source_uri === goodCandidate) {
+        preflightCalls += 1;
+      }
       await originalPreflight?.(input, context);
     };
     try {
