@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { BoundaryOptions } from '../security/boundary.js';
+import type { ConsumedApprovalExecutionGrant, ConsumedApprovalReceipt } from '../security/approval.js';
 
 const SemverSchema = z.string().regex(/^\d+\.\d+\.\d+$/);
 
@@ -47,6 +48,13 @@ export const CapabilityManifestSchema = z
         max_coordinate_ordinates: z.number().int().positive().optional(),
         max_json_depth: z.number().int().positive().optional(),
         max_json_nodes: z.number().int().positive().optional(),
+        max_report_bytes: z.number().int().positive().optional(),
+        max_evidence_bytes: z.number().int().positive().optional(),
+        max_artifact_bytes: z.number().int().positive().optional(),
+        max_archive_bytes: z.number().int().positive().optional(),
+        max_archive_entries: z.number().int().positive().optional(),
+        max_project_bytes: z.number().int().positive().optional(),
+        max_project_bundles: z.number().int().positive().optional(),
       })
       .strict(),
     idempotency: z
@@ -98,6 +106,13 @@ export interface CapabilityDefinition<TInput, TOutput> {
   inputSummary: readonly string[];
   boundaryFields: readonly string[];
   /**
+   * Trusted native-capability predicate for copy-on-write/dry-run operations.
+   * Read manifests remain non-approval-requiring; non-read manifests require
+   * approval unless this hook explicitly returns false for already-validated
+   * input. Never derive this from model/user payload fields outside the schema.
+   */
+  requiresApproval?(input: TInput): boolean;
+  /**
    * Optional capability-specific preflight that runs after the shared execution
    * boundary accepts the validated input and before approval, invocation
    * recording, audit logging, or execution. Use only for checks that require
@@ -119,4 +134,51 @@ export interface CapabilityExecutionContext {
    * requests; capabilities must pass these to the shared URL checks so
    * audit/DNS behavior stays consistent with the executor preflight. */
   boundary?: BoundaryOptions;
+  /** Opaque proof that the exact parsed native-capability input already passed
+   * its generic preflight before invocation persistence. Only the capability
+   * registry can mint or validate it; caller-supplied objects fail closed. */
+  capabilityPreflightGrant?: unknown;
+  /**
+   * Opaque receipt minted only by security/approval.consumeApproval. It is
+   * input authority only: the registry or direct capability claims it once
+   * into approvalExecutionGrant and sinks must not fall back to this receipt.
+   */
+  approvalReceipt?: ConsumedApprovalReceipt;
+  /**
+   * Unforgeable one-execution grant. Capability entry consumes it once; durable
+   * sinks repeatedly verify that same consumed grant immediately before each
+   * externally visible mutation.
+   */
+  approvalExecutionGrant?: ConsumedApprovalExecutionGrant;
+}
+
+export interface ParsedCapabilityInput<TInput> {
+  readonly alreadyParsed: true;
+  readonly parsedInput: TInput;
+}
+
+function isParsedCapabilityInput<TInput>(value: unknown): value is ParsedCapabilityInput<TInput> {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      (value as { alreadyParsed?: unknown }).alreadyParsed === true &&
+      'parsedInput' in value,
+  );
+}
+
+/**
+ * Shared native approval policy. Raw input is schema-validated here; callers
+ * that already validated at a trusted boundary may pass `{ alreadyParsed: true,
+ * parsedInput }` to avoid double parsing. Invalid raw input throws so planners
+ * can fail closed while runSkill can return the real validation error.
+ */
+export function capabilityRequiresApproval<TInput, TOutput>(
+  definition: CapabilityDefinition<TInput, TOutput>,
+  rawOrParsedInput: unknown,
+): boolean {
+  if (definition.manifest.classification === 'read') return false;
+  const parsedInput = isParsedCapabilityInput<TInput>(rawOrParsedInput)
+    ? rawOrParsedInput.parsedInput
+    : definition.inputSchema.parse(rawOrParsedInput);
+  return definition.requiresApproval?.(parsedInput) === false ? false : true;
 }

@@ -44,6 +44,7 @@
     "typescript": "^5.8.0"
   },
   "overrides": {
-    "@hono/node-server": "2.0.5"
+    "@hono/node-server": "2.0.10",
+    "fast-uri": "3.1.4"
   }
 }

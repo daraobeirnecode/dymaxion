@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "title": "Synthetic evidence export preview",
+  "summary": {
+    "purpose": "Exercise deterministic evidence-bundle preview and approval-bound persist without live GIS or production storage.",
+    "feature_count": 2,
+    "artifact_kind": "svg"
+  },
+  "quality": {
+    "raw_sources_included": false,
+    "notes": [
+      "Synthetic CC0 GISBench fixture",
+      "Generated artifact only; no source data export"
+    ]
+  }
+}

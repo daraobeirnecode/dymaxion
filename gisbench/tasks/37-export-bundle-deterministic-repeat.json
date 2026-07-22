@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "id": "export-bundle-deterministic-repeat",
+  "capability": "export_evidence_bundle",
+  "input": {
+    "scenario": "deterministic_repeat",
+    "project_id": "22222222-2222-4222-8222-222222222222",
+    "bundle_slug": "gisbench-repeat-preview",
+    "report_fixture": "export-evidence-bundle/preview-report.json",
+    "evidence_fixture": "export-evidence-bundle/preview-evidence.json",
+    "artifact_fixture": "export-evidence-bundle/useful-map.svg",
+    "artifact_output_name": "map_svg",
+    "artifact_file_name": "useful-map.svg",
+    "artifact_media_type": "image/svg+xml; charset=utf-8"
+  },
+  "expected": { "outcome": "success", "golden_file": "export-bundle-deterministic-repeat.json" },
+  "tolerances": { "numeric_absolute": 0, "normalized_fields": [] },
+  "allowed_operations": ["boundary_preflight", "canonicalize_json", "build_zip_store", "hash_sha256"],
+  "expected_approval": { "required": false, "decision": "not-requested" }
+}

@@ -1,7 +1,7 @@
 # GISBench fixtures
 
 All files in this directory are small synthetic datasets created for Dymaxion
-Phase 0/1A/1B/1C/1D/1E/1F tests. They contain no City of Sacramento, client,
+Phase 0/1A/1B/1C/1D/1E/1F/1G tests. They contain no City of Sacramento, client,
 employer, private ArcGIS, or production-system data, no real usernames or PII,
 and no real tokens or credentials.
 
@@ -128,6 +128,16 @@ from the output artifact. CC0 test fixtures.
   thresholded nearest candidate that becomes an unmatched primary feature.
 - `empty-candidate-primary.geojson` / `empty-candidates.geojson`: non-empty
   primary features with an empty candidate FeatureCollection.
+
+## Phase 1G evidence-export fixtures (`export-evidence-bundle/`)
+
+Hand-authored synthetic inputs used only by the offline
+`export_evidence_bundle` GISBench tasks. `preview-report.json` is an invented
+bounded report; `preview-evidence.json` is an invented strict EvidenceBundle;
+`useful-map.svg` is an invented static map-like artifact. The SVG's committed
+SHA-256/byte count is cross-bound in the evidence. No fixture came from a live
+GIS service, client system, employer source, or production artifact store. CC0
+test fixtures.
 
 The coordinates, attributes, identifiers, and timestamps are invented. They
 are not suitable for operational decisions.

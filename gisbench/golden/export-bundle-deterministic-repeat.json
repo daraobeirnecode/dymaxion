@@ -1,0 +1,138 @@
+{
+  "ok": true,
+  "output": {
+    "schema_version": "1.0.0",
+    "operation": "preview",
+    "persisted": false,
+    "created": false,
+    "handle": "artifact://project/22222222-2222-4222-8222-222222222222/bundle/93fe8aacc6214f1bb7cd0a5a447672c715029ed5e88bc4dd2a672e691eb18c90",
+    "archive": {
+      "media_type": "application/zip",
+      "sha256": "93fe8aacc6214f1bb7cd0a5a447672c715029ed5e88bc4dd2a672e691eb18c90",
+      "bytes": 3962,
+      "entries": 4,
+      "zip_profile": "store-fixed-1980-utf8-crc32-v1",
+      "read_back_verified": false
+    },
+    "manifest": {
+      "schema_version": "1.0.0",
+      "bundle_slug": "gisbench-repeat-preview",
+      "project_id": "22222222-2222-4222-8222-222222222222",
+      "created_by": {
+        "capability": "export_evidence_bundle",
+        "capability_version": "1.0.0"
+      },
+      "zip_profile": "store-fixed-1980-utf8-crc32-v1",
+      "entries": {
+        "manifest": {
+          "path": "manifest.json",
+          "media_type": "application/json; charset=utf-8"
+        },
+        "report": {
+          "path": "report.json",
+          "media_type": "application/json; charset=utf-8",
+          "sha256": "d4c3fcbcf2c75422b96c8d0c817b60f3e4b3890bac89c37da0cb7c3dfe1bf498",
+          "bytes": 381
+        },
+        "evidence": {
+          "path": "evidence.json",
+          "media_type": "application/json; charset=utf-8",
+          "sha256": "edbc0698a97ed52bb1a6705cb6a69de6cc85834f7ad7cad978a8a2bdd3c509e5",
+          "bytes": 1246
+        },
+        "artifact": {
+          "path": "useful-map.svg",
+          "media_type": "image/svg+xml; charset=utf-8",
+          "sha256": "9cab88edf20b55d04875d28be0171d2e1a555d547f35a6abbbb1b6a2e57dc6cf",
+          "bytes": 1003,
+          "output_name": "map_svg"
+        }
+      },
+      "raw_sources_included": false
+    },
+    "export_report": {
+      "schema_version": "1.0.0",
+      "project_id": "22222222-2222-4222-8222-222222222222",
+      "bundle_slug": "gisbench-repeat-preview",
+      "archive_sha256": "93fe8aacc6214f1bb7cd0a5a447672c715029ed5e88bc4dd2a672e691eb18c90",
+      "archive_bytes": 3962,
+      "entry_count": 4,
+      "zip_profile": "store-fixed-1980-utf8-crc32-v1",
+      "report": {
+        "sha256": "d4c3fcbcf2c75422b96c8d0c817b60f3e4b3890bac89c37da0cb7c3dfe1bf498",
+        "bytes": 381
+      },
+      "evidence": {
+        "sha256": "edbc0698a97ed52bb1a6705cb6a69de6cc85834f7ad7cad978a8a2bdd3c509e5",
+        "bytes": 1246
+      },
+      "artifact": {
+        "output_name": "map_svg",
+        "file_name": "useful-map.svg",
+        "media_type": "image/svg+xml; charset=utf-8",
+        "sha256": "9cab88edf20b55d04875d28be0171d2e1a555d547f35a6abbbb1b6a2e57dc6cf",
+        "bytes": 1003
+      },
+      "raw_sources_included": false
+    },
+    "export_evidence": {
+      "schema_version": "1.0.0",
+      "bundle_id": "export_evidence_bundle:93fe8aacc6214f1bb7cd0a5a447672c715029ed5e88bc4dd2a672e691eb18c90",
+      "generated_at": "2026-07-21T12:00:00.000Z",
+      "source": {
+        "uri": "dymaxion:inline-evidence:edbc0698a97ed52bb1a6705cb6a69de6cc85834f7ad7cad978a8a2bdd3c509e5",
+        "identity": {
+          "kind": "inline-evidence",
+          "value": "edbc0698a97ed52bb1a6705cb6a69de6cc85834f7ad7cad978a8a2bdd3c509e5"
+        },
+        "version": {},
+        "retrieved_at": "2026-07-21T12:00:00.000Z",
+        "sha256": "edbc0698a97ed52bb1a6705cb6a69de6cc85834f7ad7cad978a8a2bdd3c509e5",
+        "bytes": 1246
+      },
+      "gis_metadata": {
+        "format": "Dymaxion evidence bundle",
+        "crs": null,
+        "axis_order": null,
+        "units": null,
+        "extent": null,
+        "schema": [],
+        "row_count": 1,
+        "geometry_types": [],
+        "temporal_fields": []
+      },
+      "parameters": {
+        "canonical_json": "{\"artifact\":{\"bytes\":1003,\"file_name\":\"useful-map.svg\",\"media_type\":\"image/svg+xml; charset=utf-8\",\"output_name\":\"map_svg\",\"sha256\":\"9cab88edf20b55d04875d28be0171d2e1a555d547f35a6abbbb1b6a2e57dc6cf\"},\"bundle_slug\":\"gisbench-repeat-preview\",\"operation\":\"preview\",\"project_id\":\"22222222-2222-4222-8222-222222222222\",\"report\":{\"bytes\":381,\"sha256\":\"d4c3fcbcf2c75422b96c8d0c817b60f3e4b3890bac89c37da0cb7c3dfe1bf498\"},\"upstream_evidence\":{\"bytes\":1246,\"sha256\":\"edbc0698a97ed52bb1a6705cb6a69de6cc85834f7ad7cad978a8a2bdd3c509e5\"}}",
+        "sha256": "602db272362aa96597c36999f13aeb0b5a01e2a07263288da2324393c61dab42"
+      },
+      "execution": {
+        "capability": "export_evidence_bundle",
+        "capability_version": "1.0.0",
+        "mode": "deterministic",
+        "model_planning": []
+      },
+      "outputs": [
+        {
+          "name": "evidence_bundle_zip",
+          "sha256": "93fe8aacc6214f1bb7cd0a5a447672c715029ed5e88bc4dd2a672e691eb18c90",
+          "bytes": 3962,
+          "validation": {
+            "valid": true,
+            "checks": [
+              "deterministic ZIP profile store-fixed-1980-utf8-crc32-v1",
+              "four entry hashes and byte counts verified"
+            ],
+            "warnings": []
+          }
+        }
+      ],
+      "approvals": [],
+      "rollback": {
+        "required": false,
+        "strategy": "none",
+        "artifacts": []
+      }
+    }
+  },
+  "cost_usd": 0
+}

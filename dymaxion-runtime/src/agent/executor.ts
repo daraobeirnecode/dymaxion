@@ -13,6 +13,7 @@ import { narrate, answerDirectly } from './narrator.js';
 import { runSkill } from '../skills/executor.js';
 import { shouldAttemptAuthoring, draftSkill } from '../skills/author.js';
 import { getSkill } from '../skills/registry.js';
+import { getCapability } from '../capabilities/registry.js';
 import { persistIncoming, persistOutgoing, loadRelevant } from '../memory/conversation.js';
 import { getPreference } from '../memory/preferences.js';
 import {
@@ -31,6 +32,19 @@ import type {
   MessageTarget,
   StepResult,
 } from '../gateways/common.js';
+
+function canonicalApprovalPayload(
+  skill: string,
+  input: Record<string, unknown>,
+): Record<string, unknown> {
+  const capability = getCapability(skill);
+  if (!capability) return input;
+  const parsed = capability.inputSchema.parse(input);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`native capability ${skill} approval payload must be an object`);
+  }
+  return parsed as Record<string, unknown>;
+}
 
 export async function runAgent(message: IncomingMessage, gateway: Gateway): Promise<void> {
   const started = Date.now();
@@ -96,9 +110,10 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
     for (const step of plan.steps) {
       let approvalRequest: ApprovalRequest | undefined;
       if (step.destructive) {
-        const approvalTarget = deriveApprovalTarget(step.skill, step.input);
+        const approvalPayload = canonicalApprovalPayload(step.skill, step.input);
+        const approvalTarget = deriveApprovalTarget(step.skill, approvalPayload);
         const credentialIdentity = resolveExecutionCredentialIdentity(step.skill);
-        const req = await createApprovalRequest(runId, step.description, step.input, {
+        const req = await createApprovalRequest(runId, step.description, approvalPayload, {
           timeoutMinutes,
           target: approvalTarget,
           credentialIdentity,
@@ -219,9 +234,10 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
   for (const step of storedPlan.steps) {
     let approvalRequest: ApprovalRequest | undefined;
     if (step.destructive) {
-      const approvalTarget = deriveApprovalTarget(step.skill, step.input);
+      const approvalPayload = canonicalApprovalPayload(step.skill, step.input);
+      const approvalTarget = deriveApprovalTarget(step.skill, approvalPayload);
       const credentialIdentity = resolveExecutionCredentialIdentity(step.skill);
-      const request = await createApprovalRequest(replay.id, `Replay: ${step.description}`, step.input, {
+      const request = await createApprovalRequest(replay.id, `Replay: ${step.description}`, approvalPayload, {
         timeoutMinutes,
         target: approvalTarget,
         credentialIdentity,

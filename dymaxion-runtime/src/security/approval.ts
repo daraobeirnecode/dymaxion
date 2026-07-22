@@ -1,6 +1,6 @@
 // Approval binding and one-time atomic consumption.
 
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { and, eq, gt, isNull, lte } from 'drizzle-orm';
 import { canonicalJson, sha256Canonical } from '../contracts/canonical.js';
 import { db, schema } from '../db/client.js';
@@ -44,6 +44,34 @@ interface ApprovalBinding {
   target: string;
   credentialIdentity: string;
 }
+
+export interface ConsumedApprovalSnapshot {
+  readonly approval_id: string;
+  readonly decision: 'approved';
+  readonly decided_by: string;
+  readonly decided_at: string;
+  readonly target: string;
+  readonly payload_hash: string;
+  readonly credential_identity: string;
+  readonly agent_run_id: string;
+}
+
+declare const consumedApprovalReceiptBrand: unique symbol;
+declare const consumedApprovalExecutionGrantBrand: unique symbol;
+
+export interface ConsumedApprovalReceipt {
+  readonly [consumedApprovalReceiptBrand]: never;
+  readonly snapshot: ConsumedApprovalSnapshot;
+}
+
+export interface ConsumedApprovalExecutionGrant {
+  readonly [consumedApprovalExecutionGrantBrand]: never;
+}
+
+const consumedApprovalReceipts = new WeakSet<object>();
+const claimedApprovalReceipts = new WeakSet<object>();
+const consumedApprovalExecutionGrants = new WeakSet<object>();
+const approvalExecutionGrants = new WeakMap<object, ConsumedApprovalReceipt>();
 
 export interface ApprovalStore {
   create(draft: ApprovalDraft): Promise<ApprovalRecord>;
@@ -318,7 +346,119 @@ function publicRequest(record: ApprovalRecord): ApprovalRequest {
   };
 }
 
+function immutableReceipt(record: ApprovalRecord): ConsumedApprovalReceipt {
+  if (record.decision !== 'approved') throw new Error('approval expired, already consumed, or not consumable');
+  if (!record.credentialIdentity) throw new Error('approval expired, already consumed, or not consumable');
+  const snapshot: ConsumedApprovalSnapshot = Object.freeze({
+    approval_id: record.id,
+    decision: 'approved',
+    decided_by: record.decidedBy ?? 'unknown',
+    decided_at: (record.respondedAt ?? record.consumedAt ?? record.requestedAt).toISOString(),
+    target: record.target,
+    payload_hash: record.payloadHash,
+    credential_identity: record.credentialIdentity,
+    agent_run_id: record.agentRunId,
+  });
+  const receipt = Object.freeze({ snapshot }) as ConsumedApprovalReceipt;
+  consumedApprovalReceipts.add(receipt);
+  return receipt;
+}
+
+function timingSafeHexEqual(left: string, right: string): boolean {
+  if (!/^[a-f0-9]{64}$/.test(left) || !/^[a-f0-9]{64}$/.test(right)) return false;
+  return timingSafeEqual(Buffer.from(left, 'hex'), Buffer.from(right, 'hex'));
+}
+
+export function verifyConsumedApprovalReceipt(
+  receipt: unknown,
+  binding: {
+    agentRunId: string;
+    skill: string;
+    payload: Record<string, unknown>;
+    credentialIdentity: string;
+  },
+): ConsumedApprovalSnapshot {
+  if (!receipt || typeof receipt !== 'object' || !consumedApprovalReceipts.has(receipt)) {
+    throw new Error('invalid consumed approval receipt');
+  }
+  const snapshot = (receipt as ConsumedApprovalReceipt).snapshot;
+  const expectedPayloadHash = sha256Canonical(binding.payload);
+  let expectedTarget: string;
+  try {
+    expectedTarget = deriveApprovalTarget(binding.skill, binding.payload);
+  } catch {
+    throw new Error('consumed approval receipt binding mismatch');
+  }
+  if (
+    snapshot.decision !== 'approved' ||
+    snapshot.agent_run_id !== binding.agentRunId ||
+    snapshot.credential_identity !== binding.credentialIdentity ||
+    !timingSafeHexEqual(snapshot.payload_hash, expectedPayloadHash) ||
+    snapshot.target !== expectedTarget
+  ) {
+    throw new Error('consumed approval receipt binding mismatch');
+  }
+  return snapshot;
+}
+
+export function claimConsumedApprovalReceipt(
+  receipt: unknown,
+  binding: Parameters<typeof verifyConsumedApprovalReceipt>[1],
+): ConsumedApprovalExecutionGrant {
+  verifyConsumedApprovalReceipt(receipt, binding);
+  const receiptObject = receipt as object;
+  if (claimedApprovalReceipts.has(receiptObject)) {
+    throw new Error('consumed approval receipt already claimed for execution');
+  }
+  claimedApprovalReceipts.add(receiptObject);
+  const grant = Object.freeze({}) as ConsumedApprovalExecutionGrant;
+  approvalExecutionGrants.set(grant as object, receipt as ConsumedApprovalReceipt);
+  return grant;
+}
+
+export function consumeApprovalExecutionGrant(
+  grant: unknown,
+  binding: Parameters<typeof verifyConsumedApprovalReceipt>[1],
+): ConsumedApprovalSnapshot {
+  if (!grant || typeof grant !== 'object') throw new Error('invalid consumed approval execution grant');
+  const receipt = approvalExecutionGrants.get(grant);
+  if (!receipt) throw new Error('invalid consumed approval execution grant');
+  if (consumedApprovalExecutionGrants.has(grant)) {
+    throw new Error('consumed approval execution grant already used');
+  }
+  const snapshot = verifyConsumedApprovalReceipt(receipt, binding);
+  consumedApprovalExecutionGrants.add(grant);
+  return snapshot;
+}
+
+export function verifyConsumedApprovalExecutionGrant(
+  grant: unknown,
+  binding: Parameters<typeof verifyConsumedApprovalReceipt>[1],
+): ConsumedApprovalSnapshot {
+  if (!grant || typeof grant !== 'object') throw new Error('invalid consumed approval execution grant');
+  const receipt = approvalExecutionGrants.get(grant);
+  if (!receipt || !consumedApprovalExecutionGrants.has(grant)) {
+    throw new Error('invalid consumed approval execution grant');
+  }
+  return verifyConsumedApprovalReceipt(receipt, binding);
+}
+
 export function deriveApprovalTarget(skill: string, payload: Record<string, unknown>): string {
+  if (skill === 'export_evidence_bundle') {
+    const projectId = payload.project_id;
+    const bundleSha256 = payload.target_bundle_sha256;
+    if (
+      payload.operation !== 'persist' ||
+      typeof projectId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(projectId) ||
+      typeof bundleSha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(bundleSha256)
+    ) {
+      throw new Error("approval target could not be derived for 'export_evidence_bundle'");
+    }
+    return `capability:export_evidence_bundle|project:${projectId}|bundle:${bundleSha256}`;
+  }
+
   const targetKeys =
     /(?:^|_)(?:target|destination|url|uri|endpoint|path|file|directory|service|service_name|layer|layer_id|table|schema|database|project|project_id|org|organization|item_id|dataset_id|group_id)(?:$|_)/i;
   const targets: Array<{ path: string; value: unknown }> = [];
@@ -389,7 +529,7 @@ export async function consumeApproval(
   target: string,
   credentialIdentity: string,
   supplied: ApprovalDependencies = {},
-): Promise<ApprovalRecord> {
+): Promise<ConsumedApprovalReceipt> {
   const { store, now } = deps(supplied);
   const binding: ApprovalBinding = {
     agentRunId: request.agent_run_id,
@@ -410,7 +550,7 @@ export async function consumeApproval(
     await store.expireAtomic(request.id, instant);
     throw new Error('approval expired, already consumed, or not consumable');
   }
-  return record;
+  return immutableReceipt(record);
 }
 
 /** Poll the durable decision; consumption remains a separate atomic operation. */

@@ -164,7 +164,7 @@ test('generate_map_artifact manifest, schema and registry are strict and trace a
   assert.doesNotThrow(() => schema.parse({ source_uri: 'token-inventory.geojson' }));
   assert.doesNotThrow(() => schema.parse({ source_uri: 'postal_code=95814.geojson' }));
   assert.ok(allCapabilities().some((capability) => capability.manifest.slug === 'generate_map_artifact'));
-  assert.equal(allCapabilities().length, 7);
+  assert.equal(allCapabilities().length, 8);
 });
 
 test('geometry families, multipart polygons and holes render deterministic safe inline SVG with exact evidence hashes', async () => {

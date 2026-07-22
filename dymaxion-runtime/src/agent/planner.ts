@@ -3,6 +3,8 @@
 // availability + destructive flags), and knowledge-base context.
 
 import { allCapabilities } from '../capabilities/registry.js';
+import type { CapabilityDefinition } from '../contracts/capability.js';
+import { capabilityRequiresApproval } from '../contracts/capability.js';
 import { callLLM } from '../llm/middleware.js';
 import { applicableSkills } from '../skills/registry.js';
 import type { IncomingMessage, Plan, PlanStep } from '../gateways/common.js';
@@ -78,7 +80,12 @@ export async function plan(
 
   const executable = new Map<
     string,
-    { description: string; destructive: boolean; timeoutSeconds: number }
+    {
+      description: string;
+      destructive: boolean;
+      timeoutSeconds: number;
+      capability?: CapabilityDefinition<unknown, unknown>;
+    }
   >([
     ...skills.map(
       (skill) =>
@@ -99,6 +106,7 @@ export async function plan(
             description: capability.manifest.description,
             destructive: capability.manifest.classification !== 'read',
             timeoutSeconds: Math.ceil(capability.manifest.resource_limits.max_duration_ms / 1_000),
+            capability,
           },
         ] as const,
     ),
@@ -107,12 +115,21 @@ export async function plan(
     .filter((step) => step.skill && executable.has(step.skill))
     .map((step, index) => {
       const descriptor = executable.get(step.skill!)!;
+      const input = (step.input as Record<string, unknown>) ?? {};
+      let destructive = descriptor.destructive;
+      if (descriptor.capability) {
+        try {
+          destructive = capabilityRequiresApproval(descriptor.capability, input);
+        } catch {
+          destructive = true;
+        }
+      }
       return {
         index,
         skill: step.skill!,
         description: step.description ?? descriptor.description,
-        input: (step.input as Record<string, unknown>) ?? {},
-        destructive: descriptor.destructive,
+        input,
+        destructive,
         timeout_seconds: descriptor.timeoutSeconds,
       };
     });

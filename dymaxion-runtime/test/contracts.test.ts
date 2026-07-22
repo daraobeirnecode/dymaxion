@@ -136,6 +136,39 @@ test('resource limit contract accepts optional vector-analysis ceilings and rema
   );
 });
 
+test('resource limit contract accepts strict optional evidence-export ceilings', () => {
+  const limits = {
+    max_report_bytes: 1_048_576,
+    max_evidence_bytes: 1_048_576,
+    max_artifact_bytes: 2_097_152,
+    max_archive_bytes: 5_242_880,
+    max_archive_entries: 4,
+    max_project_bytes: 67_108_864,
+    max_project_bundles: 100,
+  } as const;
+  const parsed = CapabilityManifestSchema.parse({
+    ...capability,
+    slug: 'export_evidence_bundle',
+    name: 'Export evidence bundle',
+    classification: 'copy-on-write',
+    resource_limits: { ...capability.resource_limits, ...limits },
+  });
+
+  for (const [field, value] of Object.entries(limits)) {
+    assert.equal(parsed.resource_limits[field as keyof typeof limits], value);
+    for (const invalid of [0, -1, 1.5]) {
+      assert.throws(
+        () =>
+          CapabilityManifestSchema.parse({
+            ...capability,
+            resource_limits: { ...capability.resource_limits, [field]: invalid },
+          }),
+        /greater than 0|integer|too small|invalid/i,
+      );
+    }
+  }
+});
+
 test('evidence bundles cover provenance and reject unknown fields recursively', () => {
   assert.equal(EvidenceBundleSchema.parse(evidence).execution.mode, 'deterministic');
   assert.deepEqual(EvidenceBundleSchema.parse(evidence), evidence);

@@ -7,18 +7,21 @@ an operator you delegate to, not a chatbot.
 - **Framework**: TypeScript + Vercel AI SDK + openid-client; Mastra is retained as development-only compatibility scaffolding in Phase 0
 - **Providers**: Anthropic (API key), OpenAI / Google / Azure / Cohere (OAuth 2.0), Ollama (local)
 - **Memory**: Postgres 18 + pgvector, Voyage voyage-3-large embeddings
-- **Capabilities**: seven implemented native capabilities — the Phase 0 `inspect_dataset` GeoJSON slice, the Phase 1A read-only `inspect_arcgis_org` organization inventory ([docs](docs/capabilities/inspect-arcgis-org.md)), the Phase 1B read-only `trace_arcgis_dependencies` dependency graph ([docs](docs/capabilities/trace-arcgis-dependencies.md)), the Phase 1C read-only `query_feature_service` bounded Feature Service query ([docs](docs/capabilities/query-feature-service.md)), the Phase 1D read-only `validate_spatial_data` bounded local GeoJSON QA report ([docs](docs/capabilities/validate-spatial-data.md)), the Phase 1E read-only `generate_map_artifact` deterministic inline SVG renderer ([docs](docs/capabilities/generate-map-artifact.md)), and the Phase 1F read-only `run_vector_analysis` deterministic local nearest-point analysis between two Point GeoJSON FeatureCollections — plus 45 historical Sprint 1 skill scaffolds; folder presence is not a production-readiness claim, and the remaining roadmap capabilities are not implemented
+- **Capabilities**: eight implemented native capabilities — the Phase 0 `inspect_dataset` GeoJSON slice; Phase 1A `inspect_arcgis_org`; Phase 1B `trace_arcgis_dependencies`; Phase 1C `query_feature_service`; Phase 1D `validate_spatial_data`; Phase 1E `generate_map_artifact`; Phase 1F `run_vector_analysis`; and Phase 1G `export_evidence_bundle`, which previews or approval-persistently stores a deterministic four-entry evidence ZIP under a trusted project-scoped artifact root ([docs](docs/capabilities/export-evidence-bundle.md)) — plus 45 historical Sprint 1 skill scaffolds; folder presence is not a production-readiness claim, and the remaining roadmap capabilities are not implemented
 - **Gateways**: Telegram + CLI + Web (Sprint 1); Teams, Slack, Email, ArcGIS Portal, SMS stubbed
 - **Safety**: employer boundary (structural allow/deny lists), human-in-the-loop approvals for destructive ops, per-tier monthly USD budget caps enforced pre-call, append-only audit log, LangFuse tracing
 
 Architecture authority: [ADR-0001](docs/adr/0001-phase-0-runtime-and-execution-boundaries.md) selects the TypeScript/Vercel AI SDK runtime with native middleware and a Mastra-compatible migration path, excludes core LiteLLM, and disables Windows execution pending an allowlisted-job redesign and security testing. Conflicting Sprint 1 statements are historical.
 
-Current verified phase: **Phase 1F deterministic local vector analysis**. The
-runtime has seven native read-only capabilities and GISBench has 35 committed
-golden tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, 1E, and 1F). Phase 1F is
-nearest-point only over bounded local RFC 7946 CRS84 Point FeatureCollections;
-it does not use QGIS, ArcPy, live services, basemaps, geocoding, buffering,
-overlay, reprojection, topology validation, network access, or artifact writes.
+Current verified phase: **Phase 1G deterministic evidence export**. The runtime
+has eight native capabilities and GISBench has 40 committed golden tasks (5 each
+for Phases 0, 1A, 1B, 1C, 1D, 1E, 1F, and 1G). Phase 1G accepts one report, one
+EvidenceBundle, and one inline artifact; `preview` is copy-on-write and returns
+only a deterministic content-addressed handle/hash, while `persist` requires an
+approval bound to the exact full input and exact project/archive target before
+create-only publication under the trusted internal artifact root. It does not
+publish GIS services, upload remotely, sign/encrypt archives, or export raw
+source datasets.
 
 ## Install
 
