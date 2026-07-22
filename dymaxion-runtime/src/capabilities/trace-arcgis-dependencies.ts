@@ -371,9 +371,9 @@ function acceptServiceReference(
     return;
   }
   // Credential-shaped material can also be smuggled inside the PATH itself
-  // ('/token=…/FeatureServer', singly or multiply percent-encoded), where
-  // query stripping cannot reach it. Decode to a stable point (bounded) and
-  // check after every pass; the raw value is never echoed.
+  // ('/token=…/FeatureServer' or narrow '/apikey/{value}' pairs, singly or
+  // multiply percent-encoded), where query stripping cannot reach it. Decode
+  // to a stable point (bounded) and check after every pass; never echo values.
   const pathVerdict = classifyServicePath(url.pathname);
   if (pathVerdict === 'credential') {
     sink.unresolved(locator, 'service_url', 'credential_bearing_url');

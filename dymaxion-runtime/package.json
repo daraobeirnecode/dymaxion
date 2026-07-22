@@ -15,6 +15,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test test/*.test.ts",
     "test:contracts": "tsx --test test/contracts.test.ts",
+    "pilot:arcgis-change-risk": "tsx src/pilots/arcgis-change-risk-runner.ts",
     "gisbench": "tsx src/gisbench/run.ts"
   },
   "engines": {
