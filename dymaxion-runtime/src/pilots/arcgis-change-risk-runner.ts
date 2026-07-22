@@ -36,6 +36,10 @@ type CaseSlug = (typeof CASE_SLUGS)[number];
 function publicArcgisOnlinePortalRootProblem(raw: string): string | null {
   const sharedProblem = validatePortalUrl(raw);
   if (sharedProblem) return sharedProblem;
+  const authority = raw.slice('https://'.length).split(/[/?#]/, 1)[0] ?? '';
+  if (authority.includes(':')) {
+    return 'pilot portal_url must be an ArcGIS Online organization root with no explicit port';
+  }
   const url = new URL(raw);
   if (!url.hostname.toLowerCase().endsWith('.maps.arcgis.com')) {
     return 'pilot cases must use public ArcGIS Online organization roots';

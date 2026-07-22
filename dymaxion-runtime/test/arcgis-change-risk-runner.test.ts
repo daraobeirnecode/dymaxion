@@ -194,6 +194,7 @@ test('strict case manifest accepts only the locked non-Sacramento cases', async 
     'https://juneaucounty.maps.arcgis.com?f=json',
     'https://juneaucounty.maps.arcgis.com#fragment',
     'https://juneaucounty.maps.arcgis.com/sharing',
+    'https://juneaucounty.maps.arcgis.com:443',
     'https://juneaucounty.maps.arcgis.com:444',
     'https://juneaucounty.maps.arcgis.com/%2e%2e/sharing',
     'https://juneaucounty.maps.arcgis.com/../sharing',
