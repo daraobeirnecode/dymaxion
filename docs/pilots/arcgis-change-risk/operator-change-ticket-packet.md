@@ -14,9 +14,11 @@ operator. This slice enriches the existing pilot runner
 (`dymaxion-runtime/src/pilots/arcgis-change-risk-runner.ts`) so its output is
 one operator-usable change-ticket packet per locked case, composed only from
 the existing `trace_arcgis_dependencies` and `export_evidence_bundle`
-capabilities. It adds **no** ninth native capability, skill, registry entry,
-transport, parser, or deployment surface, and no per-case CLI surface was
-added because the runner already supports `--case <slug>`.
+capabilities. The original locked pilot added no ninth capability or general
+transport surface. The follow-on `arcgis_change_risk_packet` integration now
+reuses the same deterministic packet core as a registered **workflow**—still
+not a capability—and exposes it through the agent planner/executor, a strict
+CLI command, Web/admin, and Telegram.
 
 Report and record schemas are now version `1.1.0` (runner `1.1.0`).
 
@@ -87,6 +89,40 @@ surface). Its status is `unavailable` — machine-readable in
 until a human ArcGIS administrator completes it. No time-saved, usability,
 correction-burden, adoption, or customer-value figure is fabricated anywhere
 in the packet.
+
+## Shared workflow and delivery
+
+`arcgis_change_risk_packet` accepts only an anonymous ArcGIS Online portal,
+a 32-hex root item id, a project UUID, a locked review posture, and an optional
+bounded organization label. It runs the trace, renders the exact Markdown/SVG
+candidate, previews the deterministic ZIP, requests one post-preview approval
+bound to the exact candidate SHA-256 and project target, then consumes that
+approval once for persistence. No workflow output exists on disk before the
+approval.
+
+On approval it returns exactly three verified attachments:
+
+- `evidence-bundle.zip`;
+- `change-ticket.md`; and
+- `dependency-map.svg`.
+
+Each attachment carries an opaque project/bundle/entry handle, media type,
+SHA-256, and byte count. CLI and Telegram reopen and verify persisted bytes
+before delivery. Web emits path-free signed download tokens bound to the same
+identity; tokens expire after five minutes. The authenticated admin proxy
+forwards only valid tokens to the configured runtime and never exposes local
+paths or internal credentials.
+
+Direct CLI usage:
+
+```bash
+dymaxion change-risk-packet \
+  --portal-url https://example.maps.arcgis.com \
+  --root-item-id 0123456789abcdef0123456789abcdef \
+  --project-id 00000000-0000-4000-8000-000000000001 \
+  --review-posture change_review \
+  --organization-name "Example GIS"
+```
 
 ## Frozen scope
 

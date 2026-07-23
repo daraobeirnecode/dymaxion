@@ -12,6 +12,27 @@ agent. It currently implements eight native, versioned capabilities:
 7. `run_vector_analysis`
 8. `export_evidence_bundle`
 
+## `arcgis_change_risk_packet` workflow
+
+The shared `arcgis_change_risk_packet` workflow composes
+`trace_arcgis_dependencies` and `export_evidence_bundle`; it does not add a
+ninth capability. It deterministically renders `change-ticket.md`,
+`dependency-map.svg`, and `evidence-bundle.zip`, fixes their identities during
+preview, then requests one exact post-preview approval before any persistence.
+The ZIP persisted by the approved capability is the exact previewed byte
+sequence and SHA-256.
+
+The agent planner/executor, `dymaxion change-risk-packet`, CLI gateway,
+Telegram gateway, and Web/admin chat all use this same orchestration. Delivery
+reopens trusted files and verifies byte count and SHA-256. Web sends only signed,
+five-minute, path-free artifact tokens; the admin route authenticates the
+operator and proxies the verified runtime download.
+
+The workflow remains anonymous ArcGIS Online read-only. Item-provided service
+URLs are evidence leaves and are never dispatched. It does not add Enterprise
+access, ArcGIS writes, reverse-dependency discovery, arbitrary Python, or
+authenticated inventory.
+
 ## `export_evidence_bundle` (Phase 1G)
 
 Phase 1G packages one strict report object, one strict upstream EvidenceBundle,
