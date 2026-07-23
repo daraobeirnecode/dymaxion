@@ -553,6 +553,18 @@ export async function consumeApproval(
   return immutableReceipt(record);
 }
 
+/** Read-only durable approval lookup. Workflow persistence sinks use this to
+ * re-verify the SAME consumed approval record (decision, consumption, payload
+ * hash, target, credential identity, agent run) immediately before each
+ * additional sink write. It grants nothing and mutates nothing. */
+export async function getApprovalRecord(
+  approvalId: string,
+  supplied: ApprovalDependencies = {},
+): Promise<ApprovalRecord | null> {
+  const { store } = deps(supplied);
+  return store.get(approvalId);
+}
+
 /** Poll the durable decision; consumption remains a separate atomic operation. */
 export async function awaitDecision(
   request: ApprovalRequest,

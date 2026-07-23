@@ -540,6 +540,15 @@ function defaultArtifactRoot(): string {
   throw new Error('trusted artifact root is not configured');
 }
 
+function injectedArtifactRoot(context: CapabilityExecutionContext): string | undefined {
+  const candidate = context.io?.artifactRoot;
+  if (candidate === undefined) return undefined;
+  if (typeof candidate !== 'string' || candidate.trim().length === 0) {
+    throw new Error('invalid injected artifact root');
+  }
+  return candidate;
+}
+
 function injectedStorage(context: CapabilityExecutionContext): ProjectArtifactStorage | undefined {
   const candidate = context.io?.artifactStorage;
   if (!candidate) return undefined;
@@ -647,7 +656,7 @@ export const exportEvidenceBundleCapability: CapabilityDefinition<
     };
     checkpoint(started, context);
     const storage = injectedStorage(context) ?? createProjectArtifactStorage({
-      trustedRoot: defaultArtifactRoot(),
+      trustedRoot: injectedArtifactRoot(context) ?? defaultArtifactRoot(),
       authorizeSink,
     });
     authorizeSink();

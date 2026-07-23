@@ -1,6 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  parseApprovalReview,
+  parseArtifactAttachments,
+  type ApprovalReview,
+  type ArtifactAttachment,
+} from './chat-contract';
 
 type EventKind = 'user' | 'plan' | 'progress' | 'approval_required' | 'final' | 'error';
 
@@ -9,7 +15,9 @@ interface ChatEvent {
   kind: EventKind;
   text: string;
   data?: unknown;
+  attachments?: ArtifactAttachment[];
   approvalId?: string;
+  approval?: ApprovalReview;
   decided?: string;
 }
 
@@ -76,16 +84,23 @@ export default function ChatPage() {
         case 'plan':
           push({ kind: 'plan', text, data: data.plan ?? data });
           break;
-        case 'approval_required':
+        case 'approval_required': {
+          const approval = parseApprovalReview(data);
           push({
             kind: 'approval_required',
             text: text || 'Approval required',
-            data: data.step_payload ?? data.payload,
-            approvalId: String(data.approval_id ?? data.id ?? ''),
+            approval: approval ?? undefined,
+            approvalId: approval?.approval_id,
           });
           break;
+        }
         case 'final':
-          push({ kind: 'final', text: text || dataRaw, data: data.cost_usd });
+          push({
+            kind: 'final',
+            text: text || dataRaw,
+            data: data.cost_usd,
+            attachments: parseArtifactAttachments(data.attachments),
+          });
           break;
         case 'error':
           push({ kind: 'error', text: text || dataRaw });
@@ -210,8 +225,39 @@ export default function ChatPage() {
                     approval required
                   </div>
                   <p className="mb-2 text-sm text-neutral-200">{e.text}</p>
-                  {e.data != null && (
-                    <pre className="code-block mb-2">{JSON.stringify(e.data, null, 2)}</pre>
+                  {e.approval ? (
+                    <div className="mb-3 space-y-2 text-xs text-neutral-300">
+                      <p>
+                        <span className="text-neutral-500">Description (untrusted summary): </span>
+                        {e.approval.description_untrusted}
+                      </p>
+                      <dl className="grid gap-1 sm:grid-cols-[9rem_1fr]">
+                        <dt className="text-neutral-500">Exact target</dt>
+                        <dd className="break-all font-mono">{e.approval.target}</dd>
+                        <dt className="text-neutral-500">Credential identity</dt>
+                        <dd className="break-all font-mono">{e.approval.credential_identity}</dd>
+                        <dt className="text-neutral-500">Expires</dt>
+                        <dd className="font-mono">{e.approval.expires_at}</dd>
+                        <dt className="text-neutral-500">Payload SHA-256</dt>
+                        <dd className="break-all font-mono">{e.approval.payload_sha256}</dd>
+                      </dl>
+                      <div>
+                        <div className="mb-1 text-neutral-500">Step payload</div>
+                        <pre className="code-block">
+                          {JSON.stringify(e.approval.payload, null, 2)}
+                        </pre>
+                      </div>
+                      <div>
+                        <div className="mb-1 text-neutral-500">Canonical approval payload</div>
+                        <pre className="code-block whitespace-pre-wrap break-all">
+                          {e.approval.canonical_payload}
+                        </pre>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mb-2 text-xs text-red-300">
+                      Incomplete approval facts. Decision controls are disabled.
+                    </p>
                   )}
                   {e.decided ? (
                     <span
@@ -246,6 +292,22 @@ export default function ChatPage() {
                 <div key={e.id} className="rounded border border-green-900 bg-green-950/20 p-3">
                   <div className="mb-1 text-xs uppercase tracking-wide text-green-500">final</div>
                   <p className="whitespace-pre-wrap text-sm text-neutral-200">{e.text}</p>
+                  {e.attachments && e.attachments.length > 0 && (
+                    <div className="mt-3 grid gap-2">
+                      {e.attachments.map((attachment) => (
+                        <a
+                          key={`${attachment.handle}:${attachment.sha256}`}
+                          href={attachment.download_url}
+                          className="flex items-center justify-between rounded border border-green-900/70 bg-black/20 px-3 py-2 text-sm text-green-300 hover:border-green-700 hover:text-green-200"
+                        >
+                          <span className="font-medium">{attachment.original_name}</span>
+                          <span className="font-mono text-xs text-neutral-500" title={attachment.sha256}>
+                            {attachment.bytes.toLocaleString()} bytes · {attachment.sha256.slice(0, 12)}…
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             case 'error':

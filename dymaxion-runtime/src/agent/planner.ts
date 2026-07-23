@@ -7,22 +7,26 @@ import type { CapabilityDefinition } from '../contracts/capability.js';
 import { capabilityRequiresApproval } from '../contracts/capability.js';
 import { callLLM } from '../llm/middleware.js';
 import { applicableSkills } from '../skills/registry.js';
+import { allWorkflows } from '../workflows/registry.js';
+import type { WorkflowDefinition } from '../workflows/contract.js';
 import type { IncomingMessage, Plan, PlanStep } from '../gateways/common.js';
 import type { Intent } from './classifier.js';
 import type { RecalledContext } from '../memory/conversation.js';
 
 const SYSTEM = `You are Dymaxion's planner. Decompose the user's GIS request into an ordered
-sequence of skill invocations from the catalog provided. Respond with ONLY minified JSON:
+sequence of catalog invocations. Catalog entries may be historical skills, native capabilities,
+or deterministic composed workflows. Respond with ONLY minified JSON:
 {"summary":"one-sentence plan","steps":[{"skill":"<slug>","description":"...","input":{...}}]}
 Rules:
-- Use ONLY skills from the catalog, and only ones marked available.
-- Prefer fewer steps. A single-skill plan is normal.
+- Use ONLY entries from the catalog, and only ones marked available.
+- Prefer fewer steps. A single-entry plan is normal.
+- Prefer a composed workflow when it exactly matches the requested outcome; do not manually expand it into component capabilities.
 - Greetings, small talk, questions about Dymaxion itself ("what can you do?"), and
   informational questions answerable without running tools: return
   {"summary":"conversational","steps":[]} — the runtime answers directly.
-- ONLY for an actionable GIS task that no catalog skill can perform, return
+- ONLY for an actionable GIS task that no catalog entry can perform, return
   {"summary":"no-skill-gap","steps":[]} — the runtime will consider drafting a new skill.
-- Inputs must match each skill's declared input names.`;
+- Inputs must match each catalog entry's declared input names.`;
 
 export async function plan(
   msg: IncomingMessage,
@@ -32,6 +36,15 @@ export async function plan(
 ): Promise<Plan> {
   const skills = applicableSkills(intent.domain);
   const capabilities = allCapabilities();
+  const workflows = allWorkflows();
+  const catalogSlugs = [
+    ...skills.map((skill) => skill.manifest.slug),
+    ...capabilities.map((capability) => capability.manifest.slug),
+    ...workflows.map((workflow) => workflow.manifest.slug),
+  ];
+  if (new Set(catalogSlugs).size !== catalogSlugs.length) {
+    throw new Error('planner catalog contains a workflow, capability, or skill slug collision');
+  }
   const catalog = [
     ...skills.map((skill) => ({
       slug: skill.manifest.slug,
@@ -48,6 +61,14 @@ export async function plan(
       destructive: capability.manifest.classification !== 'read',
       available: true,
       kind: 'native-capability',
+    })),
+    ...workflows.map((workflow) => ({
+      slug: workflow.manifest.slug,
+      description: workflow.manifest.description,
+      inputs: workflow.manifest.input_summary,
+      destructive: false,
+      available: true,
+      kind: 'workflow',
     })),
   ];
 
@@ -84,7 +105,9 @@ export async function plan(
       description: string;
       destructive: boolean;
       timeoutSeconds: number;
+      kind: 'historical-skill' | 'native-capability' | 'workflow';
       capability?: CapabilityDefinition<unknown, unknown>;
+      workflow?: WorkflowDefinition<unknown, unknown>;
     }
   >([
     ...skills.map(
@@ -95,6 +118,7 @@ export async function plan(
             description: skill.manifest.description,
             destructive: skill.manifest.destructive || skill.manifest.requires_approval,
             timeoutSeconds: skill.manifest.budget.max_duration_seconds,
+            kind: 'historical-skill' as const,
           },
         ] as const,
     ),
@@ -107,6 +131,20 @@ export async function plan(
             destructive: capability.manifest.classification !== 'read',
             timeoutSeconds: Math.ceil(capability.manifest.resource_limits.max_duration_ms / 1_000),
             capability,
+            kind: 'native-capability' as const,
+          },
+        ] as const,
+    ),
+    ...workflows.map(
+      (workflow) =>
+        [
+          workflow.manifest.slug,
+          {
+            description: workflow.manifest.description,
+            destructive: false,
+            timeoutSeconds: 300,
+            workflow: workflow as WorkflowDefinition<unknown, unknown>,
+            kind: 'workflow' as const,
           },
         ] as const,
     ),
@@ -124,9 +162,15 @@ export async function plan(
           destructive = true;
         }
       }
+      if (descriptor.workflow) {
+        // The composed workflow creates its approval only after preview fixes
+        // the exact ZIP and sidecar identities.
+        destructive = false;
+      }
       return {
         index,
         skill: step.skill!,
+        kind: descriptor.kind,
         description: step.description ?? descriptor.description,
         input,
         destructive,

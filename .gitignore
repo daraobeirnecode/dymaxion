@@ -12,6 +12,9 @@ docker-compose.override.yml
 data/
 logs/
 artifacts/
+# Source route, not generated artifact output.
+!dymaxion-admin/app/api/artifacts/
+!dymaxion-admin/app/api/artifacts/**
 *.log
 
 # Node

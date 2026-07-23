@@ -9,6 +9,19 @@ export interface Attachment {
   url?: string;
 }
 
+/** A workflow deliverable that has already been persisted after approval.
+ * Gateways MUST re-verify path containment, regular-file status, byte count,
+ * and SHA-256 immediately before reading or sending it. Web surfaces must
+ * serialize only the metadata/handle fields, never `path`. */
+export interface OutgoingAttachment {
+  path: string;
+  mime: string;
+  original_name: string;
+  sha256: string;
+  bytes: number;
+  handle: string;
+}
+
 export interface MessageTarget {
   gateway: string;
   source_id: string;
@@ -26,12 +39,13 @@ export interface IncomingMessage {
 
 export interface OutgoingMessage {
   body: string;
-  attachments?: Attachment[];
+  attachments?: OutgoingAttachment[];
 }
 
 export interface PlanStep {
   index: number;
   skill: string;
+  kind?: 'historical-skill' | 'native-capability' | 'workflow';
   description: string;
   input: Record<string, unknown>;
   destructive: boolean;
@@ -85,7 +99,7 @@ export interface Gateway {
   send(target: MessageTarget, msg: OutgoingMessage): Promise<void>;
   sendPlan(target: MessageTarget, plan: Plan): Promise<void>;
   sendProgress(target: MessageTarget, step: PlanStep, result: StepResult): Promise<void>;
-  sendFinal(target: MessageTarget, narrative: string, attachments?: Attachment[]): Promise<void>;
+  sendFinal(target: MessageTarget, narrative: string, attachments?: OutgoingAttachment[]): Promise<void>;
   requestApproval(target: MessageTarget, req: ApprovalRequest): Promise<ApprovalResponse>;
   onMessage(handler: IncomingHandler): void;
 }

@@ -12,6 +12,15 @@ import { canonicalJson, sha256Canonical, sha256Text } from '../src/contracts/can
 import { EvidenceBundleSchema } from '../src/contracts/evidence.js';
 import { runSkill, type RunSkillDependencies, type SkillResult } from '../src/skills/executor.js';
 import {
+  InMemoryApprovalStore,
+  decideApproval,
+} from '../src/security/approval.js';
+import {
+  ArcgisChangeRiskPacketOutputSchema,
+  arcgisChangeRiskPacketWorkflow,
+} from '../src/workflows/arcgis-change-risk-packet.js';
+import { assertWorkflowSkillSlugAvailable } from '../src/workflows/registry.js';
+import {
   ArcgisChangeRiskCaseManifestSchema,
   ArcgisChangeRiskCaseSchema,
   ChangeRiskReportSchema,
@@ -38,6 +47,14 @@ const APP = 'a'.repeat(32);
 const MAP = 'b'.repeat(32);
 const LAYER = 'c'.repeat(32);
 const SERVICE = `service:${sha256Text('https://services.arcgis.com/example/arcgis/rest/services/Layer/FeatureServer/0')}`;
+
+test('workflow registry fails closed on a historical-skill slug collision', () => {
+  assert.doesNotThrow(() => assertWorkflowSkillSlugAvailable('arcgis_change_risk_packet', () => undefined));
+  assert.throws(
+    () => assertWorkflowSkillSlugAvailable('arcgis_change_risk_packet', () => ({ available: true })),
+    /workflow slug collides with a historical skill/i,
+  );
+});
 
 function pilotCase(extra: Partial<ArcgisChangeRiskCase> = {}): ArcgisChangeRiskCase {
   return ArcgisChangeRiskCaseSchema.parse({
@@ -612,6 +629,92 @@ test('explicit approval path uses runSkill approval APIs and verifies the persis
     } finally {
       if (previousIdentity === undefined) delete process.env.DYMAXION_CREDENTIAL_IDENTITIES_JSON;
       else process.env.DYMAXION_CREDENTIAL_IDENTITIES_JSON = previousIdentity;
+    }
+  });
+});
+
+test('agent-callable workflow persists and verifies three approval-bound deliverables without mutating process env', async () => {
+  await withTempRoot(async (artifactRoot) => {
+    const previousIdentity = process.env.DYMAXION_CREDENTIAL_IDENTITIES_JSON;
+    const previousArtifactRoot = process.env.DYMAXION_ARTIFACT_ROOT;
+    process.env.DYMAXION_CREDENTIAL_IDENTITIES_JSON = JSON.stringify({
+      export_evidence_bundle: 'local-value-workflow-operator',
+    });
+    process.env.DYMAXION_ARTIFACT_ROOT = 'workflow-env-mutation-canary';
+    const store = new InMemoryApprovalStore();
+    const approvalDependencies = { store, now: () => NOW, audit: async () => undefined };
+    const composedRunSkill = async (
+      slug: string,
+      input: Record<string, unknown>,
+      agentRunId: string,
+      dependencies?: Partial<RunSkillDependencies>,
+    ): Promise<SkillResult> => {
+      if (slug === 'trace_arcgis_dependencies') {
+        return { ok: true, output: traceOutput(), durationMs: 11, costUsd: 0 };
+      }
+      return runSkill(slug, input, agentRunId, dependencies);
+    };
+
+    try {
+      const execution = await arcgisChangeRiskPacketWorkflow.execute(
+        {
+          portal_url: 'https://juneaucounty.maps.arcgis.com',
+          root_item_id: APP,
+          project_id: '519e8c7c-5176-5de6-a8cf-52b7772e0e34',
+          review_posture: 'retirement_cleanup',
+          organization_name: 'Juneau County, Wisconsin',
+        },
+        {
+          agentRunId: 'workflow-run-1',
+          trustedRoot: artifactRoot,
+          now: () => NOW,
+          approvalDependencies,
+          runSkillFn: composedRunSkill,
+          runSkillDependencies: {
+            recorder: {
+              begin: async () => 'workflow-invocation-1',
+              finish: async () => undefined,
+            },
+            audit: async () => undefined,
+          },
+          gateway: {
+            requestApproval: async (request) => {
+              assert.equal(await decideApproval(request.id, 'approved', 'operator-a', approvalDependencies), true);
+              return {
+                approval_id: request.id,
+                approved: true,
+                decision: 'approved',
+                decided_by: 'operator-a',
+              };
+            },
+          },
+        },
+      );
+
+      assert.equal(process.env.DYMAXION_ARTIFACT_ROOT, 'workflow-env-mutation-canary');
+      assert.equal(execution.output.outcome, 'persisted');
+      assert.equal(execution.deliveries.length, 3);
+      assert.deepEqual(
+        execution.deliveries.map((delivery) => delivery.original_name),
+        ['evidence-bundle.zip', 'change-ticket.md', 'dependency-map.svg'],
+      );
+      for (const delivery of execution.deliveries) {
+        const bytes = await readFile(delivery.path);
+        assert.equal(bytes.byteLength, delivery.bytes);
+        assert.ok(!execution.summary.includes(delivery.path));
+      }
+
+      const forged = structuredClone(execution.output);
+      forged.attachments[0]!.handle = forged.attachments[1]!.handle;
+      assert.throws(
+        () => ArcgisChangeRiskPacketOutputSchema.parse(forged),
+        /attachment metadata.*persisted deliverable identity|handle/i,
+      );
+    } finally {
+      if (previousIdentity === undefined) delete process.env.DYMAXION_CREDENTIAL_IDENTITIES_JSON;
+      else process.env.DYMAXION_CREDENTIAL_IDENTITIES_JSON = previousIdentity;
+      if (previousArtifactRoot === undefined) delete process.env.DYMAXION_ARTIFACT_ROOT;
+      else process.env.DYMAXION_ARTIFACT_ROOT = previousArtifactRoot;
     }
   });
 });

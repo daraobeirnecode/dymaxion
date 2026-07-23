@@ -12,6 +12,7 @@ import {
   type IncomingHandler,
   type IncomingMessage,
   type MessageTarget,
+  type OutgoingAttachment,
   type OutgoingMessage,
   type Plan,
   type PlanStep,
@@ -19,6 +20,7 @@ import {
 } from '../common.js';
 import { awaitDecision, decideApproval } from '../../security/approval.js';
 import { formatApprovalReview } from '../../security/approval-review.js';
+import { readVerifiedDeliverable, trustedArtifactRootFromEnv } from '../../workflows/deliverable-storage.js';
 
 export class CliGateway implements Gateway {
   readonly name = 'cli';
@@ -57,8 +59,27 @@ export class CliGateway implements Gateway {
     process.stdout.write(`  [${step.index + 1}] ${step.skill}: ${status} (${Math.round(result.duration_ms / 1000)}s)\n`);
   }
 
-  async sendFinal(_target: MessageTarget, narrative: string): Promise<void> {
+  async sendFinal(
+    _target: MessageTarget,
+    narrative: string,
+    attachments: OutgoingAttachment[] = [],
+  ): Promise<void> {
     process.stdout.write(`\n${narrative}\n`);
+    if (!attachments.length) return;
+
+    const trustedRoot = trustedArtifactRootFromEnv();
+    process.stdout.write('\nVerified deliverables:\n');
+    for (const attachment of attachments) {
+      await readVerifiedDeliverable({
+        trustedRoot,
+        path: attachment.path,
+        expectedSha256: attachment.sha256,
+        expectedBytes: attachment.bytes,
+      });
+      process.stdout.write(
+        `  ${attachment.original_name} | ${attachment.bytes} bytes | sha256 ${attachment.sha256} | handle ${attachment.handle}\n`,
+      );
+    }
   }
 
   async requestApproval(_target: MessageTarget, req: ApprovalRequest): Promise<ApprovalResponse> {

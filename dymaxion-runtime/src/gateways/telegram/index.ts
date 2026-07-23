@@ -14,6 +14,7 @@ import {
   type IncomingHandler,
   type IncomingMessage,
   type MessageTarget,
+  type OutgoingAttachment,
   type OutgoingMessage,
   type Plan,
   type PlanStep,
@@ -25,6 +26,7 @@ import {
   formatApprovalReview,
 } from '../../security/approval-review.js';
 import { logger } from '../../observability/logger.js';
+import { readVerifiedDeliverable, trustedArtifactRootFromEnv } from '../../workflows/deliverable-storage.js';
 
 interface TgUpdate {
   update_id: number;
@@ -143,6 +145,27 @@ export class TelegramGateway implements Gateway {
     const data = (await res.json()) as { ok: boolean; result: T; description?: string };
     if (!data.ok) throw new Error(`telegram ${method}: ${data.description}`);
     return data.result;
+  }
+
+  private async sendVerifiedDocument(target: MessageTarget, attachment: OutgoingAttachment): Promise<void> {
+    const bytes = await readVerifiedDeliverable({
+      path: attachment.path,
+      trustedRoot: trustedArtifactRootFromEnv(),
+      expectedSha256: attachment.sha256,
+      expectedBytes: attachment.bytes,
+      maxBytes: MAX_ATTACHMENT_BYTES,
+    });
+    const filename = sanitizeTelegramFilename(attachment.original_name);
+    const payload = Uint8Array.from(bytes);
+    const form = new FormData();
+    form.append('chat_id', target.source_id);
+    form.append('document', new Blob([payload.buffer], { type: attachment.mime }), filename);
+    form.append('caption', `${filename} | ${attachment.bytes} bytes | sha256 ${attachment.sha256}`);
+    const response = await fetch(this.api('sendDocument'), { method: 'POST', body: form });
+    const data = (await response.json()) as { ok: boolean; description?: string };
+    if (!response.ok || !data.ok) {
+      throw new Error(`telegram sendDocument failed: ${data.description ?? `HTTP ${response.status}`}`);
+    }
   }
 
   async start(): Promise<void> {
@@ -314,8 +337,15 @@ export class TelegramGateway implements Gateway {
     });
   }
 
-  async sendFinal(target: MessageTarget, narrative: string): Promise<void> {
+  async sendFinal(
+    target: MessageTarget,
+    narrative: string,
+    attachments: OutgoingAttachment[] = [],
+  ): Promise<void> {
     await this.send(target, { body: narrative });
+    for (const attachment of attachments) {
+      await this.sendVerifiedDocument(target, attachment);
+    }
   }
 
   async requestApproval(target: MessageTarget, req: ApprovalRequest): Promise<ApprovalResponse> {

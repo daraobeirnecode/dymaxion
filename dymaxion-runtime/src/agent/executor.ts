@@ -14,6 +14,8 @@ import { runSkill } from '../skills/executor.js';
 import { shouldAttemptAuthoring, draftSkill } from '../skills/author.js';
 import { getSkill } from '../skills/registry.js';
 import { getCapability } from '../capabilities/registry.js';
+import { getWorkflow } from '../workflows/registry.js';
+import type { DeliveredAttachment } from '../workflows/contract.js';
 import { persistIncoming, persistOutgoing, loadRelevant } from '../memory/conversation.js';
 import { getPreference } from '../memory/preferences.js';
 import {
@@ -30,6 +32,7 @@ import type {
   Gateway,
   IncomingMessage,
   MessageTarget,
+  OutgoingAttachment,
   StepResult,
 } from '../gateways/common.js';
 
@@ -44,6 +47,17 @@ function canonicalApprovalPayload(
     throw new Error(`native capability ${skill} approval payload must be an object`);
   }
   return parsed as Record<string, unknown>;
+}
+
+function outgoingAttachment(delivery: DeliveredAttachment): OutgoingAttachment {
+  return {
+    path: delivery.path,
+    mime: delivery.media_type,
+    original_name: delivery.original_name,
+    sha256: delivery.sha256,
+    bytes: delivery.bytes,
+    handle: delivery.handle,
+  };
 }
 
 export async function runAgent(message: IncomingMessage, gateway: Gateway): Promise<void> {
@@ -105,11 +119,21 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
     // 4. Execute step-by-step
     const timeoutMinutes = await getPreference<number>('approval_timeout_minutes', 30);
     const results: StepResult[] = [];
+    const attachments: OutgoingAttachment[] = [];
+    const workflowSummaries: string[] = [];
     let totalCost = 0;
 
     for (const step of plan.steps) {
+      const workflow = getWorkflow(step.skill);
+      if (
+        (step.kind === 'workflow' && !workflow)
+        || (workflow && step.kind !== 'workflow')
+        || (workflow && Boolean(getSkill(step.skill)))
+      ) {
+        throw new Error('plan step registry kind mismatch or workflow slug collision');
+      }
       let approvalRequest: ApprovalRequest | undefined;
-      if (step.destructive) {
+      if (step.destructive && !workflow) {
         const approvalPayload = canonicalApprovalPayload(step.skill, step.input);
         const approvalTarget = deriveApprovalTarget(step.skill, approvalPayload);
         const credentialIdentity = resolveExecutionCredentialIdentity(step.skill);
@@ -133,24 +157,72 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
         }
       }
 
-      const result = await runSkill(step.skill, step.input, runId, { approvalRequest });
-      const stepResult: StepResult = {
-        ok: result.ok,
-        output: result.output,
-        error: result.error,
-        cost_usd: result.costUsd,
-        duration_ms: result.durationMs,
-      };
+      let stepResult: StepResult;
+      if (workflow) {
+        const stepStarted = Date.now();
+        try {
+          const input = workflow.inputSchema.parse(step.input);
+          const execution = await workflow.execute(input, {
+            agentRunId: runId,
+            approvalTimeoutMinutes: timeoutMinutes,
+            gateway: {
+              requestApproval: async (req) => {
+                await db
+                  .update(schema.agentRuns)
+                  .set({ status: 'awaiting_approval' })
+                  .where(eq(schema.agentRuns.id, runId));
+                try {
+                  return await gateway.requestApproval(target, req).catch(async () => awaitDecision(req));
+                } finally {
+                  await db
+                    .update(schema.agentRuns)
+                    .set({ status: 'running' })
+                    .where(eq(schema.agentRuns.id, runId));
+                }
+              },
+            },
+          });
+          const output = workflow.outputSchema.parse(execution.output);
+          stepResult = {
+            ok: true,
+            output,
+            cost_usd: 0,
+            duration_ms: Date.now() - stepStarted,
+          };
+          workflowSummaries.push(execution.summary);
+          attachments.push(...execution.deliveries.map(outgoingAttachment));
+        } catch {
+          stepResult = {
+            ok: false,
+            error: 'workflow input or execution was rejected',
+            cost_usd: 0,
+            duration_ms: Date.now() - stepStarted,
+          };
+        }
+      } else {
+        const result = await runSkill(step.skill, step.input, runId, { approvalRequest });
+        stepResult = {
+          ok: result.ok,
+          output: result.output,
+          error: result.error,
+          cost_usd: result.costUsd,
+          duration_ms: result.durationMs,
+        };
+      }
       results.push(stepResult);
-      totalCost += result.costUsd;
-      await auditEvent('run_step', { step: 'execute', skill: step.skill, ok: result.ok }, runId);
+      totalCost += stepResult.cost_usd;
+      await auditEvent(
+        'run_step',
+        { step: 'execute', skill: step.skill, kind: workflow ? 'workflow' : step.kind, ok: stepResult.ok },
+        runId,
+      );
       await gateway.sendProgress(target, step, stepResult);
 
-      if (!result.ok && !step.optional) {
-        if (result.error && shouldAttemptAuthoring(result.error)) {
+      if (!stepResult.ok && !step.optional) {
+        if (!workflow && stepResult.error && shouldAttemptAuthoring(stepResult.error)) {
           const outcome = await draftSkill({
             agentRunId: runId,
-            failureContext: `Step '${step.description}' failed: ${result.error}`,
+            failureContext: `Step '${step.description}' failed: ${stepResult.error}`,
             desiredCapability: step.description,
           });
           await auditEvent('run_step', { step: 'skill-author', outcome: outcome.action }, runId);
@@ -159,8 +231,12 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
       }
     }
 
-    // 5. Self-critique (single revision pass: re-run failed non-optional steps once)
-    const critique = await review(plan, results, runId);
+    // 5. Self-critique. Deterministic workflows validate their own strict
+    // outputs and must not be restated or second-guessed by an LLM.
+    const workflowOnlyPlan = plan.steps.every((step) => Boolean(getWorkflow(step.skill)));
+    const critique = workflowOnlyPlan
+      ? { needsRevision: false, notes: 'deterministic workflow output validated by schema' }
+      : await review(plan, results, runId);
     if (critique.needsRevision) {
       await auditEvent('run_step', { step: 'critique', notes: critique.notes }, runId);
       for (let i = 0; i < results.length; i++) {
@@ -183,11 +259,16 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
       }
     }
 
-    // 6. Deliver
+    // 6. Deliver. A workflow's operator summary is deterministic and carries
+    // exact counts/hashes; do not ask an LLM to restate it.
     const durationSeconds = Math.round((Date.now() - started) / 1000);
-    const narrative = await narrate(plan, results, critique, { durationSeconds, costUsd: totalCost }, runId);
+    const narrative = workflowOnlyPlan
+      ? workflowSummaries.length
+        ? workflowSummaries.join('\n\n')
+        : `Workflow failed: ${results.find((result) => !result.ok)?.error ?? 'no validated output'}`
+      : await narrate(plan, results, critique, { durationSeconds, costUsd: totalCost }, runId);
     await finish(runId, results.every((r) => r.ok) ? 'completed' : 'failed', narrative, totalCost);
-    await gateway.sendFinal(target, narrative);
+    await gateway.sendFinal(target, narrative, attachments);
     await persistOutgoing(message.gateway, message.source_id, narrative);
   } catch (err) {
     logger.error({ err, runId }, 'agent run failed');
@@ -229,9 +310,54 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
 
   let cost = 0;
   const results: StepResult[] = [];
+  const attachments: OutgoingAttachment[] = [];
+  const workflowSummaries: string[] = [];
   const timeoutMinutes = await getPreference<number>('approval_timeout_minutes', 30);
   const replayTarget: MessageTarget = { gateway: gateway.name, source_id: 'replay' };
   for (const step of storedPlan.steps) {
+    const workflow = getWorkflow(step.skill);
+    if (workflow && Boolean(getSkill(step.skill))) {
+      throw new Error('replay registry contains a workflow slug collision');
+    }
+    if (workflow) {
+      const started = Date.now();
+      try {
+        const execution = await workflow.execute(workflow.inputSchema.parse(step.input), {
+          agentRunId: replay.id,
+          approvalTimeoutMinutes: timeoutMinutes,
+          gateway: {
+            requestApproval: async (request) => {
+              await db
+                .update(schema.agentRuns)
+                .set({ status: 'awaiting_approval' })
+                .where(eq(schema.agentRuns.id, replay.id));
+              try {
+                return await gateway.requestApproval(replayTarget, request).catch(async () => awaitDecision(request));
+              } finally {
+                await db
+                  .update(schema.agentRuns)
+                  .set({ status: 'running' })
+                  .where(eq(schema.agentRuns.id, replay.id));
+              }
+            },
+          },
+        });
+        const output = workflow.outputSchema.parse(execution.output);
+        results.push({ ok: true, output, cost_usd: 0, duration_ms: Date.now() - started });
+        workflowSummaries.push(execution.summary);
+        attachments.push(...execution.deliveries.map(outgoingAttachment));
+      } catch {
+        results.push({
+          ok: false,
+          error: 'workflow replay input or execution was rejected',
+          cost_usd: 0,
+          duration_ms: Date.now() - started,
+        });
+        break;
+      }
+      continue;
+    }
+
     let approvalRequest: ApprovalRequest | undefined;
     if (step.destructive) {
       const approvalPayload = canonicalApprovalPayload(step.skill, step.input);
@@ -258,8 +384,11 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
     cost += r.costUsd;
     if (!r.ok) break;
   }
-  const summary = `Replay of ${runId}: ${results.filter((r) => r.ok).length}/${storedPlan.steps.length} steps ok.`;
-  await finish(replay.id, results.every((r) => r.ok) ? 'completed' : 'failed', summary, cost);
+  const summary = workflowSummaries.length
+    ? workflowSummaries.join('\n\n')
+    : `Replay of ${runId}: ${results.filter((result) => result.ok).length}/${storedPlan.steps.length} steps ok.`;
+  await finish(replay.id, results.every((result) => result.ok) ? 'completed' : 'failed', summary, cost);
+  await gateway.sendFinal(replayTarget, summary, attachments);
   // eslint-disable-next-line no-console
   console.log(summary);
 }
