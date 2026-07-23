@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readdir, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -26,6 +26,15 @@ async function withRoots(run: (root: string, outside: string) => Promise<void>):
   } finally {
     await rm(root, { recursive: true, force: true });
     await rm(outside, { recursive: true, force: true });
+  }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -87,7 +96,7 @@ test('deliverable storage rejects symlinked project ancestry and trusted-root sy
         },
         { trustedRoot: root, authorize: async () => undefined },
       ),
-      /real directory|trusted artifact tree/i,
+      /real directory|trusted artifact tree|secure deliverable storage worker failed/i,
     );
 
     const linkedRoot = `${root}-link`;
@@ -107,6 +116,109 @@ test('deliverable storage rejects symlinked project ancestry and trusted-root sy
     }
   });
 });
+
+for (const attackedStage of ['temp-create', 'hard-link'] as const) {
+  test(`deliverable storage defeats ancestor replacement before ${attackedStage}`, async () => {
+    await withRoots(async (root, outside) => {
+      const content = `approved content for ${attackedStage}\n`;
+      const projectsPath = join(root, 'projects');
+      const originalProjectsPath = join(root, `projects-original-${attackedStage}`);
+      const outsideTargetDir = join(outside, PROJECT_ID, 'deliverables', BUNDLE_SHA);
+      let attacked = false;
+
+      await assert.rejects(
+        () => storeDeliverable(
+          {
+            projectId: PROJECT_ID,
+            bundleSha256: BUNDLE_SHA,
+            entry: 'change-ticket.md',
+            expectedSha256: sha256(content),
+            expectedBytes: Buffer.byteLength(content),
+            content,
+          },
+          {
+            trustedRoot: root,
+            authorize: async (stage) => {
+              if (stage !== attackedStage || attacked) return;
+              attacked = true;
+              await rename(projectsPath, originalProjectsPath);
+              await mkdir(outsideTargetDir, { recursive: true });
+              await symlink(outside, projectsPath);
+            },
+          },
+        ),
+        /secure deliverable storage worker failed/i,
+      );
+
+      assert.equal(attacked, true);
+      assert.equal(await pathExists(join(outsideTargetDir, 'change-ticket.md')), false);
+      const originalTargetDir = join(originalProjectsPath, PROJECT_ID, 'deliverables', BUNDLE_SHA);
+      const entries = await readdir(originalTargetDir);
+      assert.equal(entries.some((entry) => entry.startsWith('.tmp-')), false);
+      assert.equal(entries.includes('change-ticket.md'), false);
+    });
+  });
+}
+
+for (const attackedStage of ['temp-create', 'hard-link'] as const) {
+  test(`deliverable storage defeats trusted-root replacement before ${attackedStage}`, async () => {
+    await withRoots(async (root, outside) => {
+      const content = `approved root-bound content for ${attackedStage}\n`;
+      const detachedRoot = `${root}-detached-${attackedStage}`;
+      const detachedTarget = join(
+        detachedRoot,
+        'projects',
+        PROJECT_ID,
+        'deliverables',
+        BUNDLE_SHA,
+        'change-ticket.md',
+      );
+      const outsideTarget = join(
+        outside,
+        'projects',
+        PROJECT_ID,
+        'deliverables',
+        BUNDLE_SHA,
+        'change-ticket.md',
+      );
+      let attacked = false;
+
+      try {
+        await assert.rejects(
+          () => storeDeliverable(
+            {
+              projectId: PROJECT_ID,
+              bundleSha256: BUNDLE_SHA,
+              entry: 'change-ticket.md',
+              expectedSha256: sha256(content),
+              expectedBytes: Buffer.byteLength(content),
+              content,
+            },
+            {
+              trustedRoot: root,
+              authorize: async (stage) => {
+                if (stage !== attackedStage || attacked) return;
+                attacked = true;
+                await rename(root, detachedRoot);
+                await symlink(outside, root);
+              },
+            },
+          ),
+          /secure deliverable storage worker failed/i,
+        );
+
+        assert.equal(attacked, true);
+        assert.equal(await pathExists(outsideTarget), false);
+        assert.equal(await pathExists(detachedTarget), false);
+      } finally {
+        if (attacked) {
+          await rm(root, { force: true });
+          await rename(detachedRoot, root);
+        }
+      }
+    });
+  });
+}
 
 test('deliverable handles are strict and path-free', () => {
   const parsed = { projectId: PROJECT_ID, bundleSha256: BUNDLE_SHA, entry: 'bundle.zip' as const };

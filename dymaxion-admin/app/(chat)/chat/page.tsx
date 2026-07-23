@@ -70,7 +70,7 @@ export default function ChatPage() {
   }, []);
 
   const handleFrame = useCallback(
-    (event: string, dataRaw: string) => {
+    async (event: string, dataRaw: string): Promise<void> => {
       let data: Record<string, unknown> = {};
       try {
         data = JSON.parse(dataRaw) as Record<string, unknown>;
@@ -85,7 +85,7 @@ export default function ChatPage() {
           push({ kind: 'plan', text, data: data.plan ?? data });
           break;
         case 'approval_required': {
-          const approval = parseApprovalReview(data);
+          const approval = await parseApprovalReview(data);
           push({
             kind: 'approval_required',
             text: text || 'Approval required',
@@ -137,11 +137,11 @@ export default function ChatPage() {
         buffer += decoder.decode(value, { stream: true });
         const [frames, remainder] = parseSse(buffer);
         buffer = remainder;
-        for (const f of frames) handleFrame(f.event, f.data);
+        for (const f of frames) await handleFrame(f.event, f.data);
       }
       if (buffer.trim()) {
         const [frames] = parseSse(buffer + '\n\n');
-        for (const f of frames) handleFrame(f.event, f.data);
+        for (const f of frames) await handleFrame(f.event, f.data);
       }
     } catch (e) {
       push({

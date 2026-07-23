@@ -18,7 +18,7 @@ import { CliGateway } from './gateways/cli/index.js';
 import { getProjectBySlug, setActiveProject } from './memory/project.js';
 import { startAllMcpServers, stopAllMcpServers } from './mcp/manager.js';
 import { checkWorkerHealth, workerAvailable, workerConfigured } from './worker/client.js';
-import { getWorkflow } from './workflows/registry.js';
+import { loadChangeRiskPacketWorkflowForCli } from './workflows/direct-cli.js';
 import type { OutgoingAttachment } from './gateways/common.js';
 
 async function bootstrap(): Promise<CliGateway> {
@@ -79,8 +79,7 @@ async function runChangeRiskPacket(args: string[]): Promise<void> {
     args,
     new Set(['--portal-url', '--root-item-id', '--project-id', '--review-posture', '--organization-name']),
   );
-  const workflow = getWorkflow('arcgis_change_risk_packet');
-  if (!workflow) throw new Error('change-risk workflow is not registered');
+  const workflow = await loadChangeRiskPacketWorkflowForCli();
   const parsed = workflow.inputSchema.safeParse({
     portal_url: flags['--portal-url'],
     root_item_id: flags['--root-item-id'],

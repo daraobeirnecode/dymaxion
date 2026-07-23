@@ -27,6 +27,7 @@ import { auditEvent } from '../security/audit.js';
 import { resolveExecutionCredentialIdentity } from '../security/execution-identity.js';
 import { traceRun, flushLangfuse } from '../observability/langfuse.js';
 import { logger } from '../observability/logger.js';
+import { createReplayAfterKindValidation } from './replay-contract.js';
 import type {
   ApprovalRequest,
   Gateway,
@@ -295,6 +296,7 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
     summary?: string;
     steps?: Array<{
       skill: string;
+      kind?: unknown;
       input: Record<string, unknown>;
       description: string;
       destructive: boolean;
@@ -303,10 +305,14 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
   };
   if (!storedPlan.steps?.length) throw new Error(`agent run ${runId} has no replayable plan`);
 
-  const [replay] = await db
-    .insert(schema.agentRuns)
-    .values({ plan: { ...storedPlan, replay_of: runId }, status: 'running' })
-    .returning({ id: schema.agentRuns.id });
+  const replay = await createReplayAfterKindValidation({ steps: storedPlan.steps }, async () => {
+    const [created] = await db
+      .insert(schema.agentRuns)
+      .values({ plan: { ...storedPlan, replay_of: runId }, status: 'running' })
+      .returning({ id: schema.agentRuns.id });
+    if (!created) throw new Error('replay run could not be created');
+    return created;
+  });
 
   let cost = 0;
   const results: StepResult[] = [];
@@ -315,10 +321,7 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
   const timeoutMinutes = await getPreference<number>('approval_timeout_minutes', 30);
   const replayTarget: MessageTarget = { gateway: gateway.name, source_id: 'replay' };
   for (const step of storedPlan.steps) {
-    const workflow = getWorkflow(step.skill);
-    if (workflow && Boolean(getSkill(step.skill))) {
-      throw new Error('replay registry contains a workflow slug collision');
-    }
+    const workflow = step.kind === 'workflow' ? getWorkflow(step.skill) : undefined;
     if (workflow) {
       const started = Date.now();
       try {

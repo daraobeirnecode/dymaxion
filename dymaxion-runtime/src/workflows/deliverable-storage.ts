@@ -10,9 +10,10 @@
 // Sidecars live outside artifacts/ so export_evidence_bundle's strict quota
 // scan of the artifacts tree never sees them.
 
-import { constants as fsConstants } from 'node:fs';
+import { constants as fsConstants, existsSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { sha256Text } from '../contracts/canonical.js';
 
@@ -22,9 +23,9 @@ export type DeliverableEntry = (typeof DELIVERABLE_ENTRIES)[number];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA256_RE = /^[a-f0-9]{64}$/;
-const TEMP_PREFIX = '.tmp-';
 
-type AuthorizeSink = () => void | Promise<void>;
+export type DeliverableSinkStage = 'mkdir' | 'temp-create' | 'hard-link';
+type AuthorizeSink = (stage: DeliverableSinkStage) => void | Promise<void>;
 
 function fail(message: string): never {
   throw new Error(message);
@@ -119,29 +120,6 @@ async function verifyAncestorChain(rootRealpath: string, filePath: string): Prom
   }
 }
 
-async function ensureDirectoryComponent(
-  authorize: AuthorizeSink,
-  parentPath: string,
-  component: string,
-  rootRealpath: string,
-): Promise<string> {
-  if (component.includes('/') || component.includes('\\') || component === '.' || component === '..' || component.length === 0) {
-    fail('invalid deliverable path component');
-  }
-  const nextPath = join(parentPath, component);
-  await authorize();
-  try {
-    await fs.mkdir(nextPath, { mode: 0o700 });
-  } catch (error) {
-    if (!isErrno(error, 'EEXIST')) throw error;
-  }
-  const stat = await fs.lstat(nextPath);
-  if (!stat.isDirectory() || stat.isSymbolicLink()) fail('deliverable directory is not a real directory');
-  const real = resolve(await fs.realpath(nextPath));
-  assertContained(rootRealpath, real);
-  return nextPath;
-}
-
 export interface StoreDeliverableRequest {
   projectId: string;
   bundleSha256: string;
@@ -156,6 +134,140 @@ export interface StoredDeliverable {
   sha256: string;
   bytes: number;
   created: boolean;
+}
+
+interface StorageWorkerRequest {
+  type: 'store';
+  expectedRoot: { dev: string; ino: string };
+  rootComponents: string[];
+  components: [string, string, string, string];
+  entry: Exclude<DeliverableEntry, 'bundle.zip'>;
+  contentBase64: string;
+  expectedSha256: string;
+  expectedBytes: number;
+}
+
+interface StorageWorkerResult {
+  type: 'result';
+  created: boolean;
+}
+
+function storageWorkerPath(): string {
+  const worker = fileURLToPath(new URL('./deliverable-storage-worker.py', import.meta.url));
+  if (existsSync(worker)) return worker;
+  fail('secure deliverable storage worker is unavailable');
+}
+
+async function runStorageWorker(
+  request: Omit<StorageWorkerRequest, 'expectedRoot' | 'rootComponents'>,
+  rootRealpath: string,
+  authorize: AuthorizeSink,
+): Promise<boolean> {
+  const rootStat = await fs.lstat(rootRealpath, { bigint: true });
+  if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) fail('trusted root is not a real directory');
+  const workerRequest: StorageWorkerRequest = {
+    ...request,
+    expectedRoot: { dev: rootStat.dev.toString(), ino: rootStat.ino.toString() },
+    rootComponents: rootRealpath.split('/').filter((component) => component.length > 0),
+  };
+
+  return await new Promise<boolean>((resolvePromise, rejectPromise) => {
+    const child = spawn('/usr/bin/python3', [storageWorkerPath()], {
+      cwd: rootRealpath,
+      env: { PYTHONIOENCODING: 'utf-8' },
+      stdio: ['pipe', 'pipe', 'ignore'],
+    });
+    let settled = false;
+    let result: StorageWorkerResult | null = null;
+    let authorizationError: unknown;
+    let stdout = '';
+    const timer = setTimeout(() => {
+      authorizationError = new Error('secure deliverable storage worker timed out');
+      child.kill('SIGTERM');
+    }, 30_000);
+    timer.unref();
+
+    const finish = (error?: unknown): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) rejectPromise(error);
+      else if (result) resolvePromise(result.created);
+      else rejectPromise(new Error('secure deliverable storage worker failed'));
+    };
+
+    const send = (message: object): void => {
+      if (!child.stdin.writable) {
+        authorizationError = new Error('secure deliverable storage worker closed unexpectedly');
+        child.kill('SIGTERM');
+        return;
+      }
+      child.stdin.write(`${JSON.stringify(message)}\n`);
+    };
+
+    const handleMessage = (message: unknown): void => {
+      if (typeof message !== 'object' || message === null || !('type' in message)) {
+        authorizationError = new Error('secure deliverable storage worker returned an invalid response');
+        child.kill('SIGTERM');
+        return;
+      }
+      const typed = message as Record<string, unknown>;
+      if (typed.type === 'authorize') {
+        const stage = typed.stage;
+        if (stage !== 'mkdir' && stage !== 'temp-create' && stage !== 'hard-link') {
+          authorizationError = new Error('secure deliverable storage worker requested an invalid sink');
+          child.kill('SIGTERM');
+          return;
+        }
+        void Promise.resolve(authorize(stage)).then(
+          () => send({ type: 'authorization', stage, allowed: true }),
+          (error: unknown) => {
+            authorizationError = error;
+            send({ type: 'authorization', stage, allowed: false });
+          },
+        );
+        return;
+      }
+      if (typed.type === 'result' && typeof typed.created === 'boolean') {
+        result = { type: 'result', created: typed.created };
+        return;
+      }
+      if (typed.type !== 'error') {
+        authorizationError = new Error('secure deliverable storage worker returned an invalid response');
+        child.kill('SIGTERM');
+      }
+    };
+
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+      if (stdout.length > 65_536) {
+        authorizationError = new Error('secure deliverable storage worker exceeded its response ceiling');
+        child.kill('SIGTERM');
+        return;
+      }
+      for (;;) {
+        const newline = stdout.indexOf('\n');
+        if (newline < 0) break;
+        const line = stdout.slice(0, newline);
+        stdout = stdout.slice(newline + 1);
+        try {
+          handleMessage(JSON.parse(line) as unknown);
+        } catch {
+          authorizationError = new Error('secure deliverable storage worker returned invalid JSON');
+          child.kill('SIGTERM');
+          return;
+        }
+      }
+    });
+    child.once('error', (error) => finish(authorizationError ?? error));
+    child.once('exit', (code) => {
+      if (authorizationError) finish(authorizationError);
+      else if (code === 0 && result) finish();
+      else finish(new Error('secure deliverable storage worker failed'));
+    });
+    send(workerRequest);
+  });
 }
 
 /**
@@ -181,67 +293,31 @@ export async function storeDeliverable(
   }
 
   const rootRealpath = await verifyTrustedRoot(dependencies.trustedRoot);
-  let current = rootRealpath;
-  for (const component of ['projects', request.projectId, 'deliverables', request.bundleSha256]) {
-    current = await ensureDirectoryComponent(dependencies.authorize, current, component, rootRealpath);
-  }
-  const targetPath = join(current, request.entry);
-  await verifyAncestorChain(rootRealpath, targetPath);
-
-  const existing = await readVerifiedDeliverableIfPresent(targetPath, rootRealpath, request.expectedSha256, request.expectedBytes);
-  if (existing) {
-    return { path: targetPath, sha256: request.expectedSha256, bytes: bytes.byteLength, created: false };
-  }
-
-  const suffix = randomBytes(16).toString('hex');
-  const tempPath = join(current, `${TEMP_PREFIX}${process.pid}-${suffix}`);
-  await verifyAncestorChain(rootRealpath, tempPath);
-  await dependencies.authorize();
-  const handle = await fs.open(tempPath, fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY | noFollowFlag(), 0o600);
-  let published = false;
-  try {
-    const tempPathStat = await fs.lstat(tempPath);
-    const tempDescriptorStat = await handle.stat();
-    const tempRealpath = resolve(await fs.realpath(tempPath));
-    if (
-      tempRealpath !== tempPath
-      || !tempPathStat.isFile()
-      || tempPathStat.isSymbolicLink()
-      || tempPathStat.dev !== tempDescriptorStat.dev
-      || tempPathStat.ino !== tempDescriptorStat.ino
-    ) {
-      fail('deliverable temp file changed during verification');
-    }
-    await handle.writeFile(bytes);
-    await handle.sync();
-  } catch (error) {
-    await fs.unlink(tempPath).catch(() => undefined);
-    throw error;
-  } finally {
-    await handle.close();
-  }
-  try {
-    await dependencies.authorize();
-    await verifyAncestorChain(rootRealpath, tempPath);
-    await verifyAncestorChain(rootRealpath, targetPath);
-    if (resolve(await fs.realpath(tempPath)) !== tempPath) fail('deliverable temp path escaped its trusted root');
-    try {
-      await fs.link(tempPath, targetPath);
-      published = true;
-    } catch (error) {
-      if (isErrno(error, 'EEXIST')) {
-        const raced = await readVerifiedDeliverableIfPresent(targetPath, rootRealpath, request.expectedSha256, request.expectedBytes);
-        if (!raced) fail('deliverable target conflict');
-        return { path: targetPath, sha256: request.expectedSha256, bytes: bytes.byteLength, created: false };
-      }
-      throw error;
-    }
-  } finally {
-    await fs.unlink(tempPath).catch(() => undefined);
-  }
-  const readBack = await readVerifiedDeliverableIfPresent(targetPath, rootRealpath, request.expectedSha256, request.expectedBytes);
+  const targetPath = deliverablePath(rootRealpath, {
+    projectId: request.projectId,
+    bundleSha256: request.bundleSha256,
+    entry: request.entry,
+  });
+  const created = await runStorageWorker(
+    {
+      type: 'store',
+      components: ['projects', request.projectId, 'deliverables', request.bundleSha256],
+      entry: request.entry,
+      contentBase64: bytes.toString('base64'),
+      expectedSha256: request.expectedSha256,
+      expectedBytes: request.expectedBytes,
+    },
+    rootRealpath,
+    dependencies.authorize,
+  );
+  const readBack = await readVerifiedDeliverableIfPresent(
+    targetPath,
+    rootRealpath,
+    request.expectedSha256,
+    request.expectedBytes,
+  );
   if (!readBack) fail('deliverable read-back verification failed');
-  return { path: targetPath, sha256: request.expectedSha256, bytes: bytes.byteLength, created: published };
+  return { path: targetPath, sha256: request.expectedSha256, bytes: bytes.byteLength, created };
 }
 
 async function readVerifiedDeliverableIfPresent(

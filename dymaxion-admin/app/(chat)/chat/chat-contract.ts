@@ -65,14 +65,21 @@ function parsePublicHandle(value: unknown): ParsedPublicHandle | null {
   };
 }
 
+const ATTACHMENT_KEYS = ['bytes', 'download_url', 'handle', 'mime', 'original_name', 'sha256'] as const;
+
+function hasExactAttachmentKeys(value: Record<string, unknown>): boolean {
+  const keys = Object.keys(value).sort();
+  return keys.length === ATTACHMENT_KEYS.length && keys.every((key, index) => key === ATTACHMENT_KEYS[index]);
+}
+
 export function parseArtifactAttachments(value: unknown): ArtifactAttachment[] {
   if (!Array.isArray(value) || value.length !== 3) return [];
-  const parsed: Array<{ attachment: ArtifactAttachment; handle: ParsedPublicHandle }> = [];
   const observedNames = new Set<string>();
-
-  for (const candidate of value) {
-    if (typeof candidate !== 'object' || candidate === null || Array.isArray(candidate)) return [];
-    const item = candidate as Record<string, unknown>;
+  const parsed: Array<{ attachment: ArtifactAttachment; handle: ParsedPublicHandle }> = [];
+  for (const raw of value) {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return [];
+    const item = raw as Record<string, unknown>;
+    if (!hasExactAttachmentKeys(item)) return [];
     if (
       typeof item.original_name !== 'string' ||
       !Object.prototype.hasOwnProperty.call(ATTACHMENT_IDENTITIES, item.original_name)
@@ -80,25 +87,36 @@ export function parseArtifactAttachments(value: unknown): ArtifactAttachment[] {
       return [];
     }
     const originalName = item.original_name as keyof typeof ATTACHMENT_IDENTITIES;
-    const expected = ATTACHMENT_IDENTITIES[originalName];
-    const handle = parsePublicHandle(item.handle);
+    const identity = ATTACHMENT_IDENTITIES[originalName];
     if (
       observedNames.has(originalName) ||
-      item.mime !== expected.mime ||
+      item.mime !== identity.mime ||
       typeof item.sha256 !== 'string' ||
       !/^[a-f0-9]{64}$/.test(item.sha256) ||
+      typeof item.bytes !== 'number' ||
       !Number.isSafeInteger(item.bytes) ||
-      (item.bytes as number) <= 0 ||
-      (item.bytes as number) > 5 * 1024 * 1024 ||
-      handle === null ||
-      handle.entry !== expected.handleEntry ||
+      item.bytes <= 0 ||
+      item.bytes > 5 * 1024 * 1024 ||
+      typeof item.handle !== 'string' ||
       typeof item.download_url !== 'string' ||
-      !/^\/api\/artifacts\/[A-Za-z0-9_-]{1,1024}\.[A-Za-z0-9_-]{43}$/.test(item.download_url)
+      !/^\/api\/artifacts\/[A-Za-z0-9_-]{8,512}\.[A-Za-z0-9_-]{43}$/.test(item.download_url)
     ) {
       return [];
     }
+    const handle = parsePublicHandle(item.handle);
+    if (!handle || handle.entry !== identity.handleEntry) return [];
     observedNames.add(originalName);
-    parsed.push({ attachment: item as unknown as ArtifactAttachment, handle });
+    parsed.push({
+      attachment: {
+        original_name: originalName,
+        mime: identity.mime,
+        sha256: item.sha256,
+        bytes: item.bytes,
+        handle: item.handle,
+        download_url: item.download_url,
+      },
+      handle,
+    });
   }
 
   if (observedNames.size !== 3) return [];
@@ -110,10 +128,38 @@ export function parseArtifactAttachments(value: unknown): ArtifactAttachment[] {
   ) {
     return [];
   }
+  const archive = parsed.find(({ attachment }) => attachment.original_name === 'evidence-bundle.zip');
+  if (!archive || archive.attachment.sha256 !== identity.bundleSha256) return [];
   return parsed.map(({ attachment }) => attachment);
 }
 
-export function parseApprovalReview(value: unknown): ApprovalReview | null {
+function canonicalJson(value: unknown): string {
+  if (value === null) return 'null';
+  if (typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value);
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new TypeError('canonical JSON requires a finite JSON number');
+    return JSON.stringify(Object.is(value, -0) ? 0 : value);
+  }
+  if (Array.isArray(value)) return `[${value.map((item) => canonicalJson(item)).join(',')}]`;
+  if (typeof value === 'object') {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new TypeError('canonical JSON accepts only plain objects');
+    }
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    );
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(',')}}`;
+  }
+  throw new TypeError('canonical JSON rejected an unsupported value');
+}
+
+async function sha256Text(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function parseApprovalReview(value: unknown): Promise<ApprovalReview | null> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const item = value as Record<string, unknown>;
   const payload = item.payload;
@@ -140,6 +186,14 @@ export function parseApprovalReview(value: unknown): ApprovalReview | null {
   ) {
     return null;
   }
+  let canonicalPayload: string;
+  try {
+    canonicalPayload = canonicalJson(payload);
+  } catch {
+    return null;
+  }
+  if (canonicalPayload !== item.canonical_payload) return null;
+  if ((await sha256Text(canonicalPayload)) !== item.payload_sha256) return null;
   return {
     approval_id: item.approval_id,
     description_untrusted: item.description_untrusted,
@@ -148,6 +202,6 @@ export function parseApprovalReview(value: unknown): ApprovalReview | null {
     target: item.target,
     credential_identity: item.credential_identity,
     expires_at: item.expires_at,
-    canonical_payload: item.canonical_payload,
+    canonical_payload: canonicalPayload,
   };
 }
