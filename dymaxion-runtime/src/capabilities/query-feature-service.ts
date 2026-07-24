@@ -252,6 +252,27 @@ export const QueryFeatureServiceOutputSchema = z
 export type QueryFeatureServiceInput = z.infer<typeof QueryFeatureServiceInputSchema>;
 export type QueryFeatureServiceOutput = z.infer<typeof QueryFeatureServiceOutputSchema>;
 
+export interface QueryFeatureServiceExecutionProfile {
+  capabilitySlug: string;
+  capabilityVersion: string;
+  visibilityCaveat: string;
+  /** Header-only broker material. Never serialized. */
+  authorization?: string;
+  /** Logical URI used instead of a private target URL in report/evidence. */
+  evidenceTargetUri?: string;
+  /** Trusted logical URI used only for boundary audit records. */
+  auditTargetUri?: string;
+  /** Non-secret logical target facts included in canonical parameters. */
+  canonicalContext?: Readonly<Record<string, string>>;
+}
+
+const PUBLIC_QUERY_PROFILE: QueryFeatureServiceExecutionProfile = {
+  capabilitySlug: 'query_feature_service',
+  capabilityVersion: CAPABILITY_VERSION,
+  visibilityCaveat:
+    'The query ran with anonymous/public visibility only; records not visible to that identity are absent, and this is not proof of a complete result set.',
+};
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -639,11 +660,12 @@ function requestMaxBytes(budget: QueryBudget): number {
   return Math.min(budget.maxResponseBytes, remaining);
 }
 
-async function executeQueryFeatureService(
+export async function executeFeatureServiceQuery(
   input: QueryFeatureServiceInput,
   context: CapabilityExecutionContext,
+  profile: QueryFeatureServiceExecutionProfile = PUBLIC_QUERY_PROFILE,
 ): Promise<QueryFeatureServiceOutput> {
-  if (context.signal?.aborted) throw new Error('query_feature_service cancelled before retrieval');
+  if (context.signal?.aborted) throw new Error(`${profile.capabilitySlug} cancelled before retrieval`);
   const now = context.now ?? (() => new Date());
   const retrievedAt = now().toISOString();
 
@@ -676,7 +698,7 @@ async function executeQueryFeatureService(
   const dispatch = async (name: string, url: URL, form?: Record<string, string>) => {
     if (budget.requestCount >= budget.maxRequests) {
       throw new Error(
-        `query_feature_service exceeded the ${budget.maxRequests}-request ceiling before completing the query`,
+        `${profile.capabilitySlug} exceeded the ${budget.maxRequests}-request ceiling before completing the query`,
       );
     }
     budget.requestCount += 1; // every dispatched attempt counts
@@ -685,10 +707,19 @@ async function executeQueryFeatureService(
         name,
         url,
         transport,
-        boundary,
+        boundary: profile.auditTargetUri
+          ? {
+              ...boundary,
+              auditIdentity: {
+                url: `${profile.auditTargetUri.replace(/\/+$/, '')}/request/${encodeURIComponent(name)}`,
+                hostname: new URL(profile.auditTargetUri).hostname,
+              },
+            }
+          : boundary,
         timeoutMs: requestTimeoutMs(budget),
         maxBytes: requestMaxBytes(budget),
         signal: context.signal,
+        authorization: profile.authorization,
         ...(form === undefined ? {} : { form }),
       });
       budget.bytesUsed += result.evidence.bytes;
@@ -760,7 +791,7 @@ async function executeQueryFeatureService(
   }
   let attempt = 0;
   while (pending.length > 0) {
-    if (context.signal?.aborted) throw new Error('query_feature_service cancelled during retrieval');
+    if (context.signal?.aborted) throw new Error(`${profile.capabilitySlug} cancelled during retrieval`);
     const batch = pending.shift()!;
     attempt += 1;
     const form: Record<string, string> = {
@@ -832,7 +863,7 @@ async function executeQueryFeatureService(
   const truncated = sortedTruncationReasons.length > 0;
 
   const caveats = [
-    'The query ran with anonymous/public visibility only; records not visible to that identity are absent, and this is not proof of a complete result set.',
+    profile.visibilityCaveat,
     'Only explicit attribute queries with optional geometry are supported in this slice; statistics, group-by, order-by, geometry filters, datum transformations, attachments, and related records are rejected by the input schema.',
   ];
   if (truncated) {
@@ -842,7 +873,7 @@ async function executeQueryFeatureService(
   const report = FeatureQueryReportSchema.parse({
     schema_version: CAPABILITY_VERSION,
     service: {
-      url: layerUrl,
+      url: profile.evidenceTargetUri ?? layerUrl,
       layer_id: layerId,
       name: metadata.name,
       type: metadata.type,
@@ -883,7 +914,8 @@ async function executeQueryFeatureService(
   // evidence: it is operator input, not remote data, and reproducibility
   // requires it. It never appears in a request URL.
   const canonicalParameters = {
-    layer_url: layerUrl,
+    layer_url: profile.evidenceTargetUri ?? layerUrl,
+    ...(profile.canonicalContext ?? {}),
     where,
     out_fields: requestedFields,
     return_geometry: returnGeometry,
@@ -895,14 +927,23 @@ async function executeQueryFeatureService(
     max_total_response_bytes: budget.maxTotalBytes,
     max_duration_ms: budget.maxDurationMs,
   };
+  const evidenceRequests = profile.evidenceTargetUri
+    ? requests.map((request) => ({
+        ...request,
+        url: `${profile.evidenceTargetUri}/request/${encodeURIComponent(request.name)}`,
+      }))
+    : requests;
   const evidence = EvidenceBundleSchema.parse({
     schema_version: '1.2.0',
-    bundle_id: `query_feature_service:${requests[0].sha256.slice(0, 16)}`,
+    bundle_id: `${profile.capabilitySlug}:${requests[0].sha256.slice(0, 16)}`,
     generated_at: retrievedAt,
-    requests,
+    requests: evidenceRequests,
     source: {
-      uri: requests[0].url,
-      identity: { kind: 'arcgis_feature_layer', value: layerUrl },
+      uri: evidenceRequests[0].url,
+      identity: {
+        kind: 'arcgis_feature_layer',
+        value: profile.evidenceTargetUri ?? layerUrl,
+      },
       version: {},
       retrieved_at: retrievedAt,
       sha256: requests[0].sha256,
@@ -926,8 +967,8 @@ async function executeQueryFeatureService(
       sha256: sha256Canonical(canonicalParameters),
     },
     execution: {
-      capability: 'query_feature_service',
-      capability_version: CAPABILITY_VERSION,
+      capability: profile.capabilitySlug,
+      capability_version: profile.capabilityVersion,
       mode: 'deterministic',
       model_planning: [],
     },
@@ -1026,5 +1067,5 @@ export const queryFeatureServiceCapability: CapabilityDefinition<
     'max_duration_ms',
   ],
   boundaryFields: ['layer_url'],
-  execute: executeQueryFeatureService,
+  execute: executeFeatureServiceQuery,
 };

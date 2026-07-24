@@ -102,7 +102,7 @@ Install:
 
 ## Implemented native capabilities
 
-Exactly eight native capabilities are implemented and tested; everything else
+Exactly nine native capabilities are implemented and tested; everything else
 in the catalog is historical scaffold (see ADR-0001 and the README):
 
 - **`inspect_dataset`** (Phase 0) — deterministic, read-only local GeoJSON
@@ -128,6 +128,16 @@ in the catalog is historical scaffold (see ADR-0001 and the README):
   values in URLs). Statistics, ordering, geometry filters, transformations,
   attachments, and related records are rejected in this slice.
   Docs: `docs/capabilities/query-feature-service.md`.
+- **`query_secured_feature_service`** (Phase 2A) — approval-required,
+  authenticated, read-only Feature Service query selected only by a configured
+  logical target slug and opaque credential alias. A strict versioned registry
+  binds canonical routing/permissions; approval binds the canonical input,
+  logical target, registry digest, operation, and broker-owned credential
+  identity. Authorization is materialized only after one-time approval
+  consumption, sent only in headers, and excluded with all physical target
+  details from output, evidence, errors, logs and logical boundary audits. The
+  committed registry is empty and no production broker or live credential is
+  included.
 - **`validate_spatial_data`** (Phase 1D) — deterministic, read-only bounded
   spatial QA of one allowlisted local RFC 7946 GeoJSON FeatureCollection:
   strict structure, typed canonical feature IDs, null/empty geometries,
@@ -166,7 +176,7 @@ in the catalog is historical scaffold (see ADR-0001 and the README):
   approval subsystem/audit record and are not serialized into the response or ZIP. Docs:
   `docs/capabilities/export-evidence-bundle.md`.
 
-Phase 1A/1B/1C/1D/1E/1F/1G constraints that still hold:
+Phase 1A/1B/1C/1D/1E/1F/1G/2A constraints that still hold:
 
 - **Fixture-only testing.** All `inspect_arcgis_org`,
   `trace_arcgis_dependencies`, and `query_feature_service` tests and
@@ -174,11 +184,12 @@ Phase 1A/1B/1C/1D/1E/1F/1G constraints that still hold:
   injectable transport with stubbed DNS. No
   authenticated or private ArcGIS organization was queried during
   development, and none may be queried in tests.
-- **No trusted ArcGIS credential provider exists yet.** The capability runs
-  with anonymous/public visibility only, never accepts credential-like input
-  fields, and reports always carry a partial-visibility caveat. Any future
-  authentication must be a trusted server-side provider — credential values
-  never appear in inputs, outputs, evidence, or logs.
+- **Anonymous and authenticated reads remain separate.** `query_feature_service`
+  remains anonymous/public and never accepts credential-like input fields.
+  `query_secured_feature_service` accepts only logical target/alias selectors;
+  the runtime exposes a trusted server-side broker interface but ships no
+  production broker or credential. Credential values never appear in inputs,
+  configuration, URLs, outputs, evidence, errors, logs, or audits.
 - **Enterprise custom hosts need explicit boundary configuration.** The
   employer boundary allowlists `*.arcgis.com` / `*.maps.arcgis.com`; a
   customer ArcGIS Enterprise portal on its own domain must be added by hand

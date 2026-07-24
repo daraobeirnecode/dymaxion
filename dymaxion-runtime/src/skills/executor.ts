@@ -9,6 +9,7 @@ import {
   executeCapability,
   getCapability,
   preflightCapabilityDefinition,
+  resolveCapabilityApprovalBinding,
 } from '../capabilities/registry.js';
 import type { CapabilityExecutionContext } from '../contracts/capability.js';
 import { capabilityRequiresApproval } from '../contracts/capability.js';
@@ -214,11 +215,21 @@ export async function runSkill(
       }
       // Re-resolve trusted bindings and atomically consume at the shared sink,
       // immediately before invocation persistence and dispatch.
+      const binding = capability
+        ? await resolveCapabilityApprovalBinding(
+            capability,
+            validatedInput,
+            dependencies.capabilityContext,
+          )
+        : {
+            target: deriveApprovalTarget(slug, validatedInput),
+            credentialIdentity: resolveExecutionCredentialIdentity(slug),
+          };
       approvalReceipt = await consumeApproval(
         request,
         validatedInput,
-        deriveApprovalTarget(slug, validatedInput),
-        resolveExecutionCredentialIdentity(slug),
+        binding.target,
+        binding.credentialIdentity,
         dependencies.approvalDependencies,
       );
     }

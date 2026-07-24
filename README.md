@@ -7,21 +7,24 @@ an operator you delegate to, not a chatbot.
 - **Framework**: TypeScript + Vercel AI SDK + openid-client; Mastra is retained as development-only compatibility scaffolding in Phase 0
 - **Providers**: Anthropic (API key), OpenAI / Google / Azure / Cohere (OAuth 2.0), Ollama (local)
 - **Memory**: Postgres 18 + pgvector, Voyage voyage-3-large embeddings
-- **Capabilities**: eight implemented native capabilities — the Phase 0 `inspect_dataset` GeoJSON slice; Phase 1A `inspect_arcgis_org`; Phase 1B `trace_arcgis_dependencies`; Phase 1C `query_feature_service`; Phase 1D `validate_spatial_data`; Phase 1E `generate_map_artifact`; Phase 1F `run_vector_analysis`; and Phase 1G `export_evidence_bundle`, which previews or approval-persistently stores a deterministic four-entry evidence ZIP under a trusted project-scoped artifact root ([docs](docs/capabilities/export-evidence-bundle.md)) — plus 45 historical Sprint 1 skill scaffolds; folder presence is not a production-readiness claim, and the remaining roadmap capabilities are not implemented
+- **Capabilities**: nine implemented native capabilities — the eight Phase 0–1G capabilities plus Phase 2A `query_secured_feature_service`, an approval-required authenticated read through a strict logical target registry and broker-owned credential alias; tokens never enter plans, configuration, URLs, output, evidence, errors, logs, or audits — plus 45 historical Sprint 1 skill scaffolds; folder presence is not a production-readiness claim, and the remaining roadmap capabilities are not implemented
 - **Gateways**: Telegram + CLI + Web (Sprint 1); Teams, Slack, Email, ArcGIS Portal, SMS stubbed
 - **Safety**: employer boundary (structural allow/deny lists), human-in-the-loop approvals for destructive ops, per-tier monthly USD budget caps enforced pre-call, append-only audit log, LangFuse tracing
 
 Architecture authority: [ADR-0001](docs/adr/0001-phase-0-runtime-and-execution-boundaries.md) selects the TypeScript/Vercel AI SDK runtime with native middleware and a Mastra-compatible migration path, excludes core LiteLLM, and disables Windows execution pending an allowlisted-job redesign and security testing. Conflicting Sprint 1 statements are historical.
 
-Current verified phase: **Phase 1G deterministic evidence export**. The runtime
-has eight native capabilities and GISBench has 40 committed golden tasks (5 each
-for Phases 0, 1A, 1B, 1C, 1D, 1E, 1F, and 1G). Phase 1G accepts one report, one
-EvidenceBundle, and one inline artifact; `preview` is copy-on-write and returns
-only a deterministic content-addressed handle/hash, while `persist` requires an
-approval bound to the exact full input and exact project/archive target before
-create-only publication under the trusted internal artifact root. It does not
-publish GIS services, upload remotely, sign/encrypt archives, or export raw
-source datasets.
+Current implementation phase: **Phase 2A governed authenticated ArcGIS read**.
+The runtime has nine native capabilities and GISBench retains 40 committed
+offline golden tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, 1E, 1F, and 1G).
+Phase 2A adds `query_secured_feature_service`: callers provide only a configured
+logical target slug and an opaque credential alias. A strict versioned registry
+binds routing and permissions; approval binds the canonical query, logical
+target, registry digest, operation, and broker-owned credential identity. Token
+material is acquired only after one-time approval consumption and is sent only
+as an Authorization header. Every metadata/page request is rechecked for URL,
+DNS/IP and redirect safety, while audit/evidence surfaces use logical identities.
+The committed registry is fail-closed (`targets: []`) and no production token
+broker or live private ArcGIS endpoint is included.
 
 ## Install
 

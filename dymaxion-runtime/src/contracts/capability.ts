@@ -99,6 +99,11 @@ export const CapabilityManifestSchema = z
 
 export type CapabilityManifest = z.infer<typeof CapabilityManifestSchema>;
 
+export interface CapabilityApprovalBinding {
+  target: string;
+  credentialIdentity: string;
+}
+
 export interface CapabilityDefinition<TInput, TOutput> {
   manifest: CapabilityManifest;
   inputSchema: z.ZodType<TInput>;
@@ -106,12 +111,18 @@ export interface CapabilityDefinition<TInput, TOutput> {
   inputSummary: readonly string[];
   boundaryFields: readonly string[];
   /**
-   * Trusted native-capability predicate for copy-on-write/dry-run operations.
-   * Read manifests remain non-approval-requiring; non-read manifests require
-   * approval unless this hook explicitly returns false for already-validated
-   * input. Never derive this from model/user payload fields outside the schema.
+   * Trusted native-capability predicate for conditional reads and
+   * copy-on-write/dry-run operations. Reads remain approval-free unless this
+   * hook explicitly returns true; non-read manifests require approval unless
+   * it explicitly returns false. Input is already schema-validated.
    */
   requiresApproval?(input: TInput): boolean;
+  /** Resolve the exact trusted target and credential identity used to create,
+   * consume, and verify approval. This must not materialize secret tokens. */
+  resolveApprovalBinding?(
+    input: TInput,
+    context: CapabilityExecutionContext,
+  ): Promise<CapabilityApprovalBinding>;
   /**
    * Optional capability-specific preflight that runs after the shared execution
    * boundary accepts the validated input and before approval, invocation
@@ -176,9 +187,10 @@ export function capabilityRequiresApproval<TInput, TOutput>(
   definition: CapabilityDefinition<TInput, TOutput>,
   rawOrParsedInput: unknown,
 ): boolean {
-  if (definition.manifest.classification === 'read') return false;
   const parsedInput = isParsedCapabilityInput<TInput>(rawOrParsedInput)
     ? rawOrParsedInput.parsedInput
     : definition.inputSchema.parse(rawOrParsedInput);
-  return definition.requiresApproval?.(parsedInput) === false ? false : true;
+  const explicit = definition.requiresApproval?.(parsedInput);
+  if (definition.manifest.classification === 'read') return explicit === true;
+  return explicit === false ? false : true;
 }

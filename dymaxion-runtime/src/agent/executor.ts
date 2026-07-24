@@ -11,9 +11,10 @@ import { plan as makePlan } from './planner.js';
 import { review } from './critic.js';
 import { narrate, answerDirectly } from './narrator.js';
 import { runSkill } from '../skills/executor.js';
+
 import { shouldAttemptAuthoring, draftSkill } from '../skills/author.js';
 import { getSkill } from '../skills/registry.js';
-import { getCapability } from '../capabilities/registry.js';
+
 import { getWorkflow } from '../workflows/registry.js';
 import type { DeliveredAttachment } from '../workflows/contract.js';
 import { persistIncoming, persistOutgoing, loadRelevant } from '../memory/conversation.js';
@@ -21,13 +22,13 @@ import { getPreference } from '../memory/preferences.js';
 import {
   createApprovalRequest,
   awaitDecision,
-  deriveApprovalTarget,
 } from '../security/approval.js';
 import { auditEvent } from '../security/audit.js';
-import { resolveExecutionCredentialIdentity } from '../security/execution-identity.js';
+
 import { traceRun, flushLangfuse } from '../observability/langfuse.js';
 import { logger } from '../observability/logger.js';
 import { createReplayAfterKindValidation } from './replay-contract.js';
+import { resolveStepApproval } from './step-approval.js';
 import type {
   ApprovalRequest,
   Gateway,
@@ -37,18 +38,6 @@ import type {
   StepResult,
 } from '../gateways/common.js';
 
-function canonicalApprovalPayload(
-  skill: string,
-  input: Record<string, unknown>,
-): Record<string, unknown> {
-  const capability = getCapability(skill);
-  if (!capability) return input;
-  const parsed = capability.inputSchema.parse(input);
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error(`native capability ${skill} approval payload must be an object`);
-  }
-  return parsed as Record<string, unknown>;
-}
 
 function outgoingAttachment(delivery: DeliveredAttachment): OutgoingAttachment {
   return {
@@ -134,14 +123,12 @@ export async function runAgent(message: IncomingMessage, gateway: Gateway): Prom
         throw new Error('plan step registry kind mismatch or workflow slug collision');
       }
       let approvalRequest: ApprovalRequest | undefined;
-      if (step.destructive && !workflow) {
-        const approvalPayload = canonicalApprovalPayload(step.skill, step.input);
-        const approvalTarget = deriveApprovalTarget(step.skill, approvalPayload);
-        const credentialIdentity = resolveExecutionCredentialIdentity(step.skill);
-        const req = await createApprovalRequest(runId, step.description, approvalPayload, {
+      const approval = workflow ? undefined : await resolveStepApproval(step);
+      if (approval) {
+        const req = await createApprovalRequest(runId, step.description, approval.payload, {
           timeoutMinutes,
-          target: approvalTarget,
-          credentialIdentity,
+          target: approval.target,
+          credentialIdentity: approval.credentialIdentity,
         });
         approvalRequest = req;
         await db.update(schema.agentRuns).set({ status: 'awaiting_approval' }).where(eq(schema.agentRuns.id, runId));
@@ -362,14 +349,12 @@ export async function replayRun(runId: string, gateway: Gateway): Promise<void> 
     }
 
     let approvalRequest: ApprovalRequest | undefined;
-    if (step.destructive) {
-      const approvalPayload = canonicalApprovalPayload(step.skill, step.input);
-      const approvalTarget = deriveApprovalTarget(step.skill, approvalPayload);
-      const credentialIdentity = resolveExecutionCredentialIdentity(step.skill);
-      const request = await createApprovalRequest(replay.id, `Replay: ${step.description}`, approvalPayload, {
+    const approval = await resolveStepApproval(step);
+    if (approval) {
+      const request = await createApprovalRequest(replay.id, `Replay: ${step.description}`, approval.payload, {
         timeoutMinutes,
-        target: approvalTarget,
-        credentialIdentity,
+        target: approval.target,
+        credentialIdentity: approval.credentialIdentity,
       });
       approvalRequest = request;
       await db

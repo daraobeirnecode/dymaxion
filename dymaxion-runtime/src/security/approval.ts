@@ -376,6 +376,7 @@ export function verifyConsumedApprovalReceipt(
     skill: string;
     payload: Record<string, unknown>;
     credentialIdentity: string;
+    target?: string;
   },
 ): ConsumedApprovalSnapshot {
   if (!receipt || typeof receipt !== 'object' || !consumedApprovalReceipts.has(receipt)) {
@@ -385,7 +386,7 @@ export function verifyConsumedApprovalReceipt(
   const expectedPayloadHash = sha256Canonical(binding.payload);
   let expectedTarget: string;
   try {
-    expectedTarget = deriveApprovalTarget(binding.skill, binding.payload);
+    expectedTarget = binding.target ?? deriveApprovalTarget(binding.skill, binding.payload);
   } catch {
     throw new Error('consumed approval receipt binding mismatch');
   }

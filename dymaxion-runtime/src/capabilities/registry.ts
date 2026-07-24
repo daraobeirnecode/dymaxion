@@ -1,14 +1,19 @@
 import { readFile, stat } from 'node:fs/promises';
-import type { CapabilityDefinition, CapabilityExecutionContext } from '../contracts/capability.js';
+import type {
+  CapabilityApprovalBinding,
+  CapabilityDefinition,
+  CapabilityExecutionContext,
+} from '../contracts/capability.js';
 import { capabilityRequiresApproval } from '../contracts/capability.js';
 import { sha256Canonical } from '../contracts/canonical.js';
-import { claimConsumedApprovalReceipt } from '../security/approval.js';
+import { claimConsumedApprovalReceipt, deriveApprovalTarget } from '../security/approval.js';
 import { resolveExecutionCredentialIdentity } from '../security/execution-identity.js';
 import { generateMapArtifactCapability } from './generate-map-artifact.js';
 import { exportEvidenceBundleCapability } from './export-evidence-bundle.js';
 import { inspectArcgisOrgCapability } from './inspect-arcgis-org.js';
 import { inspectDatasetCapability } from './inspect-dataset.js';
 import { queryFeatureServiceCapability } from './query-feature-service.js';
+import { querySecuredFeatureServiceCapability } from './query-secured-feature-service.js';
 import { runVectorAnalysisCapability } from './run-vector-analysis.js';
 import { traceArcgisDependenciesCapability } from './trace-arcgis-dependencies.js';
 import { validateSpatialDataCapability } from './validate-spatial-data.js';
@@ -26,6 +31,10 @@ const capabilities = new Map<string, CapabilityDefinition<unknown, unknown>>([
   [
     queryFeatureServiceCapability.manifest.slug,
     queryFeatureServiceCapability as CapabilityDefinition<unknown, unknown>,
+  ],
+  [
+    querySecuredFeatureServiceCapability.manifest.slug,
+    querySecuredFeatureServiceCapability as CapabilityDefinition<unknown, unknown>,
   ],
   [
     validateSpatialDataCapability.manifest.slug,
@@ -51,6 +60,21 @@ export function getCapability(slug: string): CapabilityDefinition<unknown, unkno
 
 export function allCapabilities(): Array<CapabilityDefinition<unknown, unknown>> {
   return [...capabilities.values()];
+}
+
+export async function resolveCapabilityApprovalBinding<TInput, TOutput>(
+  capability: CapabilityDefinition<TInput, TOutput>,
+  input: TInput,
+  context: CapabilityExecutionContext,
+): Promise<CapabilityApprovalBinding> {
+  if (capability.resolveApprovalBinding) {
+    return capability.resolveApprovalBinding(input, context);
+  }
+  const payload = input as Record<string, unknown>;
+  return {
+    target: deriveApprovalTarget(capability.manifest.slug, payload),
+    credentialIdentity: resolveExecutionCredentialIdentity(capability.manifest.slug),
+  };
 }
 
 export function registerCapabilityForTest(definition: CapabilityDefinition<unknown, unknown>): () => void {
@@ -127,11 +151,13 @@ export async function executeCapabilityDefinition(
   }
   if (capabilityRequiresApproval(capability, { alreadyParsed: true, parsedInput: input })) {
     if (!context.agentRunId) throw new Error('consumed approval receipt binding mismatch');
+    const binding = await resolveCapabilityApprovalBinding(capability, input, context);
     const approvalExecutionGrant = claimConsumedApprovalReceipt(context.approvalReceipt, {
       agentRunId: context.agentRunId,
       skill: capability.manifest.slug,
       payload: input as Record<string, unknown>,
-      credentialIdentity: resolveExecutionCredentialIdentity(capability.manifest.slug),
+      credentialIdentity: binding.credentialIdentity,
+      target: binding.target,
     });
     context = { ...context, approvalExecutionGrant };
   }
