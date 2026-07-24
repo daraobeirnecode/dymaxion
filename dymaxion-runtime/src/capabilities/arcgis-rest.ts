@@ -15,6 +15,8 @@ export interface ArcGisTransportRequest {
   timeoutMs: number;
   maxBytes: number;
   signal?: AbortSignal;
+  /** Trusted broker material. Header-only; never included in evidence. */
+  authorization?: string;
 }
 
 export interface ArcGisTransportPostRequest extends ArcGisTransportRequest {
@@ -327,7 +329,10 @@ export const fetchArcGisTransport: ArcGisRestTransport = {
       method: 'GET',
       redirect: 'manual',
       signal: combinedSignal(request),
-      headers: { accept: 'application/json' },
+      headers: {
+        accept: 'application/json',
+        ...(request.authorization ? { authorization: request.authorization } : {}),
+      },
     });
     return readBoundedResponse(response, request);
   },
@@ -339,6 +344,7 @@ export const fetchArcGisTransport: ArcGisRestTransport = {
       headers: {
         accept: 'application/json',
         'content-type': 'application/x-www-form-urlencoded',
+        ...(request.authorization ? { authorization: request.authorization } : {}),
       },
       body: request.body,
     });
@@ -354,6 +360,8 @@ export interface ArcGisJsonRequestOptions {
   timeoutMs: number;
   maxBytes: number;
   signal?: AbortSignal;
+  /** Trusted broker material. Passed to transport only, never evidence. */
+  authorization?: string;
   /** Presence selects a POST-form dispatch. Entries are canonicalized before
    * hashing and dispatch; the target URL must carry no query string so no
    * form value can appear in evidence URLs or error text. */
@@ -399,6 +407,7 @@ export async function requestArcGisJson(options: ArcGisJsonRequestOptions): Prom
     timeoutMs: options.timeoutMs,
     maxBytes: options.maxBytes,
     signal: options.signal,
+    authorization: options.authorization,
   };
   const target = `${options.url.host}${options.url.pathname}`;
   let response: ArcGisTransportResponse;

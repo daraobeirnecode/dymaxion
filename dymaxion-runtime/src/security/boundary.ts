@@ -32,6 +32,12 @@ export interface BoundaryOptions {
   agentRunId?: string;
   audit?: AuditFn;
   resolveHost?: HostResolver;
+  /** Trusted logical identity for audit records only. Physical URLs still
+   * drive every allowlist, DNS, and IP decision. Never populate from input. */
+  auditIdentity?: {
+    url: string;
+    hostname: string;
+  };
 }
 
 const MAX_DEPTH = 32;
@@ -49,7 +55,10 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function optionsWithDefaults(options: BoundaryOptions = {}): Required<BoundaryOptions> {
+type ResolvedBoundaryOptions = Required<Omit<BoundaryOptions, 'auditIdentity'>> &
+  Pick<BoundaryOptions, 'auditIdentity'>;
+
+function optionsWithDefaults(options: BoundaryOptions = {}): ResolvedBoundaryOptions {
   return {
     agentRunId: options.agentRunId ?? '',
     audit: options.audit ?? auditEvent,
@@ -57,6 +66,7 @@ function optionsWithDefaults(options: BoundaryOptions = {}): Required<BoundaryOp
       options.resolveHost ??
       (async (hostname: string) =>
         (await lookup(hostname, { all: true, verbatim: true })).map((entry) => entry.address)),
+    auditIdentity: options.auditIdentity,
   };
 }
 
@@ -64,11 +74,11 @@ async function block(
   kind: BoundaryViolation['kind'],
   target: string,
   reason: string,
-  options: Required<BoundaryOptions>,
+  options: ResolvedBoundaryOptions,
 ): Promise<never> {
   await options.audit(
     'boundary_block',
-    { kind, target, reason },
+    { kind, target: options.auditIdentity?.url ?? target, reason },
     options.agentRunId || undefined,
   );
   throw new BoundaryViolation(kind, target, reason);
@@ -152,7 +162,11 @@ export async function assertUrlAllowed(rawUrl: string, supplied: BoundaryOptions
   if (loadConfig().boundary.audit_all_external_requests) {
     await options.audit(
       'data_query',
-      { url: url.href, hostname, boundary: 'allowed' },
+      {
+        url: options.auditIdentity?.url ?? url.href,
+        hostname: options.auditIdentity?.hostname ?? hostname,
+        boundary: 'allowed',
+      },
       options.agentRunId || undefined,
     );
   }

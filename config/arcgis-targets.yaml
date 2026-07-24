@@ -1,0 +1,5 @@
+schema_version: "1.0.0"
+
+# Exact approved ArcGIS targets only. Credentials and tokens never belong here.
+# The default repository configuration is intentionally fail-closed.
+targets: []

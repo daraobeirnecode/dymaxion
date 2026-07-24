@@ -199,7 +199,7 @@ test('run_vector_analysis manifest, schemas and registry are strict and trace Ph
     },
   );
   assert.ok(allCapabilities().some((capability) => capability.manifest.slug === 'run_vector_analysis'));
-  assert.equal(allCapabilities().length, 8);
+  assert.equal(allCapabilities().length, 9);
 });
 
 test('run_vector_analysis input schema is lexical-only and contains no filesystem canonicalization', async () => {

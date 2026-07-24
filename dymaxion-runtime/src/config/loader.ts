@@ -79,6 +79,8 @@ export interface DymaxionConfig {
   boundary: BoundaryConfig;
   gateways: Record<string, Record<string, unknown> & { enabled: boolean }>;
   mcpServers: McpServerConfig[];
+  /** Parsed by the ArcGIS connection boundary's strict versioned schema. */
+  arcgisTargets: unknown;
   configDir: string;
 }
 
@@ -119,7 +121,8 @@ export function loadConfig(): DymaxionConfig {
   const boundary = loadYaml<BoundaryConfig>(dir, 'employer-boundary.yaml');
   const gateways = loadYaml<{ gateways: DymaxionConfig['gateways'] }>(dir, 'gateways.yaml').gateways;
   const mcpServers = loadYaml<{ servers: McpServerConfig[] }>(dir, 'mcp-servers.yaml').servers;
+  const arcgisTargets = loadYaml<unknown>(dir, 'arcgis-targets.yaml');
 
-  cached = { providers, routing, budgets, boundary, gateways, mcpServers, configDir: dir };
+  cached = { providers, routing, budgets, boundary, gateways, mcpServers, arcgisTargets, configDir: dir };
   return cached;
 }

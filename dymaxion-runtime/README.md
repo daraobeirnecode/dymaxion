@@ -1,7 +1,7 @@
 # Dymaxion runtime
 
 `dymaxion-runtime` is the TypeScript/Node.js 22+ runtime for the Dymaxion GIS
-agent. It currently implements eight native, versioned capabilities:
+agent. It currently implements nine native, versioned capabilities:
 
 1. `inspect_dataset`
 2. `inspect_arcgis_org`
@@ -11,12 +11,13 @@ agent. It currently implements eight native, versioned capabilities:
 6. `generate_map_artifact`
 7. `run_vector_analysis`
 8. `export_evidence_bundle`
+9. `query_secured_feature_service`
 
 ## `arcgis_change_risk_packet` workflow
 
 The shared `arcgis_change_risk_packet` workflow composes
 `trace_arcgis_dependencies` and `export_evidence_bundle`; it does not add a
-ninth capability. It deterministically renders `change-ticket.md`,
+tenth capability. It deterministically renders `change-ticket.md`,
 `dependency-map.svg`, and `evidence-bundle.zip`, fixes their identities during
 preview, then requests one exact post-preview approval before any persistence.
 The ZIP persisted by the approved capability is the exact previewed byte
@@ -32,6 +33,39 @@ The workflow remains anonymous ArcGIS Online read-only. Item-provided service
 URLs are evidence leaves and are never dispatched. It does not add Enterprise
 access, ArcGIS writes, reverse-dependency discovery, arbitrary Python, or
 authenticated inventory.
+
+## `query_secured_feature_service` (Phase 2A)
+
+Phase 2A adds governed authenticated, read-only Feature Service queries without
+turning agent input into a credential or routing boundary. Input contains only a
+configured `target_slug`, an opaque `credential_alias`, and the same bounded
+query parameters supported by `query_feature_service`. `config/arcgis-targets.yaml`
+is parsed as strict schema version `1.0.0`; the committed default has no targets.
+Unknown versions/fields, duplicate slugs or aliases, non-canonical URLs,
+unanchored ArcGIS Online service hosts, target/alias/portal/permission mismatches,
+and expired broker descriptors fail closed.
+
+The approval request binds the canonical parsed input to the logical target,
+registry SHA-256, `feature-query` operation, agent run, capability, expiry, and
+the broker-owned credential identity. Normal execution and replay use the same
+approval resolver. Descriptor lookup does not materialize a token. Authorization
+is requested only after the approved receipt is atomically consumed, validated
+as a bounded Bearer header, and attached only to request headers—never URLs.
+
+The capability reuses the anonymous query engine's metadata validation, object-ID
+discovery, deterministic pagination/splitting, response completeness checks,
+budgets and cancellation. Each metadata/page request independently revalidates
+scheme, host, port, allowlist, DNS and resolved IP, and redirects are rejected.
+Physical endpoints remain internal to enforcement; allowed and blocked boundary
+audits, report URLs and evidence use `arcgis-target://<slug>` logical identities.
+Responses or errors that echo authorization, credential identity, configured
+URLs, or configured hostnames fail closed through secret-free error surfaces.
+
+The repository provides broker interfaces and synthetic in-memory test adapters,
+not a production broker, credential, token, or private target. Deployment must
+inject a trusted broker and explicitly configure each target. Phase 2A does not
+edit features, administer portals, publish services, accept arbitrary authenticated
+URLs, or contact live private ArcGIS/PostGIS in tests.
 
 ## `export_evidence_bundle` (Phase 1G)
 

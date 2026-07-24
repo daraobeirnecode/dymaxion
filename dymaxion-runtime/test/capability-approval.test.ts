@@ -129,6 +129,23 @@ class OrderingApprovalStore implements ApprovalStore {
   }
 }
 
+test('read capabilities remain approval-free by default but may explicitly require approval', () => {
+  const base = makeCopyOnWriteCapability({ executes: 0 });
+  const defaultRead: CapabilityDefinition<CopyInput, CopyOutput> = {
+    ...base,
+    manifest: { ...base.manifest, classification: 'read' },
+    requiresApproval: undefined,
+  };
+  const guardedRead: CapabilityDefinition<CopyInput, CopyOutput> = {
+    ...defaultRead,
+    requiresApproval: () => true,
+  };
+  const input: CopyInput = { operation: 'preview', project_id: PROJECT_ID };
+
+  assert.equal(capabilityRequiresApproval(defaultRead, input), false);
+  assert.equal(capabilityRequiresApproval(guardedRead, input), true);
+});
+
 test('conditional copy-on-write helper allows preview and requires persist approval', () => {
   const counter = { executes: 0 };
   const definition = makeCopyOnWriteCapability(counter);
