@@ -189,6 +189,19 @@ export const oauthTokens = dymaxion.table('oauth_tokens', {
   connectedByUser: text('connected_by_user').notNull(),
 });
 
+export const arcgisCredentials = dymaxion.table('arcgis_credentials', {
+  credentialAlias: text('credential_alias').primaryKey(),
+  credentialIdentity: text('credential_identity').notNull(),
+  portalKind: text('portal_kind').$type<'arcgis-online' | 'arcgis-enterprise'>().notNull(),
+  permissions: jsonb('permissions').$type<readonly ['feature:query']>().notNull(),
+  encryptedAccessTokenEnvelope: text('encrypted_access_token_envelope').notNull(),
+  tokenType: text('token_type').$type<'Bearer'>().notNull().default('Bearer'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  connectedAt: timestamp('connected_at', { withTimezone: true }).notNull(),
+  refreshedAt: timestamp('refreshed_at', { withTimezone: true }).notNull(),
+  connectedByUser: text('connected_by_user').notNull(),
+});
+
 export const oauthFlowState = dymaxion.table('oauth_flow_state', {
   state: text('state').primaryKey(),
   provider: text('provider').notNull(),

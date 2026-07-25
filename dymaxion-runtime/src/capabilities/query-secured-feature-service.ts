@@ -3,8 +3,9 @@ import type { CapabilityDefinition, CapabilityExecutionContext } from '../contra
 import { CapabilityManifestSchema } from '../contracts/capability.js';
 import { consumeApprovalExecutionGrant } from '../security/approval.js';
 import { containsCredentialMaterial } from './arcgis-rest.js';
-import { sha256Canonical } from '../contracts/canonical.js';
 import {
+  ArcGisApprovedFeatureQueryBindingSchema,
+  arcGisTargetConfigDigest,
   resolveArcGisReadConnection,
   resolveArcGisTokenBroker,
   validateBearerAuthorization,
@@ -87,22 +88,10 @@ function asPublicQueryInput(
   });
 }
 
-function targetConfigDigest(connection: ResolvedArcGisReadConnection): string {
-  return sha256Canonical({
-    target_slug: connection.target.target_slug,
-    portal_kind: connection.target.portal_kind,
-    portal_root: connection.target.portal_root,
-    service_root: connection.target.service_root,
-    layer_url: connection.target.layer_url,
-    allowed_credential_aliases: connection.target.allowed_credential_aliases,
-    allowed_operations: connection.target.allowed_operations,
-  });
-}
-
 function approvalTarget(connection: ResolvedArcGisReadConnection): string {
   return [
     `arcgis-target:${connection.target.target_slug}`,
-    `config-sha256:${targetConfigDigest(connection)}`,
+    `config-sha256:${arcGisTargetConfigDigest(connection.target)}`,
     'operation:feature-query',
   ].join('|');
 }
@@ -217,6 +206,12 @@ async function execute(
   ) {
     throw new Error('ArcGIS target or credential identity changed after approval consumption');
   }
+  const approvedBinding = ArcGisApprovedFeatureQueryBindingSchema.parse({
+    credential_identity: before.credential.credential_identity,
+    target_config_sha256: arcGisTargetConfigDigest(before.target),
+    portal_kind: before.target.portal_kind,
+    permission: 'feature:query',
+  });
 
   let authorization: string;
   try {
@@ -224,6 +219,7 @@ async function execute(
       await resolveArcGisTokenBroker(context).getAuthorization(
         input.credential_alias,
         input.target_slug,
+        approvedBinding,
       ),
     );
   } catch {
@@ -244,7 +240,7 @@ async function execute(
       canonicalContext: {
         target_slug: after.target.target_slug,
         portal_kind: after.target.portal_kind,
-        target_config_sha256: targetConfigDigest(after),
+        target_config_sha256: arcGisTargetConfigDigest(after.target),
       },
     });
   } catch (error) {

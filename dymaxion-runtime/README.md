@@ -34,9 +34,9 @@ URLs are evidence leaves and are never dispatched. It does not add Enterprise
 access, ArcGIS writes, reverse-dependency discovery, arbitrary Python, or
 authenticated inventory.
 
-## `query_secured_feature_service` (Phase 2A)
+## `query_secured_feature_service` (Phase 2A capability + Phase 2B broker)
 
-Phase 2A adds governed authenticated, read-only Feature Service queries without
+Phase 2A added governed authenticated, read-only Feature Service queries without
 turning agent input into a credential or routing boundary. Input contains only a
 configured `target_slug`, an opaque `credential_alias`, and the same bounded
 query parameters supported by `query_feature_service`. `config/arcgis-targets.yaml`
@@ -61,11 +61,18 @@ audits, report URLs and evidence use `arcgis-target://<slug>` logical identities
 Responses or errors that echo authorization, credential identity, configured
 URLs, or configured hostnames fail closed through secret-free error surfaces.
 
-The repository provides broker interfaces and synthetic in-memory test adapters,
-not a production broker, credential, token, or private target. Deployment must
-inject a trusted broker and explicitly configure each target. Phase 2A does not
-edit features, administer portals, publish services, accept arbitrary authenticated
-URLs, or contact live private ArcGIS/PostGIS in tests.
+Phase 2B adds the opt-in PostgreSQL broker and migration-backed encrypted
+envelope repository. The default remains unavailable unless
+`DYMAXION_ARCGIS_TOKEN_BROKER` is exactly `postgres`; any other present value
+fails closed. Deployment must explicitly configure each target and provision a
+valid encrypted row through a separately reviewed trusted operator process.
+There is no shipped OAuth, refresh, rotation, revocation, admin CRUD or plaintext
+token ingestion path. Phase 2B does not edit features, administer portals,
+publish services, accept arbitrary authenticated URLs, or contact live private
+ArcGIS/PostGIS in tests. See
+[`docs/capabilities/postgres-arcgis-token-broker.md`](../docs/capabilities/postgres-arcgis-token-broker.md)
+for migration order, opt-in, expiry behavior, provisioning limits and validation
+status.
 
 ## `export_evidence_bundle` (Phase 1G)
 
