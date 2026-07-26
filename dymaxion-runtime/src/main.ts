@@ -6,23 +6,33 @@
 
 import { loadConfig } from './config/loader.js';
 import { logger } from './observability/logger.js';
-import { closeDb } from './db/client.js';
-import { loadSkills, allSkills } from './skills/registry.js';
-import { startAllMcpServers, stopAllMcpServers, verifyMcpServers } from './mcp/manager.js';
-import { startWorkerHealthLoop, stopWorkerHealthLoop, checkWorkerHealth } from './worker/client.js';
-import { loadKnowledgeBase } from './knowledge/loader.js';
-import { runAgent, replayRun } from './agent/executor.js';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Gateway } from './gateways/common.js';
-import { TelegramGateway } from './gateways/telegram/index.js';
-import { CliGateway } from './gateways/cli/index.js';
-import { WebGateway } from './gateways/web/index.js';
-import { TeamsGateway } from './gateways/teams/index.js';
-import { SlackGateway } from './gateways/slack/index.js';
-import { EmailGateway } from './gateways/email/index.js';
-import { ArcgisPortalGateway } from './gateways/arcgis-portal/index.js';
-import { SmsGateway } from './gateways/sms/index.js';
+import { validateArcGisTokenBrokerSelector } from './security/arcgis-token-broker-selector.js';
 
-function buildGateways(): Map<string, Gateway> {
+const GATEWAY_NAMES = ['telegram', 'cli', 'web', 'teams', 'slack', 'email', 'arcgis-portal', 'sms'] as const;
+
+async function buildGateways(): Promise<Map<string, Gateway>> {
+  const [
+    { TelegramGateway },
+    { CliGateway },
+    { WebGateway },
+    { TeamsGateway },
+    { SlackGateway },
+    { EmailGateway },
+    { ArcgisPortalGateway },
+    { SmsGateway },
+  ] = await Promise.all([
+    import('./gateways/telegram/index.js'),
+    import('./gateways/cli/index.js'),
+    import('./gateways/web/index.js'),
+    import('./gateways/teams/index.js'),
+    import('./gateways/slack/index.js'),
+    import('./gateways/email/index.js'),
+    import('./gateways/arcgis-portal/index.js'),
+    import('./gateways/sms/index.js'),
+  ]);
   const cfg = loadConfig().gateways;
   const all = new Map<string, Gateway>();
   all.set(
@@ -46,11 +56,23 @@ function buildGateways(): Map<string, Gateway> {
 async function daemon(): Promise<void> {
   logger.info('dymaxion runtime starting');
   const cfg = loadConfig();
+  const [
+    { loadSkills },
+    { runAgent },
+    { db, schema, closeDb },
+    { startAllMcpServers, stopAllMcpServers },
+    { startWorkerHealthLoop, stopWorkerHealthLoop, checkWorkerHealth },
+  ] = await Promise.all([
+    import('./skills/registry.js'),
+    import('./agent/executor.js'),
+    import('./db/client.js'),
+    import('./mcp/manager.js'),
+    import('./worker/client.js'),
+  ]);
 
   // Runs left 'running'/'awaiting_approval' by a previous process are dead —
   // mark them failed so the dashboard reflects reality.
   const { inArray } = await import('drizzle-orm');
-  const { db, schema } = await import('./db/client.js');
   const stale = await db
     .update(schema.agentRuns)
     .set({ status: 'failed', endedAt: new Date(), finalNarrative: 'interrupted by runtime restart' })
@@ -67,7 +89,7 @@ async function daemon(): Promise<void> {
     'skill catalog ready',
   );
 
-  const gateways = buildGateways();
+  const gateways = await buildGateways();
   for (const [name, gateway] of gateways) {
     const enabled = cfg.gateways[name]?.enabled ?? false;
     if (!enabled) continue;
@@ -94,23 +116,28 @@ async function daemon(): Promise<void> {
   logger.info('dymaxion runtime ready');
 }
 
-/** Boot check without external APIs: config, registry scan, gateway construction. */
+/** Boot check without external APIs or DB initialization: config, registry scan, gateway configuration. */
 async function smokeTest(): Promise<void> {
   const cfg = loadConfig();
   console.log(`config: ${Object.keys(cfg.providers).length} providers, ${cfg.mcpServers.length} MCP servers`);
-  const skills = await loadSkills(false); // no DB persist in smoke mode
-  console.log(`skills: ${skills.length} registered from filesystem`);
-  for (const category of ['esri', 'oss', 'web-mobile', 'architecture', 'meta']) {
-    console.log(`  ${category}: ${skills.filter((s) => s.category === category).length}`);
+  const activeSkillsDir = join(process.env.SKILLS_DIR ?? '/workspace/skills', 'active');
+  let skillFolderCount = 0;
+  for (const category of existsSync(activeSkillsDir) ? readdirSync(activeSkillsDir) : []) {
+    const categoryDir = join(activeSkillsDir, category);
+    if (!statSync(categoryDir).isDirectory()) continue;
+    skillFolderCount += readdirSync(categoryDir)
+      .filter((slug) => statSync(join(categoryDir, slug)).isDirectory())
+      .length;
   }
-  const gateways = buildGateways();
-  console.log(`gateways: ${gateways.size} constructed (${
-    [...gateways.keys()].filter((g) => cfg.gateways[g]?.enabled).join(', ')
+  console.log(`skills: ${skillFolderCount} folders discovered`);
+  console.log(`gateways: ${GATEWAY_NAMES.length} configured (${
+    GATEWAY_NAMES.filter((g) => cfg.gateways[g]?.enabled).join(', ')
   } enabled)`);
   console.log('smoke test: OK');
 }
 
 async function main(): Promise<void> {
+  validateArcGisTokenBrokerSelector(process.env.DYMAXION_ARCGIS_TOKEN_BROKER);
   const [command, ...args] = process.argv.slice(2);
   switch (command) {
     case undefined:
@@ -118,26 +145,49 @@ async function main(): Promise<void> {
       await daemon();
       return; // daemon keeps the loop alive
     case 'register-skills': {
+      const [
+        { startAllMcpServers, stopAllMcpServers },
+        { checkWorkerHealth },
+      ] = await Promise.all([
+        import('./mcp/manager.js'),
+        import('./worker/client.js'),
+      ]);
       await startAllMcpServers().catch(() => undefined);
       await checkWorkerHealth().catch(() => undefined);
+      const { loadSkills } = await import('./skills/registry.js');
       const skills = await loadSkills(true);
       console.log(`registered ${skills.length} skills (${skills.filter((s) => s.available).length} available)`);
+      const { closeDb } = await import('./db/client.js');
+      await stopAllMcpServers().catch(() => undefined);
+      await closeDb().catch(() => undefined);
       break;
     }
     case 'load-knowledge-base': {
+      const { loadKnowledgeBase } = await import('./knowledge/loader.js');
       const result = await loadKnowledgeBase(args.includes('--refresh'));
       console.log(`embedded ${result.chunks} chunks from ${result.files} files`);
+      const { closeDb } = await import('./db/client.js');
+      await closeDb().catch(() => undefined);
       break;
     }
     case 'verify-mcp': {
+      const { verifyMcpServers, stopAllMcpServers } = await import('./mcp/manager.js');
       const ok = await verifyMcpServers();
       process.exitCode = ok ? 0 : 1;
+      await stopAllMcpServers().catch(() => undefined);
       break;
     }
     case 'replay-run': {
       if (!args[0]) throw new Error('usage: replay-run <agent-run-uuid>');
+      const [{ loadSkills }, { replayRun }] = await Promise.all([
+        import('./skills/registry.js'),
+        import('./agent/executor.js'),
+      ]);
+      const { CliGateway } = await import('./gateways/cli/index.js');
       await loadSkills(false);
       await replayRun(args[0], new CliGateway());
+      const { closeDb } = await import('./db/client.js');
+      await closeDb().catch(() => undefined);
       break;
     }
     case 'smoke-test':
@@ -147,8 +197,6 @@ async function main(): Promise<void> {
       console.error(`unknown command '${command}'`);
       process.exitCode = 2;
   }
-  await stopAllMcpServers().catch(() => undefined);
-  await closeDb().catch(() => undefined);
 }
 
 main().catch((err) => {

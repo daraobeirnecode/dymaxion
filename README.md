@@ -7,24 +7,28 @@ an operator you delegate to, not a chatbot.
 - **Framework**: TypeScript + Vercel AI SDK + openid-client; Mastra is retained as development-only compatibility scaffolding in Phase 0
 - **Providers**: Anthropic (API key), OpenAI / Google / Azure / Cohere (OAuth 2.0), Ollama (local)
 - **Memory**: Postgres 18 + pgvector, Voyage voyage-3-large embeddings
-- **Capabilities**: nine implemented native capabilities — the eight Phase 0–1G capabilities plus Phase 2A `query_secured_feature_service`, an approval-required authenticated read through a strict logical target registry and broker-owned credential alias; tokens never enter plans, configuration, URLs, output, evidence, errors, logs, or audits — plus 45 historical Sprint 1 skill scaffolds; folder presence is not a production-readiness claim, and the remaining roadmap capabilities are not implemented
+- **Capabilities**: nine implemented native capabilities — the eight Phase 0–1G capabilities plus Phase 2A `query_secured_feature_service`, now backed in Phase 2B by a disabled-by-default PostgreSQL encrypted-token broker; tokens never enter plans, configuration, URLs, output, evidence, errors, logs, or audits — plus 45 historical Sprint 1 skill scaffolds; folder presence is not a production-readiness claim, and the remaining roadmap capabilities are not implemented
 - **Gateways**: Telegram + CLI + Web (Sprint 1); Teams, Slack, Email, ArcGIS Portal, SMS stubbed
 - **Safety**: employer boundary (structural allow/deny lists), human-in-the-loop approvals for destructive ops, per-tier monthly USD budget caps enforced pre-call, append-only audit log, LangFuse tracing
 
 Architecture authority: [ADR-0001](docs/adr/0001-phase-0-runtime-and-execution-boundaries.md) selects the TypeScript/Vercel AI SDK runtime with native middleware and a Mastra-compatible migration path, excludes core LiteLLM, and disables Windows execution pending an allowlisted-job redesign and security testing. Conflicting Sprint 1 statements are historical.
 
-Current implementation phase: **Phase 2A governed authenticated ArcGIS read**.
+Current implementation phase: **Phase 2B opt-in PostgreSQL ArcGIS token broker**.
 The runtime has nine native capabilities and GISBench retains 40 committed
 offline golden tasks (5 each for Phases 0, 1A, 1B, 1C, 1D, 1E, 1F, and 1G).
-Phase 2A adds `query_secured_feature_service`: callers provide only a configured
+Phase 2A added `query_secured_feature_service`: callers provide only a configured
 logical target slug and an opaque credential alias. A strict versioned registry
 binds routing and permissions; approval binds the canonical query, logical
 target, registry digest, operation, and broker-owned credential identity. Token
 material is acquired only after one-time approval consumption and is sent only
 as an Authorization header. Every metadata/page request is rechecked for URL,
 DNS/IP and redirect safety, while audit/evidence surfaces use logical identities.
-The committed registry is fail-closed (`targets: []`) and no production token
-broker or live private ArcGIS endpoint is included.
+Phase 2B adds migration-backed encrypted credential storage and a production
+broker implementation. It remains unavailable unless
+`DYMAXION_ARCGIS_TOKEN_BROKER` is exactly `postgres`; the committed target
+registry remains fail-closed (`targets: []`). No credential, private target,
+provisioning/OAuth/refresh path, or live authenticated ArcGIS validation is
+included.
 
 ## Install
 
@@ -141,8 +145,17 @@ Everything lives in `config/` — no code changes to re-route or re-cap:
 | `llm-routing.yaml` | skill class → provider:model, fallback chains |
 | `llm-budgets.yaml` | monthly USD caps per tier (enforced pre-call; cap hit freezes the tier) |
 | `employer-boundary.yaml` | data-source allowlist + hostname/path denylists (no runtime override) |
+| `arcgis-targets.yaml` | exact logical ArcGIS targets and allowed credential aliases; never tokens |
 | `gateways.yaml` | which channels are enabled |
 | `mcp-servers.yaml` | MCP subprocess registry |
+
+Phase 2B ArcGIS broker opt-in is separate from model-provider OAuth. Apply
+migration `005`, configure a target, provision an encrypted credential row through
+a separately reviewed trusted process, and set
+`DYMAXION_ARCGIS_TOKEN_BROKER=postgres` in the runtime environment. No ArcGIS
+OAuth/refresh/admin provisioning flow or live pilot is shipped. See the
+[PostgreSQL ArcGIS token broker contract](docs/capabilities/postgres-arcgis-token-broker.md)
+for the complete setup order, expiry rules and rollback.
 
 Connect OAuth providers (OpenAI, Google, Azure, Cohere) in the admin
 dashboard → Providers → Connect. Tokens are AES-256-GCM-encrypted in

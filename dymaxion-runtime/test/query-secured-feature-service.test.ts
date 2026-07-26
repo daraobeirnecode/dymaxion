@@ -13,12 +13,21 @@ import {
   InMemoryApprovalStore,
 } from '../src/security/approval.js';
 import {
+  arcGisTargetConfigDigest,
   ArcGisTargetsConfigSchema,
   InMemoryArcGisTargetRegistry,
   InMemoryArcGisTokenBroker,
+  type ArcGisApprovedFeatureQueryBinding,
   type ArcGisCredentialDescriptor,
   type ArcGisTokenBroker,
 } from '../src/security/arcgis-connections.js';
+import type {
+  ArcGisCredentialMetadataRecord,
+  ArcGisCredentialSecretEnvelopeRecord,
+} from '../src/security/arcgis-token-records.js';
+import type { ArcGisCredentialRepository } from '../src/security/arcgis-token-repository.js';
+import { PostgresArcGisTokenBroker } from '../src/security/postgres-arcgis-token-broker.js';
+import { logger } from '../src/observability/logger.js';
 import { runSkill, type RunSkillDependencies } from '../src/skills/executor.js';
 
 process.env.DYMAXION_CONFIG_DIR = new URL('../../config', import.meta.url).pathname;
@@ -31,6 +40,7 @@ const CREDENTIAL_ALIAS = 'test-reader';
 const CREDENTIAL_IDENTITY = 'arcgis:online:synthetic:user:reader';
 const LAYER_URL = 'https://services.arcgis.com/synthorg/arcgis/rest/services/SecuredHydrants/FeatureServer/0';
 const QUERY_URL = `${LAYER_URL}/query`;
+const ENCRYPTED_ENVELOPE = 'bW9jay1pdi0xMjM0NTY=.bW9jay10YWctMTIzNDU2Nzg=.ZW5jcnlwdGVkLXBoYXNlMmItY2FuYXJ5LXRva2Vu';
 
 const registry = new InMemoryArcGisTargetRegistry([
   {
@@ -166,6 +176,121 @@ const input = {
   credential_alias: CREDENTIAL_ALIAS,
   out_fields: ['STATUS'],
 };
+
+function metadataRecord(overrides: Partial<ArcGisCredentialMetadataRecord> = {}): ArcGisCredentialMetadataRecord {
+  return {
+    credential_alias: CREDENTIAL_ALIAS,
+    credential_identity: CREDENTIAL_IDENTITY,
+    portal_kind: 'arcgis-online',
+    permissions: ['feature:query'],
+    token_type: 'Bearer',
+    expires_at: '2026-07-23T13:00:00.000Z',
+    connected_at: '2026-07-23T10:00:00.000Z',
+    refreshed_at: '2026-07-23T11:00:00.000Z',
+    connected_by_user: 'synthetic-operator',
+    ...overrides,
+  };
+}
+
+function secretEnvelopeRecord(
+  overrides: Partial<ArcGisCredentialSecretEnvelopeRecord> = {},
+): ArcGisCredentialSecretEnvelopeRecord {
+  return {
+    credential_alias: CREDENTIAL_ALIAS,
+    credential_identity: CREDENTIAL_IDENTITY,
+    portal_kind: 'arcgis-online',
+    permissions: ['feature:query'],
+    encrypted_access_token_envelope: ENCRYPTED_ENVELOPE,
+    token_type: 'Bearer',
+    expires_at: '2026-07-23T13:00:00.000Z',
+    ...overrides,
+  };
+}
+
+interface ProductionBrokerHarnessOptions {
+  brokerRegistry?: InMemoryArcGisTargetRegistry;
+  metadata?: ArcGisCredentialMetadataRecord | null;
+  secret?: ArcGisCredentialSecretEnvelopeRecord | null;
+  metadataError?: Error;
+  secretError?: Error;
+  decryptError?: Error;
+}
+
+function productionBrokerHarness(
+  events: string[],
+  options: ProductionBrokerHarnessOptions = {},
+): {
+  broker: PostgresArcGisTokenBroker;
+  metadataCalls: string[];
+  secretCalls: string[];
+  secretBindings: Array<{ alias: string; expectedCredentialIdentity: string }>;
+  decryptCalls: string[];
+} {
+  const metadataCalls: string[] = [];
+  const secretCalls: string[] = [];
+  const secretBindings: Array<{ alias: string; expectedCredentialIdentity: string }> = [];
+  const decryptCalls: string[] = [];
+  const repository: ArcGisCredentialRepository = {
+    async findMetadata(alias) {
+      metadataCalls.push(alias);
+      events.push(`repository:metadata:${alias}`);
+      if (options.metadataError) throw options.metadataError;
+      return options.metadata === undefined ? metadataRecord() : options.metadata;
+    },
+    async findSecretEnvelope(alias, expectedCredentialIdentity) {
+      secretCalls.push(alias);
+      secretBindings.push({ alias, expectedCredentialIdentity });
+      events.push(`repository:secret:${alias}`);
+      if (options.secretError) throw options.secretError;
+      return options.secret === undefined ? secretEnvelopeRecord() : options.secret;
+    },
+  };
+  return {
+    broker: new PostgresArcGisTokenBroker({
+      repository,
+      targetRegistry: options.brokerRegistry ?? registry,
+      now: () => NOW,
+      decryptEnvelope(envelope) {
+        decryptCalls.push(envelope);
+        events.push('decrypt:token-envelope');
+        if (options.decryptError) throw options.decryptError;
+        return TOKEN;
+      },
+    }),
+    metadataCalls,
+    secretCalls,
+    secretBindings,
+    decryptCalls,
+  };
+}
+
+async function approvedRequestFor(
+  deps: Partial<RunSkillDependencies>,
+): Promise<{ request: Awaited<ReturnType<typeof createApprovalRequest>>; store: InMemoryApprovalStore }> {
+  const parsed = querySecuredFeatureServiceCapability.inputSchema.parse(input);
+  const binding = await resolveCapabilityApprovalBinding(
+    querySecuredFeatureServiceCapability,
+    parsed,
+    deps.capabilityContext!,
+  );
+  const store = new InMemoryApprovalStore();
+  const request = await createApprovalRequest(
+    RUN_ID,
+    'Query approved secured ArcGIS layer',
+    parsed,
+    { timeoutMinutes: 30, target: binding.target, credentialIdentity: binding.credentialIdentity },
+    { store, now: () => NOW },
+  );
+  assert.equal(await decideApproval(request.id, 'approved', 'operator-test', { store, now: () => NOW }), true);
+  return { request, store };
+}
+
+function assertSurfaceHasNoCanaries(label: string, value: unknown, canaries: readonly string[]): void {
+  const serialized = JSON.stringify(value);
+  for (const canary of canaries) {
+    assert.equal(serialized.includes(canary), false, `${label} leaked ${canary}`);
+  }
+}
 
 test('secured query is a strict approval-required read capability with no URL or credential material', () => {
   assert.equal(querySecuredFeatureServiceCapability.manifest.slug, 'query_secured_feature_service');
@@ -370,6 +495,343 @@ test('approved secured query consumes once, then materializes authorization and 
   });
   assert.equal(replay.ok, false);
   assert.match(replay.error ?? '', /already consumed|not consumable/i);
+});
+
+test('production-shaped broker keeps secret lookup and decrypt after approval consumption and all persisted surfaces token-free', async (t) => {
+  const events: string[] = [];
+  const recorderSurface: unknown[] = [];
+  const auditSurface: unknown[] = [];
+  const boundarySurface: unknown[] = [];
+  const loggerSurface: unknown[] = [];
+  t.mock.method(logger, 'error', (context: unknown, message?: string) => {
+    loggerSurface.push({ context, message });
+  });
+
+  const harness = productionBrokerHarness(events);
+  const deps = dependencies(events, harness.broker, authenticatedTransport(events), {
+    recorder: {
+      async begin(invocation) {
+        events.push('recorder:begin');
+        recorderSurface.push({ phase: 'begin', invocation });
+        return 'invocation-production-broker';
+      },
+      async finish(invocationId, result) {
+        recorderSurface.push({ phase: 'finish', invocationId, result });
+      },
+    },
+    audit: async (eventType, payload, agentRunId) => {
+      auditSurface.push({ eventType, payload, agentRunId });
+    },
+    boundaryOptions: {
+      audit: async (eventType, payload, agentRunId) => {
+        boundarySurface.push({ eventType, payload, agentRunId });
+      },
+      resolveHost: async () => ['93.184.216.34'],
+    },
+  });
+  const { request, store } = await approvedRequestFor(deps);
+
+  assert.ok(harness.metadataCalls.length >= 1);
+  assert.deepEqual(harness.secretCalls, []);
+  assert.deepEqual(harness.decryptCalls, []);
+  assert.equal(events.some((event) => event.startsWith('GET:') || event.startsWith('POST:')), false);
+
+  const result = await runSkill('query_secured_feature_service', input, RUN_ID, {
+    ...deps,
+    approvalRequest: request,
+    approvalDependencies: { store, now: () => NOW },
+  });
+
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual(harness.secretCalls, [CREDENTIAL_ALIAS]);
+  assert.deepEqual(harness.secretBindings, [{
+    alias: CREDENTIAL_ALIAS,
+    expectedCredentialIdentity: CREDENTIAL_IDENTITY,
+  }]);
+  assert.deepEqual(harness.decryptCalls, [ENCRYPTED_ENVELOPE]);
+  assert.ok(events.indexOf(`repository:secret:${CREDENTIAL_ALIAS}`) > events.indexOf('recorder:begin'));
+  assert.ok(events.indexOf('decrypt:token-envelope') > events.indexOf(`repository:secret:${CREDENTIAL_ALIAS}`));
+  assert.equal(events.filter((event) => event.startsWith('GET:') || event.startsWith('POST:')).length, 3);
+  assert.equal(loggerSurface.length, 0);
+
+  const canaries = [TOKEN, ENCRYPTED_ENVELOPE, CREDENTIAL_IDENTITY, LAYER_URL, 'services.arcgis.com'];
+  assertSurfaceHasNoCanaries('result/evidence', result, canaries);
+  assertSurfaceHasNoCanaries('recorder', recorderSurface, canaries);
+  assertSurfaceHasNoCanaries('audit', auditSurface, canaries);
+  assertSurfaceHasNoCanaries('boundary audit', boundarySurface, canaries);
+  assertSurfaceHasNoCanaries('structured logger', loggerSurface, canaries);
+});
+
+test('production-shaped broker fails closed on drift, expiry, repository, and decryptor errors without canary serialization', async (t) => {
+  const loggerSurface: unknown[] = [];
+  t.mock.method(logger, 'error', (context: unknown, message?: string) => {
+    loggerSurface.push({ context, message });
+  });
+
+  const driftedRegistry = new InMemoryArcGisTargetRegistry([{
+    ...registry.resolve(TARGET_SLUG),
+    service_root: 'https://services1.arcgis.com/synthorg/arcgis/rest/services',
+    layer_url: 'https://services1.arcgis.com/synthorg/arcgis/rest/services/SecuredHydrants/FeatureServer/0',
+  }]);
+  const driftedIdentity = 'arcgis:online:synthetic:user:drift-canary';
+  const repositoryCanary = 'REPOSITORY_FAILURE_CANARY_TOKEN_URL_IDENTITY';
+  const decryptorCanary = 'DECRYPTOR_FAILURE_CANARY_OAUTH_TOKEN_ENCRYPTION_KEY';
+  const cases: Array<{
+    name: string;
+    options: ProductionBrokerHarnessOptions;
+    expectedSecretCalls: number;
+    expectedDecryptCalls: number;
+  }> = [
+    {
+      name: 'target-config-drift',
+      options: { brokerRegistry: driftedRegistry },
+      expectedSecretCalls: 0,
+      expectedDecryptCalls: 0,
+    },
+    {
+      name: 'identity-drift',
+      options: { secret: secretEnvelopeRecord({ credential_identity: driftedIdentity }) },
+      expectedSecretCalls: 1,
+      expectedDecryptCalls: 0,
+    },
+    {
+      name: 'exact-expiry-margin',
+      options: { secret: secretEnvelopeRecord({ expires_at: '2026-07-23T12:01:00.000Z' }) },
+      expectedSecretCalls: 1,
+      expectedDecryptCalls: 0,
+    },
+    {
+      name: 'repository-failure',
+      options: { secretError: new Error(`${repositoryCanary} ${TOKEN} ${LAYER_URL}`) },
+      expectedSecretCalls: 1,
+      expectedDecryptCalls: 0,
+    },
+    {
+      name: 'decryptor-failure',
+      options: { decryptError: new Error(`${decryptorCanary} ${TOKEN} ${ENCRYPTED_ENVELOPE}`) },
+      expectedSecretCalls: 1,
+      expectedDecryptCalls: 1,
+    },
+  ];
+
+  for (const testCase of cases) {
+    const events: string[] = [];
+    const recorderSurface: unknown[] = [];
+    const auditSurface: unknown[] = [];
+    const boundarySurface: unknown[] = [];
+    let transportCalls = 0;
+    const unreachableTransport: ArcGisRestTransport = {
+      async get() {
+        transportCalls += 1;
+        throw new Error('transport must not run');
+      },
+      async postForm() {
+        transportCalls += 1;
+        throw new Error('transport must not run');
+      },
+    };
+    const harness = productionBrokerHarness(events, testCase.options);
+    const deps = dependencies(events, harness.broker, unreachableTransport, {
+      recorder: {
+        async begin(invocation) {
+          events.push('recorder:begin');
+          recorderSurface.push({ phase: 'begin', invocation });
+          return `invocation-${testCase.name}`;
+        },
+        async finish(invocationId, result) {
+          recorderSurface.push({ phase: 'finish', invocationId, result });
+        },
+      },
+      audit: async (eventType, payload, agentRunId) => {
+        auditSurface.push({ eventType, payload, agentRunId });
+      },
+      boundaryOptions: {
+        audit: async (eventType, payload, agentRunId) => {
+          boundarySurface.push({ eventType, payload, agentRunId });
+        },
+        resolveHost: async () => ['93.184.216.34'],
+      },
+    });
+    const { request, store } = await approvedRequestFor(deps);
+    const loggerCountBeforeRun = loggerSurface.length;
+
+    assert.deepEqual(harness.secretCalls, [], testCase.name);
+    assert.deepEqual(harness.decryptCalls, [], testCase.name);
+    const result = await runSkill('query_secured_feature_service', input, RUN_ID, {
+      ...deps,
+      approvalRequest: request,
+      approvalDependencies: { store, now: () => NOW },
+    });
+
+    assert.equal(result.ok, false, testCase.name);
+    assert.equal(result.error, 'ArcGIS authorization materialization failed', testCase.name);
+    assert.equal(harness.secretCalls.length, testCase.expectedSecretCalls, testCase.name);
+    assert.equal(harness.decryptCalls.length, testCase.expectedDecryptCalls, testCase.name);
+    assert.equal(transportCalls, 0, testCase.name);
+    assert.equal(loggerSurface.length, loggerCountBeforeRun + 1, testCase.name);
+    assert.ok(events.indexOf('recorder:begin') >= 0, testCase.name);
+    if (testCase.expectedSecretCalls === 1) {
+      assert.ok(events.indexOf(`repository:secret:${CREDENTIAL_ALIAS}`) > events.indexOf('recorder:begin'), testCase.name);
+    }
+
+    const canaries = [
+      TOKEN,
+      ENCRYPTED_ENVELOPE,
+      CREDENTIAL_IDENTITY,
+      driftedIdentity,
+      LAYER_URL,
+      'services.arcgis.com',
+      'services1.arcgis.com',
+      repositoryCanary,
+      decryptorCanary,
+      'OAUTH_TOKEN_ENCRYPTION_KEY',
+    ];
+    assertSurfaceHasNoCanaries(`${testCase.name} result/error`, result, canaries);
+    assertSurfaceHasNoCanaries(`${testCase.name} recorder`, recorderSurface, canaries);
+    assertSurfaceHasNoCanaries(`${testCase.name} audit`, auditSurface, canaries);
+    assertSurfaceHasNoCanaries(`${testCase.name} boundary audit`, boundarySurface, canaries);
+    assertSurfaceHasNoCanaries(`${testCase.name} structured logger`, loggerSurface.slice(loggerCountBeforeRun), canaries);
+  }
+});
+
+test('approved secured query passes broker the immutable approval-bound before facts', async () => {
+  const events: string[] = [];
+  const capturedBindings: ArcGisApprovedFeatureQueryBinding[] = [];
+  const tokenBroker = broker(events, {
+    async getAuthorization(alias, targetSlug, approvedBinding) {
+      events.push(`authorize:${alias}:${targetSlug}`);
+      capturedBindings.push(approvedBinding);
+      return `Bearer ${TOKEN}`;
+    },
+  });
+  const deps = dependencies(events, tokenBroker);
+  const parsed = querySecuredFeatureServiceCapability.inputSchema.parse(input);
+  const beforeTarget = registry.resolve(TARGET_SLUG);
+  const binding = await resolveCapabilityApprovalBinding(
+    querySecuredFeatureServiceCapability,
+    parsed,
+    deps.capabilityContext!,
+  );
+  const store = new InMemoryApprovalStore();
+  const request = await createApprovalRequest(
+    RUN_ID,
+    'Query approved secured ArcGIS layer',
+    parsed,
+    { timeoutMinutes: 30, target: binding.target, credentialIdentity: binding.credentialIdentity },
+    { store, now: () => NOW },
+  );
+  assert.equal(await decideApproval(request.id, 'approved', 'operator-test', { store, now: () => NOW }), true);
+
+  events.length = 0;
+  const result = await runSkill('query_secured_feature_service', input, RUN_ID, {
+    ...deps,
+    approvalRequest: request,
+    approvalDependencies: { store, now: () => NOW },
+  });
+
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual(capturedBindings, [{
+    credential_identity: CREDENTIAL_IDENTITY,
+    target_config_sha256: arcGisTargetConfigDigest(beforeTarget),
+    portal_kind: 'arcgis-online',
+    permission: 'feature:query',
+  }]);
+  assert.equal(Object.keys(capturedBindings[0] ?? {}).sort().join(','), 'credential_identity,permission,portal_kind,target_config_sha256');
+  assert.equal(Object.isFrozen(capturedBindings[0]), true);
+  assert.equal(JSON.stringify(capturedBindings).includes(LAYER_URL), false);
+  assert.equal(JSON.stringify(capturedBindings).includes(TOKEN), false);
+});
+
+test('identity or target drift after approval consumption fails before authorization materialization', async () => {
+  const cases: Array<{
+    name: string;
+    registry?: { resolve(targetSlug: string): any };
+    tokenBroker: ArcGisTokenBroker;
+  }> = [];
+
+  {
+    let describes = 0;
+    const events: string[] = [];
+    cases.push({
+      name: 'identity-drift',
+      tokenBroker: broker(events, {
+        async describe(alias) {
+          describes += 1;
+          events.push(`describe:${alias}`);
+          return describes >= 6
+            ? descriptor({ credential_identity: 'arcgis:online:synthetic:user:rotated' })
+            : descriptor();
+        },
+        async getAuthorization() {
+          events.push('authorize:unexpected');
+          throw new Error('authorization must not run');
+        },
+      }),
+    });
+  }
+
+  {
+    let resolves = 0;
+    const events: string[] = [];
+    const driftedTarget = {
+      ...registry.resolve(TARGET_SLUG),
+      service_root: 'https://services1.arcgis.com/synthorg/arcgis/rest/services',
+      layer_url: 'https://services1.arcgis.com/synthorg/arcgis/rest/services/SecuredHydrants/FeatureServer/0',
+    };
+    cases.push({
+      name: 'target-drift',
+      registry: {
+        resolve(targetSlug: string) {
+          resolves += 1;
+          assert.equal(targetSlug, TARGET_SLUG);
+          return resolves >= 6 ? driftedTarget : registry.resolve(TARGET_SLUG);
+        },
+      },
+      tokenBroker: broker(events, {
+        async getAuthorization() {
+          events.push('authorize:unexpected');
+          throw new Error('authorization must not run');
+        },
+      }),
+    });
+  }
+
+  for (const testCase of cases) {
+    const events: string[] = [];
+    const parsed = querySecuredFeatureServiceCapability.inputSchema.parse(input);
+    const deps = dependencies(events, testCase.tokenBroker);
+    deps.capabilityContext = {
+      now: () => NOW,
+      io: {
+        arcgisTargetRegistry: testCase.registry ?? registry,
+        arcgisTokenBroker: testCase.tokenBroker,
+        arcgisTransport: authenticatedTransport(events),
+      },
+    };
+    const binding = await resolveCapabilityApprovalBinding(
+      querySecuredFeatureServiceCapability,
+      parsed,
+      deps.capabilityContext,
+    );
+    const store = new InMemoryApprovalStore();
+    const request = await createApprovalRequest(
+      RUN_ID,
+      'Query approved secured ArcGIS layer',
+      parsed,
+      { timeoutMinutes: 30, target: binding.target, credentialIdentity: binding.credentialIdentity },
+      { store, now: () => NOW },
+    );
+    assert.equal(await decideApproval(request.id, 'approved', 'operator-test', { store, now: () => NOW }), true);
+
+    const result = await runSkill('query_secured_feature_service', input, RUN_ID, {
+      ...deps,
+      approvalRequest: request,
+      approvalDependencies: { store, now: () => NOW },
+    });
+    assert.equal(result.ok, false, testCase.name);
+    assert.match(result.error ?? '', /changed after approval consumption/i, testCase.name);
+    assert.equal(JSON.stringify(result).includes(TOKEN), false, testCase.name);
+  }
 });
 
 test('credential descriptor failures do not echo broker error material', async () => {
@@ -592,5 +1054,48 @@ test('target, alias, permission, portal-kind, and expiry mismatches fail before 
     assert.match(result.error ?? '', testCase.pattern, testCase.name);
     assert.ok(!events.some((event) => event.startsWith('authorize:')), testCase.name);
     assert.ok(!events.some((event) => event.startsWith('GET:') || event.startsWith('POST:')), testCase.name);
+  }
+});
+
+test('invalid ArcGIS token broker selector fails approval binding before recorder or transport', async () => {
+  const original = process.env.DYMAXION_ARCGIS_TOKEN_BROKER;
+  const { resetArcGisTargetRegistryForTest } = await import('../src/security/arcgis-connections.js');
+  let transportCalls = 0;
+  const unreachableTransport: ArcGisRestTransport = {
+    async get() {
+      transportCalls += 1;
+      throw new Error('transport must not run');
+    },
+    async postForm() {
+      transportCalls += 1;
+      throw new Error('transport must not run');
+    },
+  };
+  try {
+    process.env.DYMAXION_ARCGIS_TOKEN_BROKER = ' Postgres ';
+    resetArcGisTargetRegistryForTest();
+    const parsed = querySecuredFeatureServiceCapability.inputSchema.parse(input);
+    await assert.rejects(
+      () => resolveCapabilityApprovalBinding(
+        querySecuredFeatureServiceCapability,
+        parsed,
+        {
+          now: () => NOW,
+          io: {
+            arcgisTargetRegistry: registry,
+            arcgisTransport: unreachableTransport,
+          },
+        },
+      ),
+      /ArcGIS token broker configuration is invalid/,
+    );
+    assert.equal(transportCalls, 0);
+  } finally {
+    if (original === undefined) {
+      delete process.env.DYMAXION_ARCGIS_TOKEN_BROKER;
+    } else {
+      process.env.DYMAXION_ARCGIS_TOKEN_BROKER = original;
+    }
+    resetArcGisTargetRegistryForTest();
   }
 });

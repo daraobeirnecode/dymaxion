@@ -1,13 +1,21 @@
 import { z } from 'zod';
 import type { CapabilityExecutionContext } from '../contracts/capability.js';
+import { sha256Canonical } from '../contracts/canonical.js';
 import { loadConfig } from '../config/loader.js';
 import { validateFeatureLayerUrl } from '../capabilities/query-feature-service.js';
 import { validatePortalUrl } from '../capabilities/arcgis-rest.js';
+import {
+  selectArcGisTokenBroker,
+  type ArcGisTokenBrokerFactory,
+} from './arcgis-token-broker-selector.js';
 
 const SLUG = /^[a-z][a-z0-9-]{0,63}$/;
 const CREDENTIAL_IDENTITY = /^[A-Za-z0-9][A-Za-z0-9:._/@-]{2,255}$/;
 const PERMISSION = /^[a-z][a-z0-9:_-]{1,127}$/;
 const MAX_AUTHORIZATION_CHARS = 8_192;
+const LOWERCASE_SHA256 = /^[a-f0-9]{64}$/;
+
+export const ARCGIS_TOKEN_EXPIRY_MARGIN_MS = 60_000;
 
 export const ArcGisPortalKindSchema = z.enum(['arcgis-online', 'arcgis-enterprise']);
 export type ArcGisPortalKind = z.infer<typeof ArcGisPortalKindSchema>;
@@ -109,6 +117,19 @@ export const ArcGisTargetsConfigSchema = z
 
 export type ArcGisTarget = z.infer<typeof ArcGisTargetSchema>;
 
+export function arcGisTargetConfigDigest(target: ArcGisTarget): string {
+  const parsed = ArcGisTargetSchema.parse(target);
+  return sha256Canonical({
+    target_slug: parsed.target_slug,
+    portal_kind: parsed.portal_kind,
+    portal_root: parsed.portal_root,
+    service_root: parsed.service_root,
+    layer_url: parsed.layer_url,
+    allowed_credential_aliases: parsed.allowed_credential_aliases,
+    allowed_operations: parsed.allowed_operations,
+  });
+}
+
 export interface ArcGisTargetRegistry {
   resolve(targetSlug: string): ArcGisTarget;
 }
@@ -149,9 +170,27 @@ export const ArcGisCredentialDescriptorSchema = z
 
 export type ArcGisCredentialDescriptor = z.infer<typeof ArcGisCredentialDescriptorSchema>;
 
+export const ArcGisApprovedFeatureQueryBindingSchema = z
+  .object({
+    credential_identity: z.string().regex(CREDENTIAL_IDENTITY),
+    target_config_sha256: z.string().regex(LOWERCASE_SHA256),
+    portal_kind: ArcGisPortalKindSchema,
+    permission: z.literal('feature:query'),
+  })
+  .strict()
+  .transform((binding) => Object.freeze({ ...binding }));
+
+export type ArcGisApprovedFeatureQueryBinding = z.infer<
+  typeof ArcGisApprovedFeatureQueryBindingSchema
+>;
+
 export interface ArcGisTokenBroker {
   describe(credentialAlias: string): Promise<ArcGisCredentialDescriptor>;
-  getAuthorization(credentialAlias: string, targetSlug: string): Promise<string>;
+  getAuthorization(
+    credentialAlias: string,
+    targetSlug: string,
+    approvedBinding: ArcGisApprovedFeatureQueryBinding,
+  ): Promise<string>;
 }
 
 export interface InMemoryArcGisTokenRegistration {
@@ -186,21 +225,16 @@ export class InMemoryArcGisTokenBroker implements ArcGisTokenBroker {
     return registration.descriptor;
   }
 
-  async getAuthorization(credentialAlias: string, targetSlug: string): Promise<string> {
+  async getAuthorization(
+    credentialAlias: string,
+    targetSlug: string,
+    _approvedBinding?: ArcGisApprovedFeatureQueryBinding,
+  ): Promise<string> {
     const registration = this.registrations.get(credentialAlias);
     if (!registration) throw new Error(`unknown ArcGIS credential alias '${credentialAlias}'`);
     return registration.authorizationForTarget(targetSlug);
   }
 }
-
-const unavailableBroker: ArcGisTokenBroker = {
-  async describe() {
-    throw new Error('no trusted ArcGIS token broker is configured');
-  },
-  async getAuthorization() {
-    throw new Error('no trusted ArcGIS token broker is configured');
-  },
-};
 
 let configuredRegistry: ArcGisTargetRegistry | undefined;
 let configuredTokenBroker: ArcGisTokenBroker | undefined;
@@ -229,12 +263,21 @@ export function resolveArcGisTargetRegistry(context: CapabilityExecutionContext)
   return configuredRegistry;
 }
 
-export function resolveArcGisTokenBroker(context: CapabilityExecutionContext): ArcGisTokenBroker {
-  return (
-    (context.io?.arcgisTokenBroker as ArcGisTokenBroker | undefined)
-    ?? configuredTokenBroker
-    ?? unavailableBroker
-  );
+export interface ResolveArcGisTokenBrokerOptions {
+  readonly brokerFactory?: ArcGisTokenBrokerFactory;
+}
+
+export function resolveArcGisTokenBroker(
+  context: CapabilityExecutionContext,
+  options: ResolveArcGisTokenBrokerOptions = {},
+): ArcGisTokenBroker {
+  const injected = context.io?.arcgisTokenBroker as ArcGisTokenBroker | undefined;
+  if (injected) return injected;
+  if (configuredTokenBroker) return configuredTokenBroker;
+  return selectArcGisTokenBroker(process.env.DYMAXION_ARCGIS_TOKEN_BROKER, {
+    brokerFactory: options.brokerFactory,
+    targetRegistryResolver: () => resolveArcGisTargetRegistry(context),
+  });
 }
 
 export interface ResolvedArcGisReadConnection {
@@ -254,9 +297,10 @@ export async function resolveArcGisReadConnection(
   if (!target.allowed_credential_aliases.includes(credentialAlias)) {
     throw new Error('credential alias is not allowed for the ArcGIS target');
   }
+  const tokenBroker = resolveArcGisTokenBroker(context);
   let described: ArcGisCredentialDescriptor;
   try {
-    described = await resolveArcGisTokenBroker(context).describe(credentialAlias);
+    described = await tokenBroker.describe(credentialAlias);
   } catch {
     throw new Error('ArcGIS credential description failed');
   }
@@ -277,7 +321,7 @@ export async function resolveArcGisReadConnection(
   }
   if (credential.expires_at !== null) {
     const now = (context.now ?? (() => new Date()))();
-    if (new Date(credential.expires_at).getTime() <= now.getTime()) {
+    if (new Date(credential.expires_at).getTime() <= now.getTime() + ARCGIS_TOKEN_EXPIRY_MARGIN_MS) {
       throw new Error('ArcGIS credential descriptor is expired');
     }
   }

@@ -128,16 +128,19 @@ in the catalog is historical scaffold (see ADR-0001 and the README):
   values in URLs). Statistics, ordering, geometry filters, transformations,
   attachments, and related records are rejected in this slice.
   Docs: `docs/capabilities/query-feature-service.md`.
-- **`query_secured_feature_service`** (Phase 2A) — approval-required,
+- **`query_secured_feature_service`** (Phase 2A capability + Phase 2B broker) — approval-required,
   authenticated, read-only Feature Service query selected only by a configured
   logical target slug and opaque credential alias. A strict versioned registry
   binds canonical routing/permissions; approval binds the canonical input,
   logical target, registry digest, operation, and broker-owned credential
   identity. Authorization is materialized only after one-time approval
   consumption, sent only in headers, and excluded with all physical target
-  details from output, evidence, errors, logs and logical boundary audits. The
-  committed registry is empty and no production broker or live credential is
-  included.
+  details from output, evidence, errors, logs and logical boundary audits. Phase
+  2B adds a disabled-by-default PostgreSQL broker and migration-backed encrypted
+  envelope repository; exact `DYMAXION_ARCGIS_TOKEN_BROKER=postgres` opts in.
+  The committed registry is empty, and no credential, provisioning/OAuth/refresh
+  path or live pilot is included. Docs:
+  `docs/capabilities/postgres-arcgis-token-broker.md`.
 - **`validate_spatial_data`** (Phase 1D) — deterministic, read-only bounded
   spatial QA of one allowlisted local RFC 7946 GeoJSON FeatureCollection:
   strict structure, typed canonical feature IDs, null/empty geometries,
@@ -187,9 +190,11 @@ Phase 1A/1B/1C/1D/1E/1F/1G/2A constraints that still hold:
 - **Anonymous and authenticated reads remain separate.** `query_feature_service`
   remains anonymous/public and never accepts credential-like input fields.
   `query_secured_feature_service` accepts only logical target/alias selectors;
-  the runtime exposes a trusted server-side broker interface but ships no
-  production broker or credential. Credential values never appear in inputs,
-  configuration, URLs, outputs, evidence, errors, logs, or audits.
+  Phase 2B ships a trusted server-side PostgreSQL broker implementation but keeps
+  it unavailable unless the selector is exactly `postgres`. It ships no
+  credential, provisioning/OAuth/refresh path or live target. Credential values
+  never appear in inputs, configuration, URLs, outputs, evidence, errors, logs,
+  or audits.
 - **Enterprise custom hosts need explicit boundary configuration.** The
   employer boundary allowlists `*.arcgis.com` / `*.maps.arcgis.com`; a
   customer ArcGIS Enterprise portal on its own domain must be added by hand
